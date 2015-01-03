@@ -11,7 +11,7 @@ from arkos.core.utilities import dictfilter, shell, random_string
 
 
 class Sites(Framework):
-    REQUIRES = ["apps", "filesystems", "site_engines"]
+    REQUIRES = ["system", "apps", "filesystems", "site_engines"]
 
     def on_init(self):
         self.site_dir = self.app.conf.get("websites", "site_dir")
@@ -21,7 +21,9 @@ class Sites(Framework):
             os.makedirs('/etc/nginx/sites-available')
         if not os.path.exists('/etc/nginx/sites-enabled'):
             os.makedirs('/etc/nginx/sites-enabled')
-        self.services.enable("nginx")
+    
+    def on_start(self):
+        self.system.services.enable("nginx")
 
     def get_types(self):
         return self.apps.get(type="website")

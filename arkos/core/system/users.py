@@ -4,17 +4,22 @@ import ldap, ldap.modlist
 import os
 import pwd
 import shutil
+import sys
 
 from arkos.core.utilities import hashpw
 
 
 class Users(object):
     def __init__(self, uri="", rootdn="", dn="cn=admin", config=None):
-        if not all([uri, rootdn, dn]) or not config:
+        if not all([uri, rootdn, dn]) and not config:
             raise Exception("No configuration values passed")
         self.uri = uri or config.get("general", "ldap_uri", "ldap://localhost")
         self.rootdn = rootdn or config.get("general", "ldap_rootdn", "dc=arkos-servers,dc=org")
-        with open("/etc/arkos/secrets.json", "r") as f:
+        if os.path.isfile(os.path.join(sys.path[0], 'secrets.json')):
+            secrets = os.path.join(sys.path[0], 'secrets.json')
+        else:
+            secrets = "/etc/arkos/secrets.json"
+        with open(secrets, "r") as f:
             data = json.loads(f.read())
             if data.has_key("ldap"):
                 data = data["ldap"]
@@ -27,7 +32,7 @@ class Users(object):
     def authenticate(self, dn, passwd, admin=False):
         c = ldap.initialize(self.uri)
         try:
-            c.simple_bind_s("%s,%s" % (dn, self.rootdn), data)
+            c.simple_bind_s("%s,%s" % (dn, self.rootdn), passwd)
             if admin:
                 data = c.search_s("cn=admins,ou=groups,%s" % self.rootdn,
                     ldap.SCOPE_SUBTREE, "(objectClass=*)", ["member"])[0]["member"]

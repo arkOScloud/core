@@ -69,6 +69,8 @@ if __name__ == '__main__':
         elif os.path.isfile(os.path.join(sys.path[0], 'settings.json')):
             # Try local config file
             config_file = os.path.join(sys.path[0], 'settings.json')
+        else:
+            raise Exception("No configuration file found")
     
     if action == 'run':
         run_daemon(log_level, config_file)

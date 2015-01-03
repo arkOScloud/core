@@ -12,5 +12,7 @@ __all__ = [
     "shell",
     "hashpw",
     "can_be_int",
-    "str_fsize"
+    "str_fsize",
+    "detect_architecture",
+    "detect_platform"
 ]

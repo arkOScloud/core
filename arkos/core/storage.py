@@ -12,6 +12,7 @@ class Storage(object):
         try:
             self.redis = redis.Redis(unix_socket_path="/tmp/arkos-redis.sock")
             self.redis.ping()
+            self.redis.flushdb()
         except redis.exceptions.ConnectionError, e:
             raise Exception(str(e))
 
@@ -22,7 +23,6 @@ class Storage(object):
     def check(self):
         # Make sure our connection to Redis is still active
         # If not, stop everything, reconnect and reload
-        self.check()
         try:
             self.redis.ping()
         except:
@@ -38,12 +38,18 @@ class Storage(object):
 
     def set(self, key, value, optval=None):
         self.check()
-        if optval and type(optval) in [list, dict]:
-            optval = json.dumps(optval)
-        elif type(value) in [list, dict]:
-            value = json.dumps(value)
         if optval:
             self.redis.hset("arkos:%s" % key, value, optval)
+        elif type(value) == list:
+            for x in enumerate(value):
+                if type(x[1]) in [list, dict]:
+                    value[x[0]] = json.dumps(x[1])
+            self.redis.rpush("arkos:%s" % key, *value)
+        elif type(value) == dict:
+            for x in value:
+                if type(value[x]) in [list, dict]:
+                    value[x] = json.dumps(value[x])
+            self.redis.hmset("arkos:%s" % key, value)
         else:
             self.redis.set("arkos:%s" % key, value)
     
@@ -64,11 +70,12 @@ class Storage(object):
         self.redis.rpush("arkos:%s" % key, value)
 
     def append_all(self, key, values):
-        self.check()
-        for x in enumerate(values):
-            if type(x[1]) in [list, dict]:
-                values[x[0]] = json.dumps(x[1])
-        self.redis.rpush("arkos:%s" % key, **values)
+        if values:
+            self.check()
+            for x in enumerate(values):
+                if type(x[1]) in [list, dict]:
+                    values[x[0]] = json.dumps(x[1])
+            self.redis.rpush("arkos:%s" % key, *values)
     
     def sortlist_getbyscore(self, key, priority, num=0):
         self.check()

@@ -34,8 +34,10 @@ class Config(object):
     def get(self, section, key, default=None):
         if self.storage:
             value = self.storage.get("config:%s" % section, key) or default
-            if value in ["True", "False"]:
-                value = bool(value)
+            if value in ["True", "true"]:
+                value = True
+            elif value in ["False", "false"]:
+                value = False
         elif self.config.has_key(section):
             value = self.config.get(section).get(key) or default
         else:

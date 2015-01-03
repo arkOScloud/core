@@ -10,9 +10,9 @@ class SystemTime(object):
     def __init__(self, dfmt="", tfmt="", ntpsrv="", log=None, config=None):
         if not all([dfmt, tfmt, ntpsrv]) and not config:
             raise Exception("No configuration values passed")
-        self.dfmt = dfmt or self.Config.get("main", "date_format", "%d %b %Y")
-        self.tfmt = tfmt or self.Config.get("main", "time_format", "%H:%M")
-        self.ntpsrv = ntpsrv or self.Config.get("main", "ntp_server")
+        self.dfmt = dfmt or config.get("general", "date_format", "%d %b %Y")
+        self.tfmt = tfmt or config.get("general", "time_format", "%H:%M")
+        self.ntpsrv = ntpsrv or config.get("general", "ntp_server")
         self.ntp = ntplib.NTPClient()
         self.log = log
 

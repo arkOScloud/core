@@ -12,18 +12,18 @@ class Updates(Framework):
             try:
                 self.check_updates()
             except Exception, e:
-                self.app.storage.put("messages", {"id": random_string()[0:8], "class": "error", 
+                self.app.storage.append("messages", {"id": random_string()[0:8], "class": "error", 
                     "finished": True,"message": "Initial update check failed. See log for details"})
                 self.app.logger.error("Initial update check failed: %s" % str(e))
             if not "updates" in [x["unit"] for x in self.app.storage.get_list("scheduled")]:
                 op = {"id": random_string()[0:8], "unit": "updates", 
-                    "order": "check_updates", "data": {}, "reschedule": 43200}
-                self.app.storage.redis.zadd("arkos:scheduled", int(time.time())+43200, op)
+                    "order": "check_updates", "data": {}, "reschedule": 43200.0}
+                self.app.storage.redis.zadd("arkos:scheduled", op, time.time()+43200.0)
     
     def check_updates(self):
         server = self.app.conf.get("general", "repo_server")
         current = self.app.conf.get("updates", "current_update", 0)
-        data = api("https:/%s/updates/%s/" % (server, current), crit=True)
+        data = api("https://%s/updates/%s/" % (server, current), crit=True)
         current_list = sorted([x["id"] for x in self.app.storage.get_list("updates")])
         for x in data:
             if not x["id"] in current_list:

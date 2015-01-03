@@ -18,7 +18,7 @@ class Apps(Framework):
     def on_init(self):
         self.app_dir = self.app.conf.get("apps", "app_dir")
         if not os.path.exists(self.app_dir):
-            os.mkdir(self.app_dir)
+            os.makedirs(self.app_dir)
 
     def get(self, **kwargs):
         apps = []

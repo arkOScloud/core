@@ -18,7 +18,7 @@ FRAMEWORKS = {"system": System, "apps": Apps, "sites": Sites,
 
 
 class FrameworkManager(object):
-    def __init__(self, app, components=[]):
+    def __init__(self, app, components={}):
         self.components = components
         self.app = app
 
@@ -38,15 +38,17 @@ class FrameworkManager(object):
                     self.register({y: FRAMEWORKS[y]})
         for x in self.components:
             self.app.logger.debug("*** Initializing %s" % x)
-            self.components[x](self.app)
+            self.components[x] = self.components[x](self.app)
             self.components[x]._on_init()
+        for x in self.components:
             self.components[x]._assign()
         for x in self.components:
             self.app.logger.debug("*** Starting %s" % x)
             self.components[x]._on_start()
 
     def register(self, com):
-        self.components.append(com)
+        n = com.keys()[0]
+        self.components[n] = com[n]
 
     def deregister(self, com):
-        self.components.remove(com)
+        del self.components[com]

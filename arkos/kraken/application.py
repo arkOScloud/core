@@ -82,7 +82,7 @@ class Application(object):
         self.storage = None
         self.stop_workers = False
     
-    def start(self, log_level, config_file=""):
+    def start(self, log_level, config_file):
         self.logger = make_log(debug=log_level==logging.DEBUG, log_level=log_level)
         self.logger.info('arkOS krakend %s' % version())
         
@@ -96,12 +96,8 @@ class Application(object):
 
         # Set up config
         self.conf = Config(self.storage)
-        if config_file:
-            self.logger.info("Using config file at %s" % config_file)
-            self.conf.load(config_file)
-        else:
-            self.logger.info("Using default settings")
-            self.conf.load("/etc/arkos/settings.json")
+        self.logger.info("Using config file at %s" % config_file)
+        self.conf.load(config_file)
         
         # Start recording log for the bug reports
         self.logger.blackbox.start()
@@ -187,7 +183,7 @@ class ScheduleProcessor(threading.Thread):
     
     def run(self):
         while not self.app.stop_workers:
-            now = int(time.time())
+            now = time.time()
             tasks = self.app.storage.sortlist_getbyscore("scheduled", now)
             if tasks:
                 pipe = self.app.storage.redis.pipeline()
@@ -197,8 +193,8 @@ class ScheduleProcessor(threading.Thread):
                 pipe.zrem("arkos:scheduled", x)
                 if x["reschedule"]:
                     x["id"] = random_string()[0:8]
-                    retime = now + int(x["reschedule"])
-                    pipe.zadd("arkos:scheduled", retime, x)
+                    retime = now + x["reschedule"]
+                    pipe.zadd("arkos:scheduled", x, retime)
             if tasks:
                 pipe.execute()
             time.sleep(5)

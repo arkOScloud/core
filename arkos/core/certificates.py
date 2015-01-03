@@ -8,26 +8,28 @@ from arkos.core.utilities import dictfilter
 
 
 class Certificates(Framework):
-    REQUIRES = ["apps", "sites"]
+    REQUIRES = ["system", "apps", "sites"]
 
     def on_init(self):
         if not self.app.conf:
             raise Exception("No configuration values passed")
         cert_dir = self.app.conf.get('certificates', 'cert_dir')
         if not os.path.exists(cert_dir):
-            os.mkdir(cert_dir)
+            os.makedirs(cert_dir)
         key_dir = self.app.conf.get('certificates', 'key_dir')
         if not os.path.exists(key_dir):
-            os.mkdir(key_dir)
+            os.makedirs(key_dir)
         ca_cert_dir = self.app.conf.get('certificates', 'ca_cert_dir')
         if not os.path.exists(ca_cert_dir):
-            os.mkdir(ca_cert_dir)
+            os.makedirs(ca_cert_dir)
         ca_key_dir = self.app.conf.get('certificates', 'ca_key_dir')
         if not os.path.exists(ca_key_dir):
-            os.mkdir(ca_key_dir)
-        if not self.users.get_group("ssl-cert", self.users.get_groups()):
-            self.users.add_group("ssl-cert")
-        self.gid = users.get_group("ssl-cert", self.users.get_groups())["gid"]
+            os.makedirs(ca_key_dir)
+    
+    def on_start(self):
+        if not self.system.users.get_group("ssl-cert", self.system.users.get_groups()):
+            self.system.users.add_group("ssl-cert")
+        self.gid = self.system.users.get_group("ssl-cert", self.system.users.get_groups())["gid"]
 
     def get(self, **kwargs):
         certs = []

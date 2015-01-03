@@ -1,6 +1,7 @@
 import json
 import os
 import random
+import sys
 
 from arkos.core.frameworks import Framework
 from arkos.core.utilities import dictfilter
@@ -14,11 +15,14 @@ class TrackedServices(Framework):
     def on_init(self, policy_path="", firewall=None):
         if not policy_path and firewall == None and not self.app.conf:
             raise Exception("No configuration values passed")
+        elif not policy_path:
+            if os.path.isfile(os.path.join(sys.path[0], 'policies.json')):
+                policy_path = os.path.join(sys.path[0], 'policies.json')
         self.policy_path = policy_path or self.app.conf.get("general", "policy_path")
         self.firewall = firewall or self.app.conf.get("general", "firewall", True)
         if not os.path.exists(self.policy_path):
             with open(self.policy_path, "w") as f:
-                f.write()
+                f.write("")
 
     def get(self):
         svrs = []

@@ -1,3 +1,11 @@
+from systemtime import SystemTime
+from users import Users
+from services import Services
+
+import stats
+import network
+import packages
+
 from arkos.core.frameworks import Framework
 
 
@@ -6,10 +14,10 @@ class System(Framework):
         pass
 
     def on_start(self):
-        self.time = SystemTime(config=self.config)
+        self.time = SystemTime(config=self.app.conf)
         self.time.verify_time(update=True)
-        self.users = Users(config=self.config)
+        self.users = Users(config=self.app.conf)
         self.services = Services()
-        self.stats = Stats()
-        self.network = Network()
-        self.packages = Packages()
+        self.stats = stats
+        self.network = network
+        self.packages = packages
