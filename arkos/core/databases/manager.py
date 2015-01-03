@@ -22,8 +22,8 @@ class DBEngines(Framework):
         try:
             mod = imp.load_module(x["pid"], *imp.find_module(x["pid"], [self.path]))
         except Exception, e:
-            self.log.warn(' *** Plugin not loadable: ' + x["pid"])
-            self.log.warn(str(e))
+            self.app.logger.warn(' *** Plugin not loadable: ' + x["pid"])
+            self.app.logger.warn(str(e))
         xmod = getattr(mod, x["database_plugin"])
         self.types[x["database_plugin"]] = xmod(self.services)
 

@@ -13,33 +13,35 @@ from arkos.core.utilities import shell
 
 
 class Filesystems(Framework):
+    REQUIRES = ["sites"]
+
     def on_init(self, vdisk_dir="")
         shell('modprobe loop')
-        if not vdisk_dir and not self.config:
+        if not vdisk_dir and not self.app.conf:
             raise Exception("No configuration values passed")
-        self.vdisk_dir = vdisk_dir or self.config.get("filesystems", "vdisk_dir")
+        self.vdisk_dir = vdisk_dir or self.app.conf.get("filesystems", "vdisk_dir")
         if not os.path.exists(self.vdisk_dir):
             os.mkdir(self.vdisk_dir)
         self.libc = ctypes.CDLL(ctypes.util.find_library("libc"), use_errno=True)
 
     def get(self):
         devs = []
-        if self.storage:
-            devs = self.storage.get_list("filesystems:devs")
-        if not self.storage or not devs:
+        if self.app.storage:
+            devs = self.app.storage.get_list("filesystems:devs")
+        if not self.app.storage or not devs:
             devs = self.scan_filesystems()
-        if self.storage:
-            self.storage.append_all("filesystems:devs", devs)
+        if self.app.storage:
+            self.app.storage.append_all("filesystems:devs", devs)
         return dictfilter(devs, kwargs)
 
     def get_points_of_interest(self):
         points = []
-        if self.storage:
-            points = self.storage.get_list("filesystems:points")
-        if not self.storage or not points:
+        if self.app.storage:
+            points = self.app.storage.get_list("filesystems:points")
+        if not self.app.storage or not points:
             points = self.scan_points()
-        if self.storage:
-            self.storage.append_all("filesystems:points", points)
+        if self.app.storage:
+            self.app.storage.append_all("filesystems:points", points)
         return dictfilter(points, kwargs)
 
     def scan_filesystems(self):
@@ -266,16 +268,16 @@ class Filesystems(Framework):
         i["icon"] = icon
         i["created_by"] = by
         i["remove"] = remove
-        if self.storage:
-            self.storage.append("filesystems:points", i)
+        if self.app.storage:
+            self.app.storage.append("filesystems:points", i)
 
     def remove_point_of_interest(self, i):
-        if self.storage:
-            self.storage.remove("filesystems:points", i)
+        if self.app.storage:
+            self.app.storage.remove("filesystems:points", i)
 
     def remove_point_of_interest_by_path(self, path):
-        if self.storage:
-            self.storage.remove(self.get_points_of_interest(path=path))
+        if self.app.storage:
+            self.app.storage.remove(self.get_points_of_interest(path=path))
 
 
 class Entry:

@@ -10,22 +10,22 @@ class Databases(Framework):
 
     def get(self, **kwargs):
         dbs = []
-        if self.storage:
-            dbs = self.storage.get_list("databases:databases")
-        if not self.storage or not dbs:
+        if self.app.storage:
+            dbs = self.app.storage.get_list("databases:databases")
+        if not self.app.storage or not dbs:
             dbs = self.scan_databases()
-        if self.storage:
-            self.storage.append_all("databases:databases", dbs)
+        if self.app.storage:
+            self.app.storage.append_all("databases:databases", dbs)
         return dictfilter(dbs, kwargs)
 
     def get_users(self, **kwargs):
         dbs = []
-        if self.storage:
-            users = self.storage.get_list("databases:users")
-        if not self.storage or not users:
+        if self.app.storage:
+            users = self.app.storage.get_list("databases:users")
+        if not self.app.storage or not users:
             users = self.scan_users()
-        if self.storage:
-            self.storage.append_all("databases:users", users)
+        if self.app.storage:
+            self.app.storage.append_all("databases:users", users)
         return dictfilter(users, kwargs)
 
     def get_types(self):

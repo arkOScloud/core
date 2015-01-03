@@ -11,10 +11,10 @@ from arkos.core.utility import dictfilter, shell, random_string
 
 
 class Sites(Framework):
-    REQUIRES = ["config", "apps", "filesystems", "site_engines"]
+    REQUIRES = ["apps", "filesystems", "site_engines"]
 
     def on_init(self):
-        self.site_dir = self.config.get("websites", "site_dir")
+        self.site_dir = self.app.conf.get("websites", "site_dir")
         if not os.path.exists(self.site_dir):
             os.mkdir(self.site_dir)
         if not os.path.exists('/etc/nginx/sites-available'):
@@ -28,12 +28,12 @@ class Sites(Framework):
 
     def get(self, **kwargs):
         sites = []
-        if self.storage:
-            sites = self.storage.get_list("websites")
-        if not self.storage or not sites:
+        if self.app.storage:
+            sites = self.app.storage.get_list("websites")
+        if not self.app.storage or not sites:
             sites = self.scan_sites()
-        if self.storage:
-            self.storage.append_all("websites", sites)
+        if self.app.storage:
+            self.app.storage.append_all("websites", sites)
         return dictfilter(sites, kwargs)
 
     def scan_sites(self):
@@ -207,11 +207,11 @@ class Sites(Framework):
             'DES-CBC3-SHA', 'HIGH', '!aNULL', '!eNULL', '!EXPORT', '!DES',
             '!RC4', '!MD5', '!PSK'
             ])
-        if self.config.get("certificates", "ciphers"):
-            ciphers = self.config.get("certificates", "ciphers")
+        if self.app.conf.get("certificates", "ciphers"):
+            ciphers = self.app.conf.get("certificates", "ciphers")
         else:
-            self.config.set("certificates", "ciphers", ciphers)
-            self.config.save()
+            self.app.conf.set("certificates", "ciphers", ciphers)
+            self.app.conf.save()
 
         c = nginx.loadf(os.path.join('/etc/nginx/sites-available/', site["name"]))
         s = c.servers[0]
@@ -275,7 +275,7 @@ class Sites(Framework):
 
     def install(self, app, vars, dbinfo={}, enable=True):
         specialmsg = ''
-        site_dir = self.config.get("websites", "site_dir")
+        site_dir = self.app.conf.get("websites", "site_dir")
         name = vars["name"].lower()
         webapp = self.site_engines.get(app["pid"])
 
@@ -389,8 +389,8 @@ class Sites(Framework):
                 raise ReloadError('PHP-FPM')
 
         # Add the new path to tracked points of interest (POIs)
-        if self.storage:
-            self.storage.append("websites", w)
+        if self.app.storage:
+            self.app.storage.append("websites", w)
         self.filesystems.add_point_of_interest(name=name, ptype="website", 
             path=target_path, by="websites", icon=app["icon"], 
             remove=False)
@@ -439,9 +439,9 @@ class Sites(Framework):
                 c.write(f)
         if pkg_path:
             os.unlink(pkg_path)
-        if self.storage:
-            self.storage.remove("websites", oldsite)
-            self.storage.append("websites", site)
+        if self.app.storage:
+            self.app.storage.remove("websites", oldsite)
+            self.app.storage.append("websites", site)
     
     def remove(self, app, site):
         webapp = self.site_engines.get(app["pid"])
@@ -465,5 +465,5 @@ class Sites(Framework):
         if webapp and site["type"] != 'ReverseProxy':
             webapp.post_remove(site)
             self.filesystems.remove_point_of_interest(path=site["path"])
-        if self.storage:
-            self.storage.remove("websites", site)
+        if self.app.storage:
+            self.app.storage.remove("websites", site)

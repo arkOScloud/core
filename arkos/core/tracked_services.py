@@ -9,23 +9,25 @@ from arkos.core.utilities import dictfilter
 COMMON_PORTS = [3000, 3306, 5222, 5223, 8000, 8080]
 
 class TrackedServices(Framework):
+    REQUIRES = ["apps", "sites", "security"]
+
     def on_init(self, policy_path="", firewall=None):
-        if not policy_path and firewall == None and not self.config:
+        if not policy_path and firewall == None and not self.app.conf:
             raise Exception("No configuration values passed")
-        self.policy_path = policy_path or self.config.get("general", "policy_path")
-        self.firewall = firewall or self.config.get("general", "firewall", True)
+        self.policy_path = policy_path or self.app.conf.get("general", "policy_path")
+        self.firewall = firewall or self.app.conf.get("general", "firewall", True)
         if not os.path.exists(self.policy_path):
             with open(self.policy_path, "w") as f:
                 f.write()
 
     def get(self):
         svrs = []
-        if self.storage:
-            svrs = self.storage.get_list("services")
-        if not self.storage or not sites:
+        if self.app.storage:
+            svrs = self.app.storage.get_list("services")
+        if not self.app.storage or not sites:
             svrs = self.scan()
-        if self.storage:
-            self.storage.append_all("services", svrs)
+        if self.app.storage:
+            self.app.storage.append_all("services", svrs)
         return dictfilter(sites, kwargs)
 
     def scan(self):
@@ -59,8 +61,8 @@ class TrackedServices(Framework):
     def add(self, stype, pid, sid, name, icon="", ports=[], policy={}):
         s = {"type": stype, "pid": pid, "sid": sid, "name": name, 
             "icon": icon, "ports": ports, "policy": policy}
-        if self.storage:
-            self.storage.append("services", s)
+        if self.app.storage:
+            self.app.storage.append("services", s)
 
     def update(self, old_sid, new_sid, name, icon="", ports=[]):
         s = self.get(sid=old_sid)
@@ -99,8 +101,8 @@ class TrackedServices(Framework):
                 indent=4, separators=(',', ': ')))
 
     def remove(self, svc):
-        if self.storage:
-            self.storage.remove("services", svc)
+        if self.app.storage:
+            self.app.storage.remove("services", svc)
         if self.firewall:
             self.security.regen_fw()
 

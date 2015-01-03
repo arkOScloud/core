@@ -5,7 +5,7 @@ from arkos.core.utilities import api, shell, random_string
 
 
 class Updates(Framework):
-    REQUIRED = []
+    REQUIRES = []
     
     def on_start(self):
         if self.app.conf.get("updates", "check_updates", True):

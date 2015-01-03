@@ -4,10 +4,10 @@ from arkos.core import Framework
 
 
 class SiteEngines(Framework):
-    REQUIRES = ["config", "apps", "databases", "users", "services"]
+    REQUIRES = ["apps", "databases", "system"]
 
     def on_start(self):
-        self.path = self.config.get("apps", "app_dir")
+        self.path = self.app.conf.get("apps", "app_dir")
         self.types = {}
         self.full_scan()
 
@@ -26,16 +26,15 @@ class SiteEngines(Framework):
             self.log.warn(' *** Plugin not loadable: ' + x["pid"])
             self.log.warn(" *** "+str(e))
         xmod = getattr(mod, x["website_plugin"])
-        self.types[x["website_plugin"]] = xmod(self.users, self.services, self.databases)
+        self.types[x["website_plugin"]] = xmod(self.system, self.databases)
 
     def get(self, pid):
         return self.types[pid if type(pid) == str else pid["pid"]]
 
 
 class SiteEngine(object):
-    def __init__(self, users, services, databases):
-        self.users = users
-        self.services = services
+    def __init__(self, system, databases):
+        self.system = system
         self.databases = databases
 
     def pre_install(self, name, vars):

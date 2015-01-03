@@ -6,6 +6,8 @@ from arkos.core.utilities import shell, cidr_to_netmask
 
 
 class Security(Framework):
+    REQUIRES = ["apps", "sites"]
+
     def on_init(self):
         self.jailconf = '/etc/fail2ban/jail.conf'
     	self.filters = '/etc/fail2ban/filter.d'

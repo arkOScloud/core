@@ -8,21 +8,21 @@ from arkos.core.utility import dictfilter
 
 
 class Certificates(Framework):
-    REQUIRES = ["apps", "sites", "config"]
+    REQUIRES = ["apps", "sites"]
 
     def on_init(self):
-        if not self.config:
+        if not self.app.conf:
             raise Exception("No configuration values passed")
-        cert_dir = self.config.get('certificates', 'cert_dir')
+        cert_dir = self.app.conf.get('certificates', 'cert_dir')
         if not os.path.exists(cert_dir):
             os.mkdir(cert_dir)
-        key_dir = self.config.get('certificates', 'key_dir')
+        key_dir = self.app.conf.get('certificates', 'key_dir')
         if not os.path.exists(key_dir):
             os.mkdir(key_dir)
-        ca_cert_dir = self.config.get('certificates', 'ca_cert_dir')
+        ca_cert_dir = self.app.conf.get('certificates', 'ca_cert_dir')
         if not os.path.exists(ca_cert_dir):
             os.mkdir(ca_cert_dir)
-        ca_key_dir = self.config.get('certificates', 'ca_key_dir')
+        ca_key_dir = self.app.conf.get('certificates', 'ca_key_dir')
         if not os.path.exists(ca_key_dir):
             os.mkdir(ca_key_dir)
         if not self.users.get_group("ssl-cert", self.users.get_groups()):
@@ -31,12 +31,12 @@ class Certificates(Framework):
 
     def get(self, **kwargs):
         certs = []
-        if self.storage:
-            certs = self.storage.get_list("certificates")
-        if not self.storage or not certs:
+        if self.app.storage:
+            certs = self.app.storage.get_list("certificates")
+        if not self.app.storage or not certs:
             certs = self.scan_certs()
-        if not self.storage:
-            self.storage.append_all("certificates", certs)
+        if not self.app.storage:
+            self.app.storage.append_all("certificates", certs)
         return dictfilter(certs, kwargs)
 
     def scan(self):
@@ -44,8 +44,8 @@ class Certificates(Framework):
         for x in self.apps.get(ssl=True) + self.sites.get(ssl=True):
             data = {'type': x["type"], 'name': x["name"]}
             assigns[x["cert_name"]].append(data) if assigns.has_key(x["cert_name"]) else assigns[x["cert_name"]] = [data]
-        if self.config.get('genesis', 'ssl'):
-            ssl = os.path.splitext(os.path.basename(self.Config.get('genesis', 'cert_file', '')))[0]
+        if self.app.conf.get('genesis', 'ssl'):
+            ssl = os.path.splitext(os.path.basename(self.app.conf.get('genesis', 'cert_file', '')))[0]
             if ssl and assigns.has_key(ssl):
                 assigns[ssl].append({'type': 'genesis'})
             elif ssl:
@@ -71,12 +71,12 @@ class Certificates(Framework):
 
     def get_cas(self, **kwargs):
         cas = []
-        if self.storage:
-            cas = self.storage.get_list("certificates:authorities")
-        if not self.storage or not cas:
+        if self.app.storage:
+            cas = self.app.storage.get_list("certificates:authorities")
+        if not self.app.storage or not cas:
             cas = self.scan_cas()
-        if self.storage:
-            self.storage.append_all("certificates:authorities", cas)
+        if self.app.storage:
+            self.app.storage.append_all("certificates:authorities", cas)
         return dictfilter(cas, kwargs)
 
     def scan_cas(self):
@@ -125,8 +125,8 @@ class Certificates(Framework):
             "sha1": sha1,
             "md5": md5
             }
-        if self.storage:
-            self.storage.append("certificates", cert)
+        if self.app.storage:
+            self.app.storage.append("certificates", cert)
         return cert
 
     def create(self, name, vars, keytype, keylength, hostname):
@@ -191,8 +191,8 @@ class Certificates(Framework):
             "sha1": sha1,
             "md5": md5
             }
-        if self.storage:
-            self.storage.append("certificates", cert)
+        if self.app.storage:
+            self.app.storage.append("certificates", cert)
         return cert
 
     def create_authority(self, hostname):
@@ -220,38 +220,38 @@ class Certificates(Framework):
         with open(os.path.join(self.ca_key_path, hostname+'.key'), "wt") as f:
             f.write(OpenSSL.crypto.dump_privatekey(OpenSSL.crypto.FILETYPE_PEM, key))
         auth = {"name": hostname, "cert_path": cert_path, "key_path": key_path}
-        if self.storage:
-            self.storage.append("certificates:authorities", auth)
+        if self.app.storage:
+            self.app.storage.append("certificates:authorities", auth)
         return auth
 
     def assign(self, cert, assign):
         # Assign a certificate to plugins/webapps as listed
         for x in assign:
             if x[0] == 'genesis':
-                self.config.set('genesis', 'cert_file', cert["cert_path"])
-                self.config.set('genesis', 'cert_key', cert["key_path"])
-                self.config.set('genesis', 'ssl', True)
-                self.config.save()
+                self.app.conf.set('genesis', 'cert_file', cert["cert_path"])
+                self.app.conf.set('genesis', 'cert_key', cert["key_path"])
+                self.app.conf.set('genesis', 'ssl', True)
+                self.app.conf.save()
             elif x[0] == 'website':
                 self.sites.ssl_enable(x[1], cert)
                 self.sites.nginx_reload()
             elif x[0] == 'plugin':
-                self.config.set('ssl_'+x[1].pid, 'cert', name)
-                self.config.save()
+                self.app.conf.set('ssl_'+x[1].pid, 'cert', name)
+                self.app.conf.save()
                 x[1].enable_ssl(cert)
 
     def unassign(self, assign):
         if assign == 'genesis':
-            self.config.set("genesis", "cert_file", "")
-            self.config.set("genesis", "cert_key", "")
-            self.config.set("genesis", "ssl", False)
-            self.config.save()
+            self.app.conf.set("genesis", "cert_file", "")
+            self.app.conf.set("genesis", "cert_key", "")
+            self.app.conf.set("genesis", "ssl", False)
+            self.app.conf.save()
         elif assign[0] == 'website':
             self.sites.ssl_disable(assign[1])
             self.sites.nginx_reload()
         elif assign[0] == 'plugin':
-            self.config.set('ssl_'+assign[1].pid, 'cert', '')
-            self.config.save()
+            self.app.conf.set('ssl_'+assign[1].pid, 'cert', '')
+            self.app.conf.save()
             assign[1].disable_ssl()
 
     def remove(self, cert):
@@ -261,18 +261,18 @@ class Certificates(Framework):
         for x in self.sites.get(ssl=True, cert_name=cert["name"]):
             self.sites.ssl_disable(x)
             self.sites.nginx_reload()
-        if self.config.get("genesis", "ssl") and self.config.get("genesis", "cert_file") == cert["cert_path"]:
-            self.config.set("genesis", "cert_file", "")
-            self.config.set("genesis", "cert_key", "")
-            self.config.set("genesis", "ssl", False)
-            self.config.save()
-        if self.storage:
-            self.storage.remove("certificates", cert)
+        if self.app.conf.get("genesis", "ssl") and self.app.conf.get("genesis", "cert_file") == cert["cert_path"]:
+            self.app.conf.set("genesis", "cert_file", "")
+            self.app.conf.set("genesis", "cert_key", "")
+            self.app.conf.set("genesis", "ssl", False)
+            self.app.conf.save()
+        if self.app.storage:
+            self.app.storage.remove("certificates", cert)
         self.unlink(cert)
 
     def remove_authority(self, ca):
-        if self.storage:
-            self.storage.remove("certificates:authorities", ca)
+        if self.app.storage:
+            self.app.storage.remove("certificates:authorities", ca)
         self.unlink(ca)
 
     def unlink(self, cert):
