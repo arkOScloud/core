@@ -32,12 +32,9 @@ class Storage(object):
     def get(self, key, optkey=None):
         self.check()
         if optkey:
-            value = self.redis.hget("arkos:%s" % key, optkey)
+            return self._get(self.redis.hget("arkos:%s" % key, optkey))
         else:
-            value = self.redis.get("arkos:%s" % key)
-        if value.startswith(("[", "{")) and value.endswith(("]", "}")):
-            return json.loads(value)
-        return value
+            return self._get(self.redis.get("arkos:%s" % key))
 
     def set(self, key, value, optval=None):
         self.check()
@@ -49,14 +46,15 @@ class Storage(object):
             self.redis.hset("arkos:%s" % key, value, optval)
         else:
             self.redis.set("arkos:%s" % key, value)
+    
+    def pop(self, key):
+        return self._get(self.redis.lpop("arkos:%s" % key))
 
     def get_list(self, key):
         self.check()
         values = []
         for x in self.redis.lrange("arkos:%s" % key, 0, -1):
-            if x.startswith(("[", "{")) and x.endswith(("]", "}")):
-                x = json.loads(x)
-            values.append(x)
+            values.append(self._get(x))
         return values
 
     def append(self, key, value):
@@ -71,12 +69,15 @@ class Storage(object):
             if type(x[1]) in [list, dict]:
                 values[x[0]] = json.dumps(x[1])
         self.redis.rpush("arkos:%s" % key, **values)
+    
+    def sortlist_getbyscore(self, key, priority, num=0):
+        self.check()
+        return self._get(self.redis.zrevrangebyscore("arkos:%s" % key, priority, num))
 
     def remove(self, key, value):
         newvals = []
         for x in self.get_list(key):
-            if x.startswith(("[", "{")) and x.endswith(("]", "}")):
-                x = json.loads(x)
+            x = self._get(x)
             if x == value:
                 continue
             newvals.append(x)
@@ -86,8 +87,7 @@ class Storage(object):
     def remove_all(self, key, values):
         newvals = []
         for x in self.get_list(key):
-            if x.startswith(("[", "{")) and x.endswith(("]", "}")):
-                x = json.loads(x)
+            x = self._get(x)
             if x in values:
                 continue
             newvals.append(x)
@@ -100,3 +100,18 @@ class Storage(object):
 
     def scan(self, key):
         return self.redis.scan(0, "arkos:%s" % key)[1]
+    
+    def _get(self, value):
+        if type(value) == str:
+            return self._translate(value)
+        elif type(value) == list:
+            vals = []
+            for x in value:
+                vals.append(self._translate(x))
+            return vals
+        return value
+    
+    def _translate(self, value):
+        if value.startswith(("[", "{")) and value.endswith(("]", "}")):
+            return json.loads(value)
+        return value

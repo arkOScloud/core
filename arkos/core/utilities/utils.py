@@ -53,28 +53,28 @@ def get_current_entropy():
 def random_string():
     return hashlib.sha1(str(random.random())).hexdigest()
 
-def send_json(url, data, method='POST', returns='json', headers=[], crit=False):
+def api(url, post=None, method="", returns="json", headers=[], crit=False):
     try:
         req = urllib2.Request(url)
         req.add_header('Content-type', 'application/json')
-        if method != 'POST':
+        if method:
             req.get_method = lambda: method
         for x in headers:
             req.add_header(x[0], x[1])
-        resp = urllib2.urlopen(req, json.dumps(data))
-        if returns == 'json':
+        resp = urllib2.urlopen(req, json.dumps(post) if post else None)
+        if returns == "json":
             return json.loads(resp.read())
         else:
             return resp.read()
     except urllib2.HTTPError, e:
         if crit:
-            raise Exception('JSON %s to %s failed - HTTP Error %s' % (method, url, str(e.code)))
+            raise Exception('%s to %s failed - HTTP Error %s' % (req.get_method(), url, str(e.code)))
     except urllib2.URLError, e:
         if crit:
-            raise Exception('JSON %s to %s failed - Server not found or URL malformed. Please check your Internet settings.' % (method, url))
+            raise Exception('%s to %s failed - Server not found or URL malformed. Please check your Internet settings.' % (req.get_method(), url))
     except Exception, e:
         if crit:
-            raise Exception('JSON %s to %s failed - %s' % (method, url, str(e)))
+            raise Exception('%s to %s failed - %s' % (req.get_method(), url, str(e)))
 
 def shell(c, stdin=None, env={}):
     p = subprocess.Popen('LC_ALL=C ' + shlex.split(c),

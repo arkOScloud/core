@@ -36,7 +36,7 @@ class Certificates(Framework):
         if not self.storage or not certs:
             certs = self.scan_certs()
         if not self.storage:
-            self.Storage.append_all("certificates", certs)
+            self.storage.append_all("certificates", certs)
         return dictfilter(certs, kwargs)
 
     def scan(self):

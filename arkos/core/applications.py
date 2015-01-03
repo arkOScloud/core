@@ -9,45 +9,45 @@ from distutils.spawn import find_executable
 from arkos.core import Framework
 from arkos.core.system import packages
 from arkos.core.languages import python
-from arkos.core.utility import dictfilter, send_json
+from arkos.core.utility import api, dictfilter
 
 
 class Apps(Framework):
-    REQUIRES = ["config", "services"]
+    REQUIRES = ["services"]
 
     def on_init(self):
-        self.app_dir = self.config.get("apps", "app_dir")
+        self.app_dir = self.app.conf.get("apps", "app_dir")
         if not os.path.exists(self.app_dir):
             os.mkdir(self.app_dir)
 
     def get(self, **kwargs):
         apps = []
-        if self.storage:
-            apps = self.storage.get_list("apps:installed")
-        if not self.storage or not apps:
+        if self.app.storage:
+            apps = self.app.storage.get_list("apps:installed")
+        if not self.app.storage or not apps:
             apps = self.scan_apps()
-        if self.storage:
-            self.storage.append_all("apps:installed", apps)
+        if self.app.storage:
+            self.app.storage.append_all("apps:installed", apps)
         return dictfilter(apps, kwargs)
 
     def get_available(self, **kwargs):
         apps = []
-        if self.storage:
-            apps = self.storage.get_list("apps:available")
-        if not self.storage or not apps:
+        if self.app.storage:
+            apps = self.app.storage.get_list("apps:available")
+        if not self.app.storage or not apps:
             apps = self.scan_available_apps()
-        if self.storage:
-            self.storage.append_all("apps:available", apps)
+        if self.app.storage:
+            self.app.storage.append_all("apps:available", apps)
         return dictfilter(apps, kwargs)
 
     def get_updateable(self, **kwargs):
         apps = []
-        if self.storage:
-            apps = self.storage.get_list("apps:updateable")
-        if not self.storage or not apps:
+        if self.app.storage:
+            apps = self.app.storage.get_list("apps:updateable")
+        if not self.app.storage or not apps:
             apps = self.scan_updateable_apps()
-        if self.storage:
-            self.storage.append_all("apps:updateable", apps)
+        if self.app.storage:
+            self.app.storage.append_all("apps:updateable", apps)
         return dictfilter(apps, kwargs)
 
     def scan_apps(self):
@@ -67,8 +67,8 @@ class Apps(Framework):
         return apps
 
     def scan_available_apps(self):
-        return send_json('https://%s/' % self.config.get("main", "repo_url"), 
-            {'get': 'list'}, returns='raw', crit=True)
+        return api('https://%s/' % self.app.conf.get("general", "repo_server"), 
+            post={'get': 'list'}, returns='raw', crit=True)
 
     def scan_updateable_apps(self):
         upgradeable = []
@@ -197,8 +197,8 @@ class Apps(Framework):
         return metoo
 
     def install(self, id, verify=False):
-        data = send_json('https://%s/' % self.config.get("main", "repo_url"), 
-            {'get': 'plugin', 'id': id}, crit=True)
+        data = api('https://%s/' % self.app.conf.get("general", "repo_server"), 
+            post={'get': 'plugin', 'id': id}, crit=True)
         if data['status'] == 200:
             with open(os.path.join(self.app_dir, 'plugin.tar.gz'), 'wb') as f:
                 f.write(base64.b64decode(data['info']))
@@ -213,12 +213,12 @@ class Apps(Framework):
             data = self.verify_system_dependencies(data)
             data = self.verify_python_dependencies(data)
             data = self.verify_app_dependencies(data, self.get())
-        if self.storage:
-            self.storage.append("apps:installed", data)
-            self.storage.remove("apps:upgradeable", data)
+        if self.app.storage:
+            self.app.storage.append("apps:installed", data)
+            self.app.storage.remove("apps:upgradeable", data)
 
     def remove(self, id, force=False):
-        purge = self.config.get("apps", "purge", False)
+        purge = self.app.conf.get("apps", "purge", False)
         with open(os.path.join(self.app_dir, id, "manifest.json")) as f:
             data = json.loads(f.read())
         shutil.rmtree(os.path.join(self.app_dir, id))
@@ -240,6 +240,6 @@ class Apps(Framework):
                     self.services.stop(item["daemon"])
                     self.services.disable(item["daemon"])
                 packages.remove([item["package"]], purge=purge)
-        if self.storage:
-            self.storage.remove("apps:installed", data)
-            self.storage.remove("apps:upgradeable", data)
+        if self.app.storage:
+            self.app.storage.remove("apps:installed", data)
+            self.app.storage.remove("apps:upgradeable", data)

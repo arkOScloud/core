@@ -1,6 +1,5 @@
-import uuid
-
 from config import Config
+from updates import Updates
 from storage import Storage
 from security import Security
 from applications import Apps
@@ -10,12 +9,14 @@ from system import System, Filesystems
 from databases import Databases, DBEngines
 from tracked_services import TrackedServices
 
+from arkos.core.utilities import random_string
+
 
 FRAMEWORKS = {"system": System, "apps": Apps, "sites": Sites, 
     "databases": Databases, "certificates": Certificates, 
     "filesystems": Filesystems, "security": Security, 
     "tracked_services": TrackedServices, "site_engines": SiteEngines, 
-    "database_engines": DBEngines}
+    "database_engines": DBEngines, "updates": Updates}
 
 
 class Framework(object):
@@ -34,10 +35,10 @@ class Framework(object):
     def _on_start(self):
         self.on_start()
     
-    def task(self, operation, *args):
+    def task(self, unit, operation, **kwargs):
         if self.storage:
-            self.storage.append("tasks", {"id": uuid.uuid4(), "unit": self.__name__, 
-                "order": operation, "data": args})
+            self.storage.append("tasks", {"id": random_string()[0:8], "unit": unit, 
+                "order": operation, "data": kwargs})
         else:
             raise Exception("Requires connection to Kraken storage for scheduling")
 
