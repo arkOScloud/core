@@ -1,5 +1,4 @@
 import base64
-import bcrypt
 import crypt
 import hashlib
 import json
@@ -38,7 +37,7 @@ def download(url, file=None, crit=False):
     try:
         data = urllib2.urlopen(url).read()
         if file:
-        	with open(file, 'w') as f:
+            with open(file, 'w') as f:
                 f.write(data)
         else:
             return data
@@ -87,11 +86,9 @@ def shell(c, stdin=None, env={}):
         "stderr": data[1]}
     return data
 
-def hashpw(passw, scheme='sha512_crypt', rounds=12):
+def hashpw(passw, scheme='sha512_crypt'):
     if scheme == 'sha512_crypt':
         return sha512_crypt.encrypt(passw)
-    elif scheme == 'bcrypt':
-        return bcrypt.encrypt(passw, rounds=rounds)
     elif scheme == 'crypt':
         salt = "$1$" + "".join(random.sample(string.ascii_uppercase+string.digits, 8)) + "$"
         return "{CRYPT}" + crypt.crypt(passw, salt)

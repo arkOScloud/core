@@ -3,9 +3,9 @@ import time
 from application import Application, TaskProcessor, ScheduleProcessor
 
 
-def run_daemon(log_level=logging.INFO, config_file=''):
+def run_daemon(log_level=20, config_file=''):
     app = Application()
-    app.start(log_level=20, config_file=config_file)
+    app.start(log_level=log_level, config_file=config_file)
 
     workers = []
     num = app.conf.get("general", "task_workers", 1)

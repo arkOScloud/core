@@ -72,7 +72,7 @@ class Services(object):
     def get_log(self, name, stype='system'):
         if stype == 'supervisor':
             s = self.supervisor.tailProcessStdoutLog(name)
-        else
+        else:
             s = shell("systemctl --no-ask-password status {}.service".format(name))["stdout"]
         return s
 

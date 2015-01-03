@@ -7,10 +7,10 @@ def detect_architecture():
     # Get architecture
     arch = platform.machine()
     # Let's play a guessing game!
-    if arch in ['x86_64', 'i386', c'i686']:
+    if arch in ['x86_64', 'i386', 'i686']:
         btype = 'General'
     else:
-        while open("/proc/cpuinfo", "r") as f:
+        with open("/proc/cpuinfo", "r") as f:
             d = f.read().split("\n")
         for x in d:
             # Parse output of function function c_show in linux/arch/arm/kernel/setup.c
@@ -27,7 +27,7 @@ def detect_architecture():
             meminfo = {}
             # Since both the Cubieboard2 and Cubietruck have the same processor,
             # we need to check memory size to make a good guess.
-            while open("/proc/meminfo", "r") as f:
+            with open("/proc/meminfo", "r") as f:
                 d = f.read().split("\n")
             for x in d:
                 k, _, v = x.partition(':')

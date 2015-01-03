@@ -8,14 +8,14 @@ import shutil
 import crypto
 import losetup
 
-from arkos.core import Framework
+from arkos.core.frameworks import Framework
 from arkos.core.utilities import shell
 
 
 class Filesystems(Framework):
     REQUIRES = ["sites"]
 
-    def on_init(self, vdisk_dir="")
+    def on_init(self, vdisk_dir=""):
         shell('modprobe loop')
         if not vdisk_dir and not self.app.conf:
             raise Exception("No configuration values passed")
@@ -170,7 +170,7 @@ class Filesystems(Framework):
             self.mount(fs)
         return fs
 
-    def encrypt_vdisk(self, fs, passwd, cipher='aes-xts-plain64', keysize=256}, move=True, mount=False):
+    def encrypt_vdisk(self, fs, passwd, cipher='aes-xts-plain64', keysize=256, move=True, mount=False):
         opts = '-c %s -s %s -h %s'%(opts['cipher'], str(opts['keysize']), opts['hash'])
         l = losetup.get_loop_devices()
         if move:

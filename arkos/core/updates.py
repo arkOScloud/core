@@ -1,6 +1,6 @@
 import time
 
-from arkos.core import Framework
+from arkos.core.frameworks import Framework
 from arkos.core.utilities import api, shell, random_string
 
 

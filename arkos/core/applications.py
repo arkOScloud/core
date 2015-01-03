@@ -6,10 +6,10 @@ import tarfile
 
 from distutils.spawn import find_executable
 
-from arkos.core import Framework
+from arkos.core.frameworks import Framework
 from arkos.core.system import packages
 from arkos.core.languages import python
-from arkos.core.utility import api, dictfilter
+from arkos.core.utilities import api, dictfilter
 
 
 class Apps(Framework):
@@ -87,7 +87,7 @@ class Apps(Framework):
                 to_pacman = ""
                 if dep["binary"] and not find_executable(dep["binary"]):
                     to_pacman = dep["package"]
-                elif packages.is_installed(dep["package"])
+                elif packages.is_installed(dep["package"]):
                     to_pacman = dep["package"]
                 else:
                     dep["verify"]["status"] = "pass"

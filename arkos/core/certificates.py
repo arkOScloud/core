@@ -3,8 +3,8 @@ import hashlib
 import OpenSSL
 import os
 
-from arkos.core Framework
-from arkos.core.utility import dictfilter
+from arkos.core.frameworks import Framework
+from arkos.core.utilities import dictfilter
 
 
 class Certificates(Framework):
@@ -43,7 +43,10 @@ class Certificates(Framework):
         certs, assigns = [], {}
         for x in self.apps.get(ssl=True) + self.sites.get(ssl=True):
             data = {'type': x["type"], 'name': x["name"]}
-            assigns[x["cert_name"]].append(data) if assigns.has_key(x["cert_name"]) else assigns[x["cert_name"]] = [data]
+            if assigns.has_key(x["cert_name"]):
+                assigns[x["cert_name"]].append(data)
+            else:
+                assigns[x["cert_name"]] = [data]
         if self.app.conf.get('genesis', 'ssl'):
             ssl = os.path.splitext(os.path.basename(self.app.conf.get('genesis', 'cert_file', '')))[0]
             if ssl and assigns.has_key(ssl):

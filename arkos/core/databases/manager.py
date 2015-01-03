@@ -1,6 +1,6 @@
 import imp
 
-from arkos.core import Framework
+from arkos.core.frameworks import Framework
 
 
 class DBEngines(Framework):
@@ -18,7 +18,7 @@ class DBEngines(Framework):
     def add(self, app):
         # Add a new database app introduced during runtime
         if not x.has_key("verify") or not x["verify"] == "pass":
-            continue
+            return
         try:
             mod = imp.load_module(x["pid"], *imp.find_module(x["pid"], [self.path]))
         except Exception, e:

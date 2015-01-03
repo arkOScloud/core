@@ -1,7 +1,5 @@
 import json
 
-from arkos.core import Framework
-
 
 class Config(object):
     def __init__(self, storage=None):

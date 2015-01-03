@@ -10,7 +10,7 @@ class Storage(object):
     def connect(self):
         # Connect to Redis server
         try:
-            self.redis = redis.Redis(unix_socket_path="/run/arkos-redis.sock")
+            self.redis = redis.Redis(unix_socket_path="/tmp/arkos-redis.sock")
             self.redis.ping()
         except redis.exceptions.ConnectionError, e:
             raise Exception(str(e))

@@ -1,4 +1,4 @@
-from arkos.core import Framework
+from arkos.core.frameworks import Framework
 
 
 class System(Framework):

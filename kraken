@@ -6,12 +6,12 @@ import os
 import logging
 
 from arkos.core.daemon import Daemon
-from standalone import run_server
+from arkos.kraken.standalone import run_daemon
 
 
 class KrakenDaemon(Daemon):
     def run(self):
-        run_server(self.log_level, self.config_file)
+        run_daemon(self.log_level, self.config_file)
 
 
 def usage():
@@ -71,7 +71,7 @@ if __name__ == '__main__':
             config_file = os.path.join(sys.path[0], 'settings.json')
     
     if action == 'run':
-        run_server(log_level, config_file)
+        run_daemon(log_level, config_file)
     else:
         krakend = KrakenDaemon('/var/run/kraken.pid', stdout='/var/log/kraken.log')
         krakend.log_level = log_level

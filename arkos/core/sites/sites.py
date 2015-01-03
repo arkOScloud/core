@@ -6,8 +6,8 @@ import nginx
 import re
 import shutil
 
-from arkos.core import Framework
-from arkos.core.utility import dictfilter, shell, random_string
+from arkos.core.frameworks import Framework
+from arkos.core.utilities import dictfilter, shell, random_string
 
 
 class Sites(Framework):
@@ -456,7 +456,7 @@ class Sites(Framework):
             elif os.path.islink(site["path"]):
                 os.unlink(site["path"])
             else:
-                shutil.rmtree(site.["path"])
+                shutil.rmtree(site["path"])
             if site.has_key("dbengine") and site["dbengine"]:
                 dbase = self.Databases.engines.get(site['dbengine'])
                 dbase.remove(site["dbname"])

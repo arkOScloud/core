@@ -1,4 +1,4 @@
-from arkos.core import Framework
+from arkos.core.frameworks import Framework
 from arkos.core.utilities import dictfilter
 
 
@@ -30,7 +30,7 @@ class Databases(Framework):
 
     def get_types(self):
         tlist = []
-        for x in self.apps.get(type="database")
+        for x in self.apps.get(type="database"):
             active = True
             if x["database_engine"]:
                 status = self.services.get_status(x["database_engine"])

@@ -2,7 +2,7 @@ import json
 import os
 import random
 
-from arkos.core import Framework
+from arkos.core.frameworks import Framework
 from arkos.core.utilities import dictfilter
 
 

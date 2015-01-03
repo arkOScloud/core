@@ -4,10 +4,11 @@ import sys
 import threading
 import time
 
+from arkos import version
+from arkos.core.utilities import *
 from arkos.core.config import Config
 from arkos.core.storage import Storage
-from arkos.core import FrameworkManager
-from arkos.core.utilities import *
+from arkos.core.frameworks.manager import FrameworkManager
 
 
 class DebugHandler(logging.StreamHandler):
@@ -160,7 +161,7 @@ class TaskProcessor(threading.Thread):
                 else:
                     func = getattr(self.app.manager.components[x[1]["unit"]], x[1]["order"])
                     try:
-                        response = func(**x[1]["data"], _task_id=task["id"])
+                        response = func(_task_id=task["id"], **x[1]["data"])
                         resp = {"status": "complete", "code": 0, "result": response}
                     except Exception, e:
                         resp = {"status": "failed", "code": 1, "result": response}
@@ -168,15 +169,15 @@ class TaskProcessor(threading.Thread):
                         break
                 responses.append((x[0], resp))
                 self.app.storage.append("messages", {"id": task["id"], "status": "processing",
-                    "completion": (x[0], len(task["tasks"])), "responses": responses)
+                    "completion": (x[0], len(task["tasks"])), "responses": responses})
             else:
                 self.app.logger.error("Failed to complete task %s at step %s: %s" % (task["id"], task["responses"][-1][0], task["responses"][-1][1]))
                 self.app.storage.append("messages", {"id": task["id"], "status": "failed",
-                    "responses": responses)
+                    "responses": responses})
                 continue
             self.app.logger.debug("*** Completed task %s" % task["id"])
             self.app.storage.append("messages", {"id": task["id"], "status": "complete",
-                "responses": responses)
+                "responses": responses})
 
 
 class ScheduleProcessor(threading.Thread):
