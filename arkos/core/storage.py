@@ -18,6 +18,7 @@ class Storage(object):
 
     def disconnect(self):
         # Disconnect from Redis server
+        self.redis.flushdb()
         self.redis.connection_pool.disconnect()
 
     def check(self):
@@ -35,6 +36,12 @@ class Storage(object):
             return self._get(self.redis.hget("arkos:%s" % key, optkey))
         else:
             return self._get(self.redis.get("arkos:%s" % key))
+    
+    def get_all(self, key):
+        values = self.redis.hgetall("arkos:%s" % key)
+        for x in values:
+            values[x] = self._get(values[x])
+        return values
 
     def set(self, key, value, optval=None):
         self.check()

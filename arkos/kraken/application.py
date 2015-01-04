@@ -140,9 +140,13 @@ class TaskProcessor(threading.Thread):
             for x in sorted(task["tasks"]):
                 getout = False
                 if x[1]["unit"] == "shell":
-                    s = shell(x[1]["order"], stdin=x[1]["data"])
+                    s = shell(x[1]["order"], stdin=x[1].get("data"))
                     resp = {"status": "complete", "code": s["code"],
                         "result": s["stdout"], "stderr": s["stderr"]}
+                    if s["code"] != 0:
+                        responses.append((x[0], resp))
+                        getout = True
+                        break
                 elif x[1]["unit"] == "fetch":
                     try:
                         download(x[1]["order"], x[1]["data"], True)
@@ -153,6 +157,7 @@ class TaskProcessor(threading.Thread):
                             code = e.code
                         resp = {"status": "failed", "code": code}
                         responses.append((x[0], resp))
+                        getout = True
                         break
                 else:
                     func = getattr(self.app.manager.components[x[1]["unit"]], x[1]["order"])
@@ -162,18 +167,19 @@ class TaskProcessor(threading.Thread):
                     except Exception, e:
                         resp = {"status": "failed", "code": 1, "result": response}
                         responses.append((x[0], resp))
+                        getout = True
                         break
                 responses.append((x[0], resp))
                 self.app.storage.append("messages", {"id": task["id"], "status": "processing",
-                    "completion": (x[0], len(task["tasks"])), "responses": responses})
-            else:
-                self.app.logger.error("Failed to complete task %s at step %s: %s" % (task["id"], task["responses"][-1][0], task["responses"][-1][1]))
+                    "completion": (x[0]+1, len(task["tasks"])), "responses": responses})
+            if getout:
+                self.app.logger.error("Failed to complete task %s at step %s: %s" % (task["id"], responses[-1][0]+1, responses[-1][1]))
                 self.app.storage.append("messages", {"id": task["id"], "status": "failed",
-                    "responses": responses})
+                    "finished": True, "responses": responses})
                 continue
             self.app.logger.debug("*** Completed task %s" % task["id"])
             self.app.storage.append("messages", {"id": task["id"], "status": "complete",
-                "responses": responses})
+                "finished": True, "responses": responses})
 
 
 class ScheduleProcessor(threading.Thread):

@@ -188,7 +188,7 @@ class Users(object):
         shell('passwd %s' % u, stdin='%s\n%s\n' % (l,l))
 
     def get_next_uid(self):
-        pass
+        return max([x["uid"] for x in self.get_system_users()]) + 1
 
     def get_next_gid(self):
-        pass
+        return max([x["gid"] for x in self.get_groups()]) + 1

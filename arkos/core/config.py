@@ -1,5 +1,7 @@
 import json
 
+from arkos.core.utilities import can_be_int
+
 
 class Config(object):
     def __init__(self, storage=None):
@@ -24,7 +26,7 @@ class Config(object):
                 section = x.split(":", 2)[2]
                 if section.startswith("enviro"):
                     continue
-                d[section] = self.storage.get("config:%s" % section)
+                d[section] = self.storage.get_all("config:%s" % section)
         else:
             d = self.config
         with open(self.filename, 'w') as f:
@@ -38,6 +40,8 @@ class Config(object):
                 value = True
             elif value in ["False", "false"]:
                 value = False
+            elif can_be_int(value):
+                value = int(value)
         elif self.config.has_key(section):
             value = self.config.get(section).get(key) or default
         else:

@@ -23,7 +23,7 @@ class Updates(Framework):
     def check_updates(self):
         server = self.app.conf.get("general", "repo_server")
         current = self.app.conf.get("updates", "current_update", 0)
-        data = api("https://%s/updates/%s/" % (server, current), crit=True)
+        data = api("https://%s/updates/%s" % (server, current), crit=True)
         current_list = sorted([x["id"] for x in self.app.storage.get_list("updates")])
         for x in data:
             if not x["id"] in current_list:
