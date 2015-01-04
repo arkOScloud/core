@@ -1,5 +1,6 @@
 from detect import *
 from utils import *
+from errors import *
 
 __all__ = [
     "dictfilter",
@@ -14,5 +15,7 @@ __all__ = [
     "can_be_int",
     "str_fsize",
     "detect_architecture",
-    "detect_platform"
+    "detect_platform",
+    "process_exception",
+    "MalformedObject"
 ]

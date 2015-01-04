@@ -1,6 +1,8 @@
 import json
 import redis
 
+from utilities import MalformedObject
+
 
 class Storage(object):
     def __init__(self, app):
@@ -43,25 +45,27 @@ class Storage(object):
             values[x] = self._get(values[x])
         return values
 
-    def set(self, key, value, optval=None):
+    def set(self, key, value, optval=None, pipe=None):
         self.check()
+        r = pipe or self.redis
         if optval:
-            self.redis.hset("arkos:%s" % key, value, optval)
+            r.hset("arkos:%s" % key, value, optval)
         elif type(value) == list:
             for x in enumerate(value):
                 if type(x[1]) in [list, dict]:
                     value[x[0]] = json.dumps(x[1])
-            self.redis.rpush("arkos:%s" % key, *value)
+            r.rpush("arkos:%s" % key, *value)
         elif type(value) == dict:
             for x in value:
                 if type(value[x]) in [list, dict]:
                     value[x] = json.dumps(value[x])
-            self.redis.hmset("arkos:%s" % key, value)
+            r.hmset("arkos:%s" % key, value)
         else:
-            self.redis.set("arkos:%s" % key, value)
+            r.set("arkos:%s" % key, value)
     
-    def pop(self, key):
-        return self._get(self.redis.lpop("arkos:%s" % key))
+    def pop(self, key, pipe=None):
+        r = pipe or self.redis
+        return self._get(r.lpop("arkos:%s" % key))
 
     def get_list(self, key):
         self.check()
@@ -70,50 +74,71 @@ class Storage(object):
             values.append(self._get(x))
         return values
 
-    def append(self, key, value):
+    def append(self, key, value, pipe=None):
         self.check()
+        r = pipe or self.redis
         if type(value) in [list, dict]:
             value = json.dumps(value)
-        self.redis.rpush("arkos:%s" % key, value)
+        r.rpush("arkos:%s" % key, value)
 
-    def append_all(self, key, values):
+    def append_all(self, key, values, pipe=None):
         if values:
+            r = pipe or self.redis
             self.check()
             for x in enumerate(values):
                 if type(x[1]) in [list, dict]:
                     values[x[0]] = json.dumps(x[1])
-            self.redis.rpush("arkos:%s" % key, *values)
+            r.rpush("arkos:%s" % key, *values)
     
-    def sortlist_getbyscore(self, key, priority, num=0):
+    def sortlist_add(self, key, priority, value, pipe=None):
         self.check()
-        return self._get(self.redis.zrevrangebyscore("arkos:%s" % key, priority, num))
+        r = pipe or self.redis
+        if type(value) in [list, dict]:
+            value = json.dumps(value)
+        r.zadd("arkos:%s" % key, value, priority)
+    
+    def sortlist_getbyscore(self, key, priority, num=0, pop=False):
+        self.check()
+        data = self.redis.zrevrangebyscore("arkos:%s" % key, priority, num)
+        if pop:
+            self.redis.zremrangebyscore("arkos:%s" % key, num, priority)
+        return self._get(data)
 
-    def remove(self, key, value):
+    def remove(self, key, value, pipe=None):
+        r = pipe or self.redis
         newvals = []
         for x in self.get_list(key):
             x = self._get(x)
             if x == value:
                 continue
             newvals.append(x)
-        self.delete(key)
-        self.append_all(newvals)
+        self.delete(key, pipe=r)
+        self.append_all(newvals, pipe=r)
 
-    def remove_all(self, key, values):
+    def remove_all(self, key, values, pipe=None):
+        r = pipe or self.redis
         newvals = []
         for x in self.get_list(key):
             x = self._get(x)
             if x in values:
                 continue
             newvals.append(x)
-        self.delete(key)
-        self.append_all(newvals)
+        self.delete(key, pipe=r)
+        self.append_all(newvals, pipe=r)
 
-    def delete(self, key):
+    def delete(self, key, pipe=None):
         self.check()
-        self.redis.delete("arkos:%s" % key)
+        r = pipe or self.redis
+        r.delete("arkos:%s" % key)
 
     def scan(self, key):
         return self.redis.scan(0, "arkos:%s" % key)[1]
+    
+    def pipeline(self):
+        return self.redis.pipeline()
+    
+    def execute(self, pipe):
+        pipe.execute()
     
     def _get(self, value):
         if type(value) == str:
@@ -127,5 +152,8 @@ class Storage(object):
     
     def _translate(self, value):
         if value.startswith(("[", "{")) and value.endswith(("]", "}")):
-            return json.loads(value)
+            try:
+                return json.loads(value)
+            except ValueError:
+                raise MalformedObject(value)
         return value
