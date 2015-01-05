@@ -16,13 +16,6 @@ class Framework(object):
     
     def _on_start(self):
         self.on_start()
-    
-    def task(self, unit, operation, **kwargs):
-        if self.storage:
-            self.storage.append("tasks", {"id": random_string()[0:8], "unit": unit, 
-                "order": operation, "data": kwargs})
-        else:
-            raise Exception("Requires connection to Kraken storage for scheduling")
 
     def on_init(self):
         pass

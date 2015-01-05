@@ -7,7 +7,7 @@ import time
 from arkos import version
 from arkos.core.utilities import *
 from arkos.core.config import Config
-from arkos.core.storage import Storage
+from arkos.core.storage import Storage, StorageOps
 from arkos.core.frameworks.manager import FrameworkManager
 
 
@@ -84,6 +84,8 @@ class Application(object):
         self.logger.info('Detected platform: %s' % platform)
         self.conf.set("enviro", "arch", arch[0])
         self.conf.set("enviro", "board", arch[1])
+        
+        self.ops = StorageOps()
 
         # Load components
         self.logger.info("Loading components...")
@@ -106,66 +108,79 @@ class TaskProcessor(threading.Thread):
     def run(self):
         while not self.app.stop_workers:
             try:
-                try:
-                    task = self.app.storage.pop("tasks")
-                except MalformedObject, e:
-                    self.app.logger.error(str(e))
-                    continue
+                task = self.app.storage.pop("tasks")
                 if not task:
                     time.sleep(1)
                     continue
-                responses = []
-                getout = False
-                self.app.logger.debug("*** Starting task %s" % task["id"])
-                if task.get("message") and task["message"].get("start"):
-                    self.app.storage.append("messages", {"id": task["id"], "class": "info", 
-                        "message": task["message"]["start"]})
-                for x in sorted(task["tasks"]):
-                    getout = False
-                    if x[1]["unit"] == "shell":
-                        s = shell(x[1]["order"], stdin=x[1].get("data"))
-                        if s["code"] != 0:
-                            responses.append((x[0], s["stderr"]))
-                            getout = True
+                if task.get("group") and task["group"]:
+                    for x in task["tasks"]:
+                        status = self.process_tasks(x)
+                        if not status:
                             break
-                    elif x[1]["unit"] == "fetch":
-                        try:
-                            download(x[1]["order"], x[1]["data"], True)
-                        except Exception, e:
-                            code = 1
-                            if hasattr(e, "code"):
-                                code = e.code
-                            responses.append((x[0], str(code)))
-                            getout = True
-                            break
-                    else:
-                        try:
-                            func = getattr(self.app.manager.components[x[1]["unit"]], x[1]["order"])
-                        except (KeyError, NameError, AttributeError):
-                            responses.append((x[0], str(MalformedObject(x[1]))))
-                            getout = True
-                            break
-                        try:
-                            response = func(_task_id=task["id"], **x[1]["data"])
-                            responses.append((x[0], response))
-                        except Exception, e:
-                            responses.append((x[0], str(e)))
-                            getout = True
-                            break
-                    responses.append((x[0], resp))
-                if getout:
-                    self.app.logger.error("Failed to complete task %s at step %s: %s" % (task["id"], responses[-1][0]+1, responses[-1][1]))
-                    if task.get("message") and task["message"].get("error"):
-                        self.app.storage.append("messages", {"id": task["id"], "class": "error",
-                            "finished": True, "message": "%s: %s" % task["message"]["error"]})
+                else:
+                    status = self.process_tasks(task)
+                if not status:
                     continue
-                self.app.logger.debug("*** Completed task %s" % task["id"])
-                if task.get("message") and task["message"].get("success"):
-                    self.app.storage.append("messages", {"id": task["id"], "class": "success",
-                        "finished": True, "message": task["message"]["success"], 
-                        "responses": responses})
+            except MalformedObject, e:
+                self.app.logger.error(str(e))
+                continue
             except:
                 process_exception(self.app, "task processor")
+    
+    def process_tasks(self, task):
+        responses = []
+        self.app.logger.debug("*** Starting task %s" % task["id"])
+        if task.get("message") and task["message"].get("start"):
+            self.app.ops.put_message("info", task["message"]["start"], task["id"])
+        for x in sorted(task["tasks"]):
+            getout = False
+            if x[1]["unit"] == "shell":
+                s = shell(x[1]["order"], stdin=x[1].get("data"))
+                if s["code"] != 0:
+                    responses.append((x[0], s["stderr"]))
+                    getout = True
+                    break
+            elif x[1]["unit"] == "fetch":
+                try:
+                    download(x[1]["order"], x[1]["data"], True)
+                except Exception, e:
+                    code = 1
+                    if hasattr(e, "code"):
+                        code = e.code
+                    responses.append((x[0], str(code)))
+                    getout = True
+                    break
+            elif x[1]["unit"] == "setconf":
+                self.app.conf.set(x[1]["order"][0], x[1]["order"][1], x[1]["data"])
+            else:
+                try:
+                    func = getattr(self.app.manager.components[x[1]["unit"]], x[1]["order"])
+                except (KeyError, NameError, AttributeError):
+                    responses.append((x[0], str(MalformedObject(x[1]))))
+                    getout = True
+                    break
+                try:
+                    if x[1].get("data"):
+                        response = func(task_id=task["id"], **x[1]["data"])
+                    else:
+                        response = func(task_id=task["id"])
+                    responses.append((x[0], response))
+                except Exception, e:
+                    responses.append((x[0], str(e)))
+                    getout = True
+                    break
+            responses.append((x[0], resp))
+        if getout:
+            self.app.logger.error("Failed to complete task %s at step %s: %s" % (task["id"], responses[-1][0]+1, responses[-1][1]))
+            if task.get("message") and task["message"].get("error"):
+                self.app.ops.put_message("error", "%s: %s" % (task["message"]["error"], responses[-1][1]), 
+                    task["id"], True)
+            return False
+        self.app.logger.debug("*** Completed task %s" % task["id"])
+        if task.get("message") and task["message"].get("success"):
+            self.app.ops.put_message("success", task["message"]["success"], task["id"],
+                True, responses)
+        return True
 
 
 class ScheduleProcessor(threading.Thread):
@@ -182,12 +197,11 @@ class ScheduleProcessor(threading.Thread):
                     pipe = self.app.storage.pipeline()
                 for x in tasks:
                     self.app.logger.debug("*** Processing scheduled task %s" % x["id"])
-                    self.app.storage.append("tasks", x, pipe=pipe)
-                    if x.get("reschedule"):
+                    self.app.ops.add_raw_task(x, pipe=pipe)
+                    if x.get("reschedule") and x["reschedule"]:
                         newtask = x
                         newtask["id"] = random_string()[0:8]
-                        retime = now + float(newtask["reschedule"])
-                        self.app.storage.sortlist_add("scheduled", retime, newtask, pipe=pipe)
+                        self.app.ops.schedule_task(newtask, newtask["reschedule"], pipe=pipe)
                 if tasks:
                     self.app.storage.execute(pipe)
                 time.sleep(5)

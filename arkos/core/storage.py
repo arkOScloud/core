@@ -1,7 +1,8 @@
 import json
 import redis
+import time
 
-from utilities import MalformedObject
+from utilities import MalformedObject, random_string
 
 
 class Storage(object):
@@ -157,3 +158,34 @@ class Storage(object):
             except ValueError:
                 raise MalformedObject(value)
         return value
+
+
+class StorageOps(object):
+    def __init__(self, app):
+        self.app = app
+    
+    def form_task(self, id=None, tasks=[], messages={}):
+        id = id or random_string()[0:8]
+        return {"id": id, "tasks": tasks, "messages": messages}
+    
+    def add_task(self, id=None, tasks=[], messages={}, pipe=None):
+        id = id or random_string()[0:8]
+        self.app.storage.append("tasks", self.form_task(id, tasks, messages), pipe=pipe)
+
+    def add_raw_task(self, task, pipe=None):
+        self.app.storage.append("tasks", x, pipe=pipe)
+
+    def add_task_group(self, tasks, pipe=None):
+        self.app.storage.append("tasks", {"group": True, "tasks": tasks}, pipe=pipe)
+    
+    def schedule_task(self, task, stime, reschedule=0.0, from_now=True, pipe=None):
+        if reschedule:
+            task["reschedule"] = reschedule
+        if from_now:
+            stime = time.time() + float(stime)
+        self.app.storage.sortlist_add("scheduled", stime, task, pipe=pipe)
+
+    def put_message(self, cls, message, id=None, finished=False, responses=[]):
+        id = id or random_string()[0:8]
+        self.app.storage.append("messages", {"id": id, "class": cls,
+            "finished": finished, "message": message, "responses": responses})
