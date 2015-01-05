@@ -40,4 +40,4 @@ class Updates(Framework):
                 "success": "Update %s installed successfully. Please restart your system." % x[1]["id"]
                 }
             self.app.ops.add_task(tasks=x[1]["operations"], messages=messages)
-        self.app.ops.add_task(tasks=[[0, "unit": "updates", "order": "check_updates"]])
+        self.app.ops.add_task(tasks=[[0, {"unit": "updates", "order": "check_updates"}]])

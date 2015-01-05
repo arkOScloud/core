@@ -8,24 +8,26 @@ class Databases(Framework):
     def on_start(self):
         self.get(types=self.get_types())
 
-    def get(self, **kwargs):
+    def get(self, reset=False, **kwargs):
         dbs = []
         if self.app.storage:
             dbs = self.app.storage.get_list("databases:databases")
         if not self.app.storage or not dbs:
             dbs = self.scan_databases()
-        if self.app.storage:
-            self.app.storage.append_all("databases:databases", dbs)
+            reset = True
+        if self.app.storage and reset:
+            self.app.storage.set_list("databases:databases", dbs)
         return dictfilter(dbs, kwargs)
 
-    def get_users(self, **kwargs):
+    def get_users(self, reset=False, **kwargs):
         dbs = []
         if self.app.storage:
             users = self.app.storage.get_list("databases:users")
         if not self.app.storage or not users:
             users = self.scan_users()
-        if self.app.storage:
-            self.app.storage.append_all("databases:users", users)
+            reset = True
+        if self.app.storage and reset:
+            self.app.storage.set_list("databases:users", users)
         return dictfilter(users, kwargs)
 
     def get_types(self):

@@ -24,14 +24,15 @@ class TrackedServices(Framework):
             with open(self.policy_path, "w") as f:
                 f.write("")
 
-    def get(self):
+    def get(self, reset=False, **kwargs):
         svrs = []
         if self.app.storage:
             svrs = self.app.storage.get_list("services")
         if not self.app.storage or not sites:
             svrs = self.scan()
-        if self.app.storage:
-            self.app.storage.append_all("services", svrs)
+            reset = True
+        if self.app.storage and reset:
+            self.app.storage.set_list("services", svrs)
         return dictfilter(sites, kwargs)
 
     def scan(self):

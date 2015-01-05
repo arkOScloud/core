@@ -24,24 +24,26 @@ class Filesystems(Framework):
             os.mkdir(self.vdisk_dir)
         self.libc = ctypes.CDLL(ctypes.util.find_library("libc"), use_errno=True)
 
-    def get(self):
+    def get(self, reset=False, **kwargs):
         devs = []
         if self.app.storage:
             devs = self.app.storage.get_list("filesystems:devs")
         if not self.app.storage or not devs:
             devs = self.scan_filesystems()
-        if self.app.storage:
-            self.app.storage.append_all("filesystems:devs", devs)
+            reset = True
+        if self.app.storage and reset:
+            self.app.storage.set_list("filesystems:devs", devs)
         return dictfilter(devs, kwargs)
 
-    def get_points_of_interest(self):
+    def get_points_of_interest(self, reset=False, **kwargs):
         points = []
         if self.app.storage:
             points = self.app.storage.get_list("filesystems:points")
         if not self.app.storage or not points:
             points = self.scan_points()
-        if self.app.storage:
-            self.app.storage.append_all("filesystems:points", points)
+            reset = True
+        if self.app.storage and reset:
+            self.app.storage.set_list("filesystems:points", points)
         return dictfilter(points, kwargs)
 
     def scan_filesystems(self):

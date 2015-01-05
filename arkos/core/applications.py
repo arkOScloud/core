@@ -20,34 +20,37 @@ class Apps(Framework):
         if not os.path.exists(self.app_dir):
             os.makedirs(self.app_dir)
 
-    def get(self, **kwargs):
+    def get(self, reset=False, **kwargs):
         apps = []
         if self.app.storage:
             apps = self.app.storage.get_list("apps:installed")
         if not self.app.storage or not apps:
             apps = self.scan_apps()
-        if self.app.storage:
-            self.app.storage.append_all("apps:installed", apps)
+            reset = True
+        if self.app.storage and reset:
+            self.app.storage.set_list("apps:installed", apps)
         return dictfilter(apps, kwargs)
 
-    def get_available(self, **kwargs):
+    def get_available(self, reset=False, **kwargs):
         apps = []
         if self.app.storage:
             apps = self.app.storage.get_list("apps:available")
         if not self.app.storage or not apps:
             apps = self.scan_available_apps()
-        if self.app.storage:
-            self.app.storage.append_all("apps:available", apps)
+            reset = True
+        if self.app.storage and reset:
+            self.app.storage.set_list("apps:available", apps)
         return dictfilter(apps, kwargs)
 
-    def get_updateable(self, **kwargs):
+    def get_updateable(self, reset=False, **kwargs):
         apps = []
         if self.app.storage:
             apps = self.app.storage.get_list("apps:updateable")
         if not self.app.storage or not apps:
             apps = self.scan_updateable_apps()
-        if self.app.storage:
-            self.app.storage.append_all("apps:updateable", apps)
+            reset = True
+        if self.app.storage and reset:
+            self.app.storage.set_list("apps:updateable", apps)
         return dictfilter(apps, kwargs)
 
     def scan_apps(self):
@@ -58,9 +61,11 @@ class Apps(Framework):
         while len(applist) > 0:
             app = applist[-1]
             try:
-                with open(os.path.join(self.app_dir, app, "manifest.json")) as f:
+                self.app.logger.debug(" *** Scanning data for %s" % app)
+                with open(os.path.join(self.app_dir, app, "manifest.json"), "r") as f:
                     data = json.loads(f.read())
             except Exception, e:
+                self.app.logger.error("Failed to scan and import " % app)
                 continue
             apps.append(data)
             applist.remove(app)

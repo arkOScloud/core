@@ -28,14 +28,15 @@ class Sites(Framework):
     def get_types(self):
         return self.apps.get(type="website")
 
-    def get(self, **kwargs):
+    def get(self, reset=False, **kwargs):
         sites = []
         if self.app.storage:
             sites = self.app.storage.get_list("websites")
         if not self.app.storage or not sites:
             sites = self.scan_sites()
-        if self.app.storage:
-            self.app.storage.append_all("websites", sites)
+            reset = True
+        if self.app.storage and reset:
+            self.app.storage.set_list("websites", sites)
         return dictfilter(sites, kwargs)
 
     def scan_sites(self):
@@ -361,7 +362,7 @@ class Sites(Framework):
         try:
             w = {"name": name, "type": app["website_plugin"],
             "path": target_path, "addr": vars["addr"] or "localhost",
-            "port": vars["port"] or 80, "php": app["php"] or php or False,
+            "port": vars["port"] or 80, "php": app["uses_php"] or php or False,
             "version": app["version"].rsplit("-", 1)[0] if app["website_updates"] else None,
             "dbengine": dbinfo["engine"] if dbinfo else None,
             "dbname": dbinfo["name"] if dbinfo else None,
@@ -384,7 +385,7 @@ class Sites(Framework):
                 self.component.nginx_enable(w)
             except:
                 raise ReloadError('nginx')
-        if enable and app["php"]:
+        if enable and app["uses_php"]:
             try:
                 self.component.php_reload()
             except:

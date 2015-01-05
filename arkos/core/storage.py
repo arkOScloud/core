@@ -84,12 +84,23 @@ class Storage(object):
 
     def append_all(self, key, values, pipe=None):
         if values:
-            r = pipe or self.redis
+            r = pipe or self.redis.pipeline()
             self.check()
+            values = list(values)
             for x in enumerate(values):
                 if type(x[1]) in [list, dict]:
                     values[x[0]] = json.dumps(x[1])
             r.rpush("arkos:%s" % key, *values)
+            if not pipe:
+                r.execute()
+    
+    def set_list(self, key, values, pipe=None):
+        if values:
+            r = pipe or self.redis.pipeline()
+            r.delete("arkos:%s" % key)
+            self.append_all(key, values, pipe=r)
+            if not pipe:
+                r.execute()
     
     def sortlist_add(self, key, priority, value, pipe=None):
         self.check()

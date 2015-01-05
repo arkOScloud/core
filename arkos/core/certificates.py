@@ -31,14 +31,15 @@ class Certificates(Framework):
             self.system.users.add_group("ssl-cert")
         self.gid = self.system.users.get_group("ssl-cert", self.system.users.get_groups())["gid"]
 
-    def get(self, **kwargs):
+    def get(self, reset=False, **kwargs):
         certs = []
         if self.app.storage:
             certs = self.app.storage.get_list("certificates")
         if not self.app.storage or not certs:
             certs = self.scan_certs()
-        if not self.app.storage:
-            self.app.storage.append_all("certificates", certs)
+            reset = True
+        if not self.app.storage and reset:
+            self.app.storage.set_list("certificates", certs)
         return dictfilter(certs, kwargs)
 
     def scan(self):
@@ -74,14 +75,15 @@ class Certificates(Framework):
                 })
         return certs
 
-    def get_cas(self, **kwargs):
+    def get_cas(self, reset=False, **kwargs):
         cas = []
         if self.app.storage:
             cas = self.app.storage.get_list("certificates:authorities")
         if not self.app.storage or not cas:
             cas = self.scan_cas()
-        if self.app.storage:
-            self.app.storage.append_all("certificates:authorities", cas)
+            reset = True
+        if self.app.storage and reset:
+            self.app.storage.set_list("certificates:authorities", cas)
         return dictfilter(cas, kwargs)
 
     def scan_cas(self):
@@ -291,5 +293,5 @@ class Certificates(Framework):
         h.update(OpenSSL.crypto.dump_certificate(OpenSSL.crypto.FILETYPE_ASN1, key))
         m.update(OpenSSL.crypto.dump_certificate(OpenSSL.crypto.FILETYPE_ASN1, key))
         h, m = h.hexdigest(), m.hexdigest()
-        return {"sha1": ":".join([h[i:i+2].upper() for i in range(0,len(h), 2)]), 
-            "md5": ":".join([m[i:i+2].upper() for i in range(0,len(m), 2)])}
+        return (":".join([h[i:i+2].upper() for i in range(0,len(h), 2)]), 
+            ":".join([m[i:i+2].upper() for i in range(0,len(m), 2)]))
