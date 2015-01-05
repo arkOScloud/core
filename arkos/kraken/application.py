@@ -85,7 +85,7 @@ class Application(object):
         self.conf.set("enviro", "arch", arch[0])
         self.conf.set("enviro", "board", arch[1])
         
-        self.ops = StorageOps()
+        self.ops = StorageOps(self)
 
         # Load components
         self.logger.info("Loading components...")

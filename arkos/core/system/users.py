@@ -44,9 +44,9 @@ class Users(object):
 
     def get_users(self):
         r = []
-        for x in self.get_system_users():
-            if x["uid"] == 0 or x["uid"] >= 1000:
-                r.append(x)
+        for x in self.udb.search_s("ou=users,%s" % self.rootdn, ldap.SCOPE_SUBTREE,
+             "(objectClass=inetOrgPerson)", None):
+            r.append(x[1])
         return r
 
     def get_system_users(self):
@@ -54,7 +54,7 @@ class Users(object):
         for x in pwd.getpwall():
             r.append({"username": x.pw_name, "uid": x.pw_uid, "gid": x.pw_gid,
                 "dir": x.pw_dir, "shell": x.pw_shell, "groups": []})
-        r = self.map_groups(r, self.get_system_groups())
+        r = self.map_groups(r, self.get_groups())
         sf = lambda x: -1 if x["uid"]==0 else (x["uid"]+1000 if x["uid"]<1000 else x["uid"]-1000)
         return sorted(r, key=sf)
 
@@ -86,7 +86,7 @@ class Users(object):
         return None
 
     def add_user(self, attrs, admin=False, sudo=False):
-        uid = self.get_next_uid()
+        uid = str(self.get_next_uid())
         ldif = {
             "objectClass": ["mailAccount", "inetOrgPerson", "posixAccount"],
             "givenName": attrs["firstname"],
@@ -94,7 +94,7 @@ class Users(object):
             "displayName": attrs["firstname"]+" "+attrs["lastname"],
             "cn": attrs["firstname"]+" "+attrs["lastname"],
             "uid": attrs["username"],
-            "mail": attrs["mail"]+attrs["domain"],
+            "mail": attrs["username"]+"@"+attrs["domain"],
             "maildrop": attrs["username"],
             "userPassword": hashpw(attrs["password"], "crypt"),
             "gidNumber": uid,
@@ -109,7 +109,7 @@ class Users(object):
                 ldap.SCOPE_SUBTREE, "(objectClass=*)", None)[0][1]
             memlist = self.udb.search_s("cn=admins,ou=groups,%s" % self.rootdn,
                 ldap.SCOPE_SUBTREE, "(objectClass=*)", ["member"])[0][1]["member"]
-            memlist += "uid%s,ou=users,%s" % (attrs["username"],self.rootdn)
+            memlist += "uid=%s,ou=users,%s" % (attrs["username"],self.rootdn)
             ldif = ldap.modlist.modifyModlist(ldif, {"member": memlist},
                 ignore_oldexistent=1)
             self.udb.modify_ext_s("cn=admins,ou=groups,%s" % self.rootdn, ldif)
@@ -124,6 +124,50 @@ class Users(object):
             }
             ldif = ldap.modlist.addModlist(ldif)
             self.udb.add_s("cn=%s,ou=sudo,%s" % (attrs["username"], self.rootdn), ldif)
+
+    def edit_user(self, attrs, admin=None, sudo=None):
+        ldif = self.udb.search_s("uid=%s,ou=users,%s" % (attrs["username"],self.rootdn),
+            ldap.SCOPE_SUBTREE, "(objectClass=inetOrgPerson)", None)[0][1]
+        for x in ldif:
+            if type(ldif[x]) == list and len(ldif[x]) == 1:
+                ldif[x] = ldif[x][0]
+        attrs = {
+            "givenName": attrs.get("firstname") or ldif["givenName"],
+            "sn": attrs.get("lastname") or ldif["sn"],
+            "displayName": "%s %s" % ((attrs.get("firstname") or ldif["givenName"]),(attrs.get("lastname") or ldif["sn"])),
+            "cn": "%s %s" % ((attrs.get("firstname") or ldif["givenName"]),(attrs.get("lastname") or ldif["sn"])),
+            "mail": (ldif["uid"]+"@"+attrs.get("domain")) or ldif["mail"],
+            "userPassword": hashpw(attrs["password"], "crypt") if attrs.get("password") else ldif["userPassword"],
+        }
+        nldif = ldap.modlist.modifyModlist(ldif, nldif, ignore_oldexistent=1)
+        self.udb.modify_ext_s("uid=%s,ou=users,%s" % (ldif["username"],self.rootdn), nldif)
+        if admin in [True, False]:
+            nldif = self.udb.search_s("cn=admins,ou=groups,%s" % self.rootdn,
+                ldap.SCOPE_SUBTREE, "(objectClass=*)", None)[0][1]
+            memlist = self.udb.search_s("cn=admins,ou=groups,%s" % self.rootdn,
+                ldap.SCOPE_SUBTREE, "(objectClass=*)", ["member"])[0][1]["member"]
+            if admin == True:
+                memlist += "uid=%s,ou=users,%s" % (ldif["uid"],self.rootdn)
+            else:
+                try:
+                    memlist.remove("uid=%s,ou=users,%s" % (ldif["uid"],self.rootdn))
+                except:
+                    pass
+            nldif = ldap.modlist.modifyModlist(nldif, {"member": memlist},
+                ignore_oldexistent=1)
+        if sudo == True:
+            nldif = {
+                "objectClass": ["sudoRole", "top"],
+                "cn": ldif["uid"],
+                "sudoHost": "ALL",
+                "sudoCommand": "ALL",
+                "sudoUser": ldif["uid"],
+                "sudoOption": "authenticate"
+            }
+            nldif = ldap.modlist.addModlist(nldif)
+            self.udb.add_s("cn=%s,ou=sudo,%s" % (ldif["uid"], self.rootdn), nldif)
+        elif sudo == False:
+            self.udb.delete_s("cn=%s,ou=sudo,%s" % (ldif["uid"], self.rootdn))
 
     def del_user(self, v, home=False):
         if home:
@@ -179,7 +223,7 @@ class Users(object):
 
     def change_user_password(self, u, p):
         ldif = self.udb.search_s("uid=%s,ou=users,%s" % (u,self.rootdn),
-                ldap.SCOPE_SUBTREE, "(objectClass=*)", None)[0][1]
+            ldap.SCOPE_SUBTREE, "(objectClass=*)", None)[0][1]
         ldif = ldap.modlist.modifyModlist(ldif, {"userPassword": hashpw(p, "crypt")},
             ignore_oldexistent=1)
         self.udb.modify_ext_s("uid=%s,ou=users,%s" % (u,self.rootdn), ldif)
@@ -192,3 +236,19 @@ class Users(object):
 
     def get_next_gid(self):
         return max([x["gid"] for x in self.get_groups()]) + 1
+    
+    def get_domains(self):
+        results = []
+        qset = self.udb.search_s("ou=domains,%s" % self.rootdn,
+            ldap.SCOPE_SUBTREE, "virtualdomain=*", ["virtualdomain"])
+        for x in qset:
+            results.append(x[1]["virtualdomain"][0])
+        return results
+    
+    def add_domain(self, domain):
+        ldif = {"virtualdomain": domain, "objectClass": ["mailDomain", "top"]}
+        self.udb.add_s("virtualdomain=%s,ou=domains,%s" % (domain,self.rootdn),
+            ldap.modlist.addModlist(ldif))
+    
+    def remove_domain(self, domain):
+        self.udb.delete_s("virtualdomain=%s,ou=domains,%s" % (domain,self.rootdn))
