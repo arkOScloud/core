@@ -28,10 +28,12 @@ class Apps(Framework):
             apps = self.scan_apps()
             reset = True
         if self.app.storage and reset:
+            apps = self.verify_all_dependencies(apps)
             self.app.storage.set_list("apps:installed", apps)
         return dictfilter(apps, kwargs)
 
     def get_available(self, reset=False, **kwargs):
+        """
         apps = []
         if self.app.storage:
             apps = self.app.storage.get_list("apps:available")
@@ -41,6 +43,8 @@ class Apps(Framework):
         if self.app.storage and reset:
             self.app.storage.set_list("apps:available", apps)
         return dictfilter(apps, kwargs)
+        """
+        return []
 
     def get_updateable(self, reset=False, **kwargs):
         apps = []
@@ -98,6 +102,7 @@ class Apps(Framework):
                     dep["verify"]["status"] = "pass"
                 if to_pacman:
                     try:
+                        self.app.logger.debug(" *** Installing %s..." % to_pacman)
                         packages.install([to_pacman], query=True)
                     except Exception, e:
                         dep["verify"]["status"] = "fail"
@@ -131,6 +136,7 @@ class Apps(Framework):
                         dep["verify"]["status"] = "pass"
                 if to_pip:
                     try:
+                        self.app.logger.debug(" *** Installing %s (via pip)..." % dep["package"])
                         python.install([dep["package"]])
                     except Exception, e:
                         dep["verify"]["status"] = "fail"
@@ -145,89 +151,99 @@ class Apps(Framework):
                             dep["verify"]["status"] = "pass"
         return (verify, app)
 
-    def verify_app_dependencies(self, app, loaded_apps):
-        verify = True
-        for dep in app["dependencies"]:
-            if dep["type"] == "app":
-                dep["verify"] = {}
-                if not dep["package"] in [x["pid"] for x in loaded_apps]:
-                    dep["verify"]["status"] = "fail"
-                    dep["verify"]["info"] = "not_installed"
-                    verify = False
-                else:
-                    if next(x for x in loaded_apps if x["pid"] == dep["package"])["verify"] == "pass":
-                        dep["verify"]["status"] = "pass"
-                    else:
+    def verify_app_dependencies(self, apps):
+        verified, disable = [], []
+        for x in apps:
+            for dep in x["dependencies"]:
+                if dep["type"] == "app":
+                    dep["verify"] = {}
+                    if not dep["package"] in [y["pid"] for y in apps]:
                         dep["verify"]["status"] = "fail"
-                        verify = False
-        return (verify, app)
+                        dep["verify"]["info"] = "not_installed"
+                        x["verify"] = "fail"
+                        self.app.logger.debug("*** Verify failed for %s -- %s app load failed" % (x["pid"],dep["package"]))
+                        disable += [y["pid"] for y in self.verify_operation(x["pid"], "remove", apps, [])]
+                    else:
+                        if next(y for y in apps if y["pid"] == dep["package"])["verify"] == "pass":
+                            dep["verify"]["status"] = "pass"
+                        else:
+                            dep["verify"]["status"] = "fail"
+                            self.app.logger.debug("*** Verify failed for %s -- %s app load failed" % (x["pid"],dep["package"]))
+                            disable += [y["pid"] for y in self.verify_operation(x["pid"], "remove", apps, [])]
+            verified.append(x)
+        disable = list(set(disable))
+        for x in disable:
+            for y in enumerate(verified):
+                if x == y[1]["pid"]:
+                    self.app.logger.debug("*** Verify failed for %s -- app load failed prior" % x)
+                    verified[y[0]]["verify"] = "fail"
+        return verified
 
     def verify_all_dependencies(self, apps):
-        # TODO fix dependency chain check
-        stage1, stage2, stage3, apps = [], [], [], []
-        for app in apps:
-            # STAGE 1: Verify system dependencies, install via pacman
-            rsp = self.verify_system_dependencies(app)
+        apps = list(apps)
+        for app in enumerate(apps):
+            rsp = self.verify_system_dependencies(app[1])
             if not rsp[0]:
-                rsp[1]["verify"] == "fail"
-            stage1.append(rsp[1])
-            # STAGE 2: Verify Python dependencies, install via pip
-            rsp = self.verify_python_dependencies(app)
+                rsp[1]["verify"] = "fail"
+            rsp = self.verify_python_dependencies(rsp[1])
             if not rsp[0]:
-                rsp[1]["verify"] == "fail"
-            stage2.append(rsp[1])
-        for app in stage2:
-            # STAGE 3: Verify app dependencies
-            rsp = self.verify_app_dependencies(app, apps)
-            if not rsp[0]:
-                rsp[1]["verify"] == "fail"
-            stage3.append(rsp[1])
+                rsp[1]["verify"] = "fail"
+            apps[app[0]] = rsp[1]
+        apps = self.verify_app_dependencies(apps)
         return apps
 
-    def verify_operation(self, id, op):
-        pdata = self.get()
+    def verify_operation(self, id, op, inst=[], avail=[]):
         metoo = []
+        inst = inst or self.get()
+        avail = avail or self.get_available()
         if op == 'remove':
-            for i in pdata:
+            for i in inst:
                 for dep in i["dependencies"]:
                     if dep['type'] == 'app' and dep['package'] == id:
                         metoo.append(('Remove', i))
-                        metoo += self.check_conflict(i["pid"], 'remove')
+                        metoo += self.verify_operation(i["pid"], 'remove', inst, avail)
         elif op == 'install':
-            i = next(x for x in self.get_available() if x["pid"] == id)
+            i = next(x for x in avail if x["pid"] == id)
             for dep in i["dependencies"]:
-                if dep["type"] == 'app' and dep['package'] not in [x["pid"] for x in pdata]:
+                if dep["type"] == 'app' and dep['package'] not in [x["pid"] for x in inst]:
                     metoo.append(('Install', dep['package']))
-                    metoo += self.check_conflict(dep['package'], 'install')
+                    metoo += self.verify_operation(dep['package'], 'install', inst, avail)
         return metoo
+    
+    def install(self, ids):
+        for x in ids:
+            self._install_app(x)
+        if self.app.storage:
+            self.app.storage.get(reset=True)
+            self.app.storage.get_updateable(reset=True)
 
-    def install(self, id, verify=False):
+    def _install_app(self, id):
         data = api('https://%s/' % self.app.conf.get("general", "repo_server"), 
             post={'get': 'plugin', 'id': id}, crit=True)
         if data['status'] == 200:
             with open(os.path.join(self.app_dir, 'plugin.tar.gz'), 'wb') as f:
                 f.write(base64.b64decode(data['info']))
         else:
-            raise Exception('Plugin retrieval failed - %s' % str(data['info']))
+            raise Exception('Application retrieval failed - %s' % str(data['info']))
         with tarfile.open(os.path.join(self.app_dir, 'plugin.tar.gz'), 'r:gz') as t:
             t.extractall(self.app_dir)
         os.unlink(os.path.join(self.app_dir, 'plugin.tar.gz'))
         with open(os.path.join(self.app_dir, id, "manifest.json")) as f:
             data = json.loads(f.read())
-        if verify:
-            data = self.verify_system_dependencies(data)
-            data = self.verify_python_dependencies(data)
-            data = self.verify_app_dependencies(data, self.get())
+    
+    def remove(self, ids):
+        for x in ids:
+            self._remove_app(x)
         if self.app.storage:
-            self.app.storage.append("apps:installed", data)
-            self.app.storage.remove("apps:upgradeable", data)
+            self.app.storage.get(reset=True)
+            self.app.storage.get_updateable(reset=True)
 
-    def remove(self, id, force=False):
+    def _remove_app(self, id, force=False):
         purge = self.app.conf.get("apps", "purge", False)
         with open(os.path.join(self.app_dir, id, "manifest.json")) as f:
             data = json.loads(f.read())
         shutil.rmtree(os.path.join(self.app_dir, id))
-        exclude = ['openssl', 'openssh', 'nginx', 'python2', 'redis']
+        exclude = ['openssl', 'openssh', 'nginx', 'python2', 'redis', 'git']
         depends = []
         pdata = self.get()
         for item in data["dependencies"]:
@@ -245,6 +261,3 @@ class Apps(Framework):
                     self.services.stop(item["daemon"])
                     self.services.disable(item["daemon"])
                 packages.remove([item["package"]], purge=purge)
-        if self.app.storage:
-            self.app.storage.remove("apps:installed", data)
-            self.app.storage.remove("apps:upgradeable", data)

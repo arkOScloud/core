@@ -18,13 +18,13 @@ class SiteEngines(Framework):
 
     def add(self, app):
         # Add a new website app introduced during runtime
-        if not x.has_key("verify") or not x["verify"] == "pass":
+        if not app.has_key("verify") or not app["verify"] == "pass":
             return
         try:
             mod = imp.load_module(x["pid"], *imp.find_module(x["pid"], [self.path]))
         except Exception, e:
-            self.log.warn(' *** Plugin not loadable: ' + x["pid"])
-            self.log.warn(" *** "+str(e))
+            self.app.logger.warn(' *** Site engine not loadable: ' + x["pid"])
+            self.app.logger.warn(" *** "+str(e))
         xmod = getattr(mod, x["website_plugin"])
         self.types[x["website_plugin"]] = xmod(self.system, self.databases)
 
