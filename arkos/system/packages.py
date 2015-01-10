@@ -1,4 +1,4 @@
-from arkos.core.utilities import shell
+from arkos.utilities import shell
 
 
 def install(packages, query=False, needed=True):

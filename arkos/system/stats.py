@@ -3,6 +3,8 @@ import os
 import psutil
 import time
 
+from arkos import config
+
 
 def get_all(self):
     return {
@@ -13,28 +15,28 @@ def get_all(self):
         "uptime": get_uptime()
     }
 
-def get_load(self):
+def get_load():
     return os.getloadavg()
 
-def get_temp(self, hw=""):
+def get_temp():
     # TODO: replace this with libsensors.so / PySensors
-    if hw == 'Raspberry Pi':
+    if config.get("enviro", "board") == 'Raspberry Pi':
         return '%3.1f°C'%(float(shell('cat /sys/class/thermal/thermal_zone0/temp').split('\n')[0])/1000)
     else:
         if os.path.exists('/sys/class/hwmon/hwmon1/temp1_input'):
             return '%3.1f°C'%(float(shell('cat /sys/class/hwmon/hwmon1/temp1_input'))/1000)
     return ''
 
-def get_ram(self):
+def get_ram():
     s = psutil.virtual_memory()
     a = int(s.used) - (int(s.cached) + int(s.buffers))
     return (a, int(s.total), int(s.percent))
 
-def get_swap(self):
+def get_swap():
     s = psutil.swap_memory()
     return (int(s.used), int(s.total))
 
-def get_uptime(self):
+def get_uptime():
     minute = 60
     hour = minute * 60
     day = hour * 24

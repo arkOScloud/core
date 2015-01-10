@@ -1,0 +1,72 @@
+import datetime
+import logging
+import sys
+
+from arkos import config
+from errors import DefaultException
+
+
+class DefaultMessage:
+    def __init__(self, cls="", msg=""):
+        self.speak = config.get("enviro", "print_messages", False)
+        if cls == "error" and msg:
+            raise DefaultException(str(msg))
+        elif self.speak and cls == "warning" and msg:
+            print "\033[33m%s\033[0m" % msg
+        elif self.speak and msg:
+            print "\033[32m%s\033[0m" % msg
+    
+    def update(self, cls, msg):
+        if cls == "error":
+            raise DefaultException(str(msg))
+        elif self.speak and cls == "warning":
+            print "\033[33m%s\033[0m" % msg
+        elif self.speak:
+            print "\033[32m%s\033[0m" % msg
+    
+    def complete(self, cls, msg):
+        if cls == "error":
+            raise DefaultException(str(msg))
+        elif self.speak and cls == "warning":
+            print "\033[33m%s\033[0m" % msg
+        elif self.speak:
+            print "\033[32m%s\033[0m" % msg
+
+
+class ConsoleHandler(logging.StreamHandler):
+    def __init__(self, stream, debug):
+        self.debug = debug
+        logging.StreamHandler.__init__(self, stream)
+
+    def handle(self, record):
+        if not self.stream.isatty():
+            return logging.StreamHandler.handle(self, record)
+
+        s = ''
+        d = datetime.datetime.fromtimestamp(record.created)
+        s += d.strftime("\033[37m%d.%m.%Y %H:%M \033[0m")
+        if self.debug:
+            s += ('%s:%s'%(record.filename,record.lineno)).ljust(30)
+        l = ''
+        if record.levelname == 'DEBUG':
+            l = '\033[37mDEBUG\033[0m '
+        if record.levelname == 'INFO':
+            l = '\033[32mINFO\033[0m  '
+        if record.levelname == 'WARNING':
+            l = '\033[33mWARN\033[0m  '
+        if record.levelname == 'ERROR':
+            l = '\033[31mERROR\033[0m '
+        s += l.ljust(9)
+        s += record.msg
+        s += '\n'
+        self.stream.write(s)
+
+
+def new_logger(log_level=logging.INFO, debug=False):
+    logger = logging.Logger()
+    stdout = ConsoleHandler(sys.stdout, debug)
+    stdout.setLevel(log_level)
+    dformatter = logging.Formatter('%(asctime)s [%(levelname)s] %(module)s: %(message)s')
+    stdout.setFormatter(dformatter)
+    logger.addHandler(stdout)
+    return logger

@@ -3,10 +3,11 @@ import packages
 import services
 import stats
 import systemtime
+import domains
 import users
+import groups
+import filesystems
 
-from system import System
-from filesystems import Filesystems
 
 __all__ = [
     "network",
@@ -14,7 +15,8 @@ __all__ = [
     "services",
     "stats",
     "systemtime",
+    "domains",
     "users",
-    "System",
-    "Filesystems"
+    "groups",
+    "filesystems"
 ]
