@@ -7,7 +7,7 @@ import tarfile
 
 from distutils.spawn import find_executable
 
-from arkos import config, storage, logger
+from arkos import config, storage, logger, security
 from arkos.system import packages, services
 from arkos.languages import python
 from arkos.utilities import api, dictfilter, DefaultMessage
@@ -94,7 +94,13 @@ class App:
                     services.disable(item["daemon"])
                 packages.remove([item["package"]], purge=config.get("apps", "purge", False))
         shutil.rmtree(os.path.join(config.get("apps", "app_dir"), id))
-        storage.app.remove("installed", self)
+        storage.apps.remove("installed", self)
+        regen_fw = False
+        for x in self.services:
+            if x["ports"]:
+                regen_fw = True
+        if regen_fw:
+            tracked_services.remove_policy(self.id)
 
 
 def get():
@@ -194,6 +200,13 @@ def install(id, install_deps=True, message=DefaultMessage()):
             return
         else:
             raise
+    regen_fw = False
+    for x in storage.apps.get("installed", id).services:
+        if x["ports"]:
+            regen_fw = True
+            tracked_services.update_policy(id, x["binary"], 2, False)
+    if regen_fw:
+        security.regen_fw(tracked_services.get())
 
 def _install(id):
     data = api('https://%s/apps/%s' % (config.get("general", "repo_server"), id), crit=True)
@@ -207,4 +220,4 @@ def _install(id):
     os.unlink(os.path.join(config.get("apps", "app_dir"), 'plugin.tar.gz'))
     with open(os.path.join(config.get("apps", "app_dir"), id, "manifest.json")) as f:
         data = json.loads(f.read())
-        storage.app.append("installed", App(**data))
+        storage.apps.append("installed", App(**data))

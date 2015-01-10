@@ -3,120 +3,86 @@ import os
 import random
 import sys
 
-from arkos.core.frameworks import Framework
-from arkos.core.utilities import dictfilter
+from arkos import storage, security
+from arkos.utilities import dictfilter
+
+COMMON_PORTS = [3000, 3306, 5222, 5223, 8000, 8080, 8765]
 
 
-COMMON_PORTS = [3000, 3306, 5222, 5223, 8000, 8080]
-
-class TrackedServices(Framework):
-    REQUIRES = ["apps", "sites", "security"]
-
-    def on_init(self, policy_path="", firewall=None):
-        if not policy_path and firewall == None and not self.app.conf:
-            raise Exception("No configuration values passed")
-        elif not policy_path:
-            if os.path.isfile(os.path.join(sys.path[0], 'policies.json')):
-                policy_path = os.path.join(sys.path[0], 'policies.json')
-        self.policy_path = policy_path or self.app.conf.get("general", "policy_path")
-        self.firewall = firewall or self.app.conf.get("general", "firewall", True)
-        if not os.path.exists(self.policy_path):
-            with open(self.policy_path, "w") as f:
-                f.write("")
-
-    def get(self, reset=False, **kwargs):
-        svrs = []
-        if self.app.storage:
-            svrs = self.app.storage.get_list("services")
-        if not self.app.storage or not sites:
-            svrs = self.scan()
-            reset = True
-        if self.app.storage and reset:
-            self.app.storage.set_list("services", svrs)
-        return dictfilter(sites, kwargs)
-
-    def scan(self):
-        # Get policies
-        with open(self.policy_path, "r") as f:
+def get(policies={}):
+    # Get policies
+    if not policies:
+        with open(config.get("general", "policy_path"), "r") as f:
             policies = json.loads(f.read())
-        # Get services
-        services = []
-        policy = policies["arkos"]["fail2ban"] if policies.has_key("arkos") \
-            and policies["arkos"].has_key("fail2ban") else {}
-        services.append({"type": "internal", "pid": "arkos", 
-            "sid": "fail2ban", "name": "Intrusion Prevention", 
-            "icon": "gen-arkos-round", "ports": [], "policy": policy})
-        for p in self.apps.get():
-            if p.has_key('services') and p["pid"] not in [x["pid"] for x in servers]:
-                for s in p["services"]:
-                    policy = policies[p["pid"]][s["binary"]] if policies.has_key(p["pid"]) \
-                        and policies[p["pid"]].has_key(s["binary"]) else {}
-                    services.append({"type": p["type"], "pid": p["pid"], 
-                        "sid": s['binary'], "name": s['name'], 
-                        "icon": p["icon"], "ports": s['ports'], 
-                        "policy": policy})
-        for s in self.sites.get():
-            policy = policies[s["type"]][s["name"]] if policies.has_key(s["type"]) \
-                and policies[s["type"]].has_key(s["name"]) else {}
-            services.append({"type": "website", "pid": s["type"], 
-                "sid": s["name"], "name": s["name"], "icon": s["icon"], 
-                "ports": [('tcp', s["port"])], "policy": policy})
-        return services
+    # Get services
+    services = {}
+    policy = policies["arkos"]["genesis"] if policies.has_key("arkos") \
+        and policies["arkos"].has_key("genesis") else 2
+    services["arkos"]["genesis"] = {"policy": policy, 
+        "name": "System Management (Genesis/APIs)", "icon": "gen-arkos-round", 
+        "ports": [("tcp", int(config.get("genesis", "port"))), ("tcp", 8765)]}
+    for p in storage.apps.get("installed")
+        for s in p.services:
+            policy = policies[p.id][s["binary"]] if policies.has_key(p.id) \
+                and policies[p.id].has_key(s["binary"]) else 2
+            if not services.has_key(p.id): services[p.id] = {}
+            services[p.id][s['binary']] = {"name": s['name'], 
+                "icon": p.icon, "ports": s['ports'], "policy": policy}
+    for s in storage.sites.get("sites"):
+        policy = policies[s.meta.id][s.name] if policies.has_key(s.meta.id) \
+            and policies[s.meta.id].has_key(s.name) else 2
+        if not services.has_key(s.meta.id): services[s.meta.id] = {}
+        services[s.meta.id][s.name] = {"name": s.name, "icon": s.icon, 
+            "ports": [('tcp', s.port)], "policy": policy}
+    return services
 
-    def add(self, stype, pid, sid, name, icon="", ports=[], policy={}):
-        s = {"type": stype, "pid": pid, "sid": sid, "name": name, 
-            "icon": icon, "ports": ports, "policy": policy}
-        if self.app.storage:
-            self.app.storage.append("services", s)
+def update_policy(pid, sid, policy, fw=True):
+    with open(config.get("general", "policy_path"), "r") as f:
+        policies = json.loads(f.read())
+    if policies.has_key(pid):
+        policies[pid][sid] = policy
+    else:
+        policies[pid] = {}
+        policies[pid][sid] = policy
+    with open(config.get("general", "policy_path"), "w") as f:
+        f.write(json.dumps(policies, sort_keys=True, 
+            indent=4, separators=(',', ': ')))
+    if config.get("general", "firewall", True) and fw:
+        security.regen_fw(get(policies))
 
-    def update(self, old_sid, new_sid, name, icon="", ports=[]):
-        s = self.get(sid=old_sid)
-        self.remove(s)
-        self.add(s["type"], s["pid"], new_sid, name, icon, ports, s["policy"])
-        if self.firewall:
-            self.security.regen_fw()
+def remove_policy(pid, sid="", fw=True):
+    with open(config.get("general", "policy_path"), "r") as f:
+        policies = json.loads(f.read())
+    if policies.has_key(pid) and not sid:
+        del policies[pid]
+    elif policies.has_key(pid) and policies[pid].has_key(sid):
+        del policies[pid][sid]
+    with open(config.get("general", "policy_path"), "w") as f:
+        f.write(json.dumps(policies, sort_keys=True, 
+            indent=4, separators=(',', ': ')))
+    if config.get("general", "firewall", True) and fw:
+        security.regen_fw(get(policies))
 
-    def update_policy(self, sid, policy):
-        s = self.get(sid=sid)
-        self.remove(s)
-        self.add(s["type"], s["pid"], s["sid"], s["name"], s["icon"], 
-            s["ports"], policy)
-        with open(self.policy_path, "r") as f:
-            policies = json.loads(f.read())
-        if policies.has_key(s["pid"]) and policies[s["pid"]].has_key(s["sid"]):
-            policies[s["pid"]][s["sid"]] = policy
-            with open(self.policy_path, "w") as f:
-                f.write(json.dumps(policies, sort_keys=True, 
-                    indent=4, separators=(',', ': ')))
-        if self.firewall:
-            self.security.regen_fw()
+def refresh_policies():
+    with open(config.get("general", "policy_path"), "r") as f:
+        policies = json.loads(f.read())
+    svcs = get()
+    newpolicies = {}
+    for x in policies:
+        if x == "custom":
+            newpolicies["custom"] = policies["custom"]
+        if x in svcs:
+            newpolicies[x] = {}
+            for s in policies[x]:
+                if s in svcs[x]:
+                    newpolicies[x][s] = policies[x][s]
+    with open(config.get("general", "policy_path"), "w") as f:
+        f.write(json.dumps(newpolicies, sort_keys=True, 
+            indent=4, separators=(',', ': ')))
 
-    def cleanup_policies(self):
-        with open(self.policy_path, "r") as f:
-            policies = json.loads(f.read())
-        svcs = self.get()
-        for x in policies:
-            if x == "custom":
-                continue
-            for s in x:
-                if not self.get(pid=x, sid=s):
-                    del policies[x][s]
-        with open(self.policy_path, "w") as f:
-            f.write(json.dumps(policies, sort_keys=True, 
-                indent=4, separators=(',', ': ')))
-
-    def remove(self, svc):
-        if self.app.storage:
-            self.app.storage.remove("services", svc)
-        if self.firewall:
-            self.security.regen_fw()
-
-    def remove_by_pid(self, pid):
-        for x in self.get(pid=pid):
-            self.remove(x)
-
-    def get_open_port(self, ignore_common=False):
-        ports = [[x[1] for x in s["ports"]] for s in self.get()]
-        if not ignore_common: ports = ports + COMMON_PORTS
-        r = random.randint(1025, 65534)
-        return r if not r in ports else self.get_open_port()
+def get_open_port(ignore_common=False):
+    data = get()
+    ports = [[[z[1] for z in y["ports"]] for y in data[x]] for x in data]
+    if not ignore_common: ports = ports + COMMON_PORTS
+    r = random.randint(1025, 65534)
+    return r if not r in ports else get_open_port()

@@ -6,8 +6,8 @@ import re
 import shutil
 
 from arkos import config, storage, databases
-
-from arkos.utilities import dictfilter, shell, random_string, DefaultMessage
+from tracked_services import update_policy, refresh_policies
+from arkos.utilities import shell, random_string, DefaultMessage
 
 
 class Site:
@@ -162,6 +162,7 @@ class Site:
                 php_reload()
             except:
                 raise ReloadError('PHP-FPM')
+        update_policy(self.meta.id, self.name, 2)
         self.installed = True
         if specialmsg:
             return specialmsg
@@ -293,6 +294,7 @@ class Site:
         s.filter('Key', 'root')[0].value = self.path
         s.filter('Key', 'index')[0].value = 'index.php' if self.php else 'index.html'
         nginx.dumpf(c, os.path.join('/etc/nginx/sites-available', oldname))
+        refresh_policies()
         nginx_reload()
 
     def update(self, message=DefaultMessage()):
@@ -356,6 +358,7 @@ class Site:
             self.db.remove()
             self.db.usermod('del', '')
         self.nginx_disable(reload=True)
+        refresh_policies()
         try:
             os.unlink(os.path.join('/etc/nginx/sites-available', self.name))
         except:
