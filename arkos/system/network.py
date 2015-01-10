@@ -127,7 +127,7 @@ def get_interfaces(name=None):
         data = psutil.net_io_counters(pernic=True)
         data = data[x] if type(data) == dict else data
         i.rx, i.tx = data[0], data[1]
-        i.ip = netifaces.ifaddresses(i.name).[netifaces.AF_INET]
+        i.ip = netifaces.ifaddresses(i.name)[netifaces.AF_INET]
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             r = fcntl.ioctl(s.fileno(), 0x8913, i.name + ("\0"*256))
             flags, = struct.unpack("H", r[16:18])

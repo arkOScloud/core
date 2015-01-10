@@ -1,5 +1,6 @@
 import base64
 import crypt
+import git
 import hashlib
 import json
 import os
@@ -11,6 +12,14 @@ import urllib2
 
 from passlib.hash import sha512_crypt
 
+
+def version():
+    release = '0.7'
+    try:
+        g = git.repo.Repo("./")
+        return g.git.describe(tags=True)
+    except (git.exc.InvalidGitRepositoryError, git.exc.GitCommandError):
+        return "0.7"
 
 def dictfilter(inp, kwargs):
     results = []

@@ -1,16 +1,14 @@
 import traceback
 
-from arkos import version
-from utils import api
+from utils import api, version
 
 
-class MalformedObject(Exception):
-    def __init__(self, raw):
-        Exception.__init__(self)
-        self.raw = raw
+class DefaultException(Exception):
+    def __init__(self, msg):
+        self.msg = msg
     
     def __str__(self):
-        return "Malformed object encountered in storage: %s" % str(self.raw)
+        return self.msg
 
 
 def process_exception(app, unit):

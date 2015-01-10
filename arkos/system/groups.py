@@ -2,7 +2,7 @@ import grp
 import ldap
 import ldap.modlist
 
-from arkos.connections import db_ldap
+from arkos import conns
 from arkos.utilities import shell
 
 
@@ -15,11 +15,11 @@ class Group(object):
     
     def add(self):
         try:
-            ldif = db_ldap.search_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn),
+            ldif = conns.LDAP.search_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn),
                 ldap.SCOPE_SUBLIST, "(objectClass=*)", None)
             raise Exception("A group with this name already exists")
         except ldap.NO_SUCH_OBJECT:
-            continue
+            pass
         ldif = {
             "objectClass": ["posixGroup", "top"],
             "cn": self.name,
@@ -27,11 +27,11 @@ class Group(object):
             "memberUid": users
         }
         ldif = ldap.modlist.addModlist(ldif)
-        db_ldap.add_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn), ldif)
+        conns.LDAP.add_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn), ldif)
     
     def update(self):
         try:
-            ldif = db_ldap.search_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn),
+            ldif = conns.LDAP.search_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn),
                 ldap.SCOPE_SUBLIST, "(objectClass=*)", None)
         except ldap.NO_SUCH_OBJECT:
             raise Exception("This group does not exist")
@@ -39,10 +39,10 @@ class Group(object):
         ldif = ldif[0][1]
         attrs = {"memberUid": self.users}
         nldif = ldap.modlist.modifyModlist(ldif, attrs, ignore_oldexistent=1)
-        db_ldap.modify_ext_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn), nldif)
+        conns.LDAP.modify_ext_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn), nldif)
     
     def delete(self):
-        db_ldap.delete_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn))
+        conns.LDAP.delete_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn))
 
 
 class SystemGroup(object):
@@ -54,7 +54,7 @@ class SystemGroup(object):
         shell("groupadd %s" % self.name)
         self.update()
         for x in grp.getgrall():
-            if x.gr_name = self.name:
+            if x.gr_name == self.name:
                 self.gid = x.gr_gid
     
     def update(self):
@@ -67,7 +67,7 @@ class SystemGroup(object):
 
 def get(gid=None):
     r = []
-    for x in db_ldap.search_s("ou=groups,%s" % self.rootdn, ldap.SCOPE_SUBTREE,
+    for x in conns.LDAP.search_s("ou=groups,%s" % self.rootdn, ldap.SCOPE_SUBTREE,
          "(objectClass=*)", None):
         g = Group(name=x[1]["cn"], gid=x[1]["gidNumber"], users=x[1]["memberUid"],
             rootdn=x[0].split("ou=users,")[1])

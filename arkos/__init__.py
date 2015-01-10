@@ -1,18 +1,8 @@
-import subprocess
+from arkos.connections import *
+from arkos.config import Config
+from arkos.storage import Storage
+from arkos.utilities.logs import new_logger
 
-from config import Config
-from storage import Storage
-from utilities.logs import new_logger
-
-
-def version():
-    release = '0.7'
-    p = subprocess.Popen('git describe --tags 2> /dev/null',
-            shell=True,
-            stdout=subprocess.PIPE)
-    if p.wait() != 0:
-        return release
-    return p.stdout.read().strip('\n ')
 
 class StorageControl:
     def __init__(self):
@@ -23,6 +13,13 @@ class StorageControl:
         self.points = Storage(["points"])
         self.updates = Storage(["updates"])
 
+class ConnectionsManager:
+    def __init__(self):
+        self.LDAP = ldap_connect(config=config)
+        self.SystemD = systemd_connect()
+        self.Supervisor = supervisor_connect()
+
 config = Config()
 storage = StorageControl()
 logger = new_logger(20, debug=False)
+conns = ConnectionsManager()

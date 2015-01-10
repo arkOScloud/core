@@ -26,7 +26,7 @@ import random
 import time
 from pycryptsetup import CryptSetup
 
-from arkos.core.utilities import get_current_entropy
+from arkos.utilities import get_current_entropy
 
 MIN_CREATE_ENTROPY = 256 # bits
 

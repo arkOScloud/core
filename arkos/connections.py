@@ -1,6 +1,8 @@
 import json
 import ldap
 import ldap.modlist
+import os
+import sys
 import xmlrpclib
 
 from dbus import SystemBus, Interface
@@ -26,13 +28,14 @@ def ldap_connect(uri="", rootdn="", dn="cn=admin", config=None, passwd=""):
                 raise Exception("Admin LDAP credentials not found in secrets file")
     c = ldap.initialize(uri)
     try:
-        c.simple_bind_s("%s,%s" % (self.dn, self.rootdn), passwd)
+        c.simple_bind_s("%s,%s" % (dn, rootdn), passwd)
     except ldap.INVALID_CREDENTIALS:
         raise Exception("Admin LDAP authentication failed.")
-    data = c.search_s("cn=admins,ou=groups,%s" % self.rootdn,
-        ldap.SCOPE_SUBTREE, "(objectClass=*)", ["member"])[0]["member"]
-    if "uid=%s,ou=users,%s" % (self.name, self.rootdn) not in data:
-        raise Exception("User is not an administrator")        
+    if dn != "cn=admin":
+        data = c.search_s("cn=admins,ou=groups,%s" % rootdn,
+            ldap.SCOPE_SUBTREE, "(objectClass=*)", ["member"])[0][1]["member"]
+        if "%s,%s" % (dn, rootdn) not in data:
+            raise Exception("User is not an administrator")        
     return c
 
 def systemd_connect():
@@ -43,8 +46,3 @@ def systemd_connect():
 def supervisor_connect():
     s = xmlrpclib.Server("http://localhost:9001/RPC2")
     return s.supervisor
-
-
-db_ldap = ldap_connect(config)
-systemd = systemd_connect()
-supervisor = supervisor_connect()

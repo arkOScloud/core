@@ -21,6 +21,10 @@ def get(policies={}):
     services["arkos"]["genesis"] = {"policy": policy, 
         "name": "System Management (Genesis/APIs)", "icon": "gen-arkos-round", 
         "ports": [("tcp", int(config.get("genesis", "port"))), ("tcp", 8765)]}
+    if policies.has_key("custom"):
+        services["custom"] = {}
+        for x in policies["custom"]:
+            services["custom"][x] = policies["custom"][x]
     for p in storage.apps.get("installed")
         for s in p.services:
             policy = policies[p.id][s["binary"]] if policies.has_key(p.id) \

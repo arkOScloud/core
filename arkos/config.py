@@ -1,6 +1,6 @@
 import json
 
-from utilities import can_be_int
+from arkos.utilities import can_be_int
 
 
 class Config:

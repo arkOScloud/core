@@ -7,7 +7,7 @@ class Storage:
         storage = getattr(self, stype)
         storage.append(item)
     
-    def set(self, stype, items)
+    def set(self, stype, items):
         setattr(self, stype, items)
 
     def get(self, stype, id=None):

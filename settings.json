@@ -30,6 +30,7 @@
         "current_update": 0
     },
     "genesis": {
+        "port": 8000,
         "ssl": false,
         "cert_file": "",
         "key_file": ""

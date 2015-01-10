@@ -8,13 +8,13 @@ import sys
 
 import groups
 
+from arkos import conns
 from arkos.utilities import hashpw
-from arkos.connections import db_ldap
 
 
 class User(object):
     def __init__(
-            self, name="", first_name="", last_name="", uid=0, domain=""
+            self, name="", first_name="", last_name="", uid=0, domain="", 
             rootdn="dc=arkos-servers,dc=org", admin=False, sudo=False):
         self.name = name
         self.first_name = first_name
@@ -27,11 +27,11 @@ class User(object):
     
     def add(self, passwd):
         try:
-            ldif = db_ldap.search_s("uid=%s,ou=users,%s" % (self.name,self.rootdn),
+            ldif = conns.LDAP.search_s("uid=%s,ou=users,%s" % (self.name,self.rootdn),
                 ldap.SCOPE_SUBLIST, "(objectClass=*)", None)
             raise Exception("A user with this name already exists")
         except ldap.NO_SUCH_OBJECT:
-            continue
+            pass
 
         ldif = {
             "objectClass": ["mailAccount", "inetOrgPerson", "posixAccount"],
@@ -49,12 +49,12 @@ class User(object):
             "loginShell": "/usr/bin/bash"
             }
         ldif = ldap.modlist.addModlist(ldif)
-        db_ldap.add_s("uid=%s,ou=users,%s" % (self.name,self.rootdn), ldif)
+        conns.LDAP.add_s("uid=%s,ou=users,%s" % (self.name,self.rootdn), ldif)
         self.update_adminsudo()
     
     def update(self):
         try:
-            ldif = db_ldap.search_s("uid=%s,ou=users,%s" % (self.name,self.rootdn),
+            ldif = conns.LDAP.search_s("uid=%s,ou=users,%s" % (self.name,self.rootdn),
                 ldap.SCOPE_SUBLIST, "(objectClass=*)", None)
         except ldap.NO_SUCH_OBJECT:
             raise Exception("This user does not exist")
@@ -71,27 +71,27 @@ class User(object):
             "mail": self.name+"@"+self.domain
         }
         nldif = ldap.modlist.modifyModlist(ldif, attrs, ignore_oldexistent=1)
-        db_ldap.modify_ext_s("uid=%s,ou=users,%s" % (self.name,self.rootdn), nldif)
+        conns.LDAP.modify_ext_s("uid=%s,ou=users,%s" % (self.name,self.rootdn), nldif)
         self.update_adminsudo()
 
     def update_adminsudo(self):
-        nldif = db_ldap.search_s("cn=admins,ou=groups,%s" % self.rootdn,
+        nldif = conns.LDAP.search_s("cn=admins,ou=groups,%s" % self.rootdn,
             ldap.SCOPE_SUBTREE, "(objectClass=*)", None)[0][1]
         memlist = nldif["member"]
         
         if admin and "uid=%s,ou=users,%s"%(self.name,self.rootdn) not in memlist:
             memlist += "uid=%s,ou=users,%s" % (self.name,self.rootdn)
-            nldif = ldap.modlist.modifyModlist(nldif, {"member": memlist, 
+            nldif = ldap.modlist.modifyModlist(nldif, {"member": memlist}, 
                 ignore_oldexistent=1)
-            db_ldap.modify_ext_s("cn=admins,ou=groups,%s" % self.rootdn, nldif)
+            conns.LDAP.modify_ext_s("cn=admins,ou=groups,%s" % self.rootdn, nldif)
         elif not admin and "uid=%s,ou=users,%s"%(self.name,self.rootdn) in memlist:
             memlist.remove("uid=%s,ou=users,%s" % (self.name,self.rootdn))
             nldif = ldap.modlist.modifyModlist(nldif, {"member": memlist},
                 ignore_oldexistent=1)
-            db_ldap.modify_ext_s("cn=admins,ou=groups,%s" % self.rootdn, nldif)
+            conns.LDAP.modify_ext_s("cn=admins,ou=groups,%s" % self.rootdn, nldif)
 
         try:
-            db_ldap.search_s("cn=%s,ou=sudo,%s" % (self.name,self.rootdn),
+            conns.LDAP.search_s("cn=%s,ou=sudo,%s" % (self.name,self.rootdn),
                 ldap.SCOPE_SUBLIST, "(objectClass=*)", None)
             is_sudo = True
         except ldap.NO_SUCH_OBJECT:
@@ -107,9 +107,9 @@ class User(object):
                 "sudoOption": "authenticate"
             }
             nldif = ldap.modlist.addModlist(nldif)
-            db_ldap.add_s("cn=%s,ou=sudo,%s" % (self.name, self.rootdn), nldif)
+            conns.LDAP.add_s("cn=%s,ou=sudo,%s" % (self.name, self.rootdn), nldif)
         elif not sudo and is_sudo:
-            db_ldap.delete_s("cn=%s,ou=sudo,%s" % (self.name, self.rootdn))
+            conns.LDAP.delete_s("cn=%s,ou=sudo,%s" % (self.name, self.rootdn))
     
     def verify_passwd(self, passwd):
         try:
@@ -127,10 +127,10 @@ class User(object):
         self.admin, self.sudo = False, False
         self.update_adminsudo()
         if delete_home:
-            hdir = db_ldap.search_s("uid=%s,ou=users,%s" % (v,self.rootdn),
+            hdir = conns.LDAP.search_s("uid=%s,ou=users,%s" % (v,self.rootdn),
                 ldap.SCOPE_SUBTREE, "(objectClass=*)", ["homeDirectory"])[0][1]["homeDirectory"]
             shutil.rmtree(hdir)
-        db_ldap.delete_s("uid=%s,ou=users,%s" % (v,self.rootdn))
+        conns.LDAP.delete_s("uid=%s,ou=users,%s" % (v,self.rootdn))
 
 
 class SystemUser(object):
@@ -155,20 +155,20 @@ class SystemUser(object):
 
 def get(uid=None):
     r = []
-    for x in db_ldap.search_s("ou=users,%s" % self.rootdn, ldap.SCOPE_SUBTREE,
+    for x in conns.LDAP.search_s("ou=users,%s" % self.rootdn, ldap.SCOPE_SUBTREE,
          "(objectClass=inetOrgPerson)", None):
         u = User(name=x[1]["uid"], uid=int(x[1]["uidNumber"]), 
             first_name=x[1]["givenName"], last_name=x[1]["sn"],
             domain=x[1]["mail"].split("@")[1], rootdn=x[0].split("ou=users,")[1])
 
         try:
-            db_ldap.search_s("cn=%s,ou=sudo,%s" % (self.name,self.rootdn),
+            conns.LDAP.search_s("cn=%s,ou=sudo,%s" % (self.name,self.rootdn),
                 ldap.SCOPE_SUBLIST, "(objectClass=*)", None)
             u.sudo = True
         except ldap.NO_SUCH_OBJECT:
             u.sudo = False
 
-        memlist = db_ldap.search_s("cn=admins,ou=groups,%s" % self.rootdn,
+        memlist = conns.LDAP.search_s("cn=admins,ou=groups,%s" % self.rootdn,
             ldap.SCOPE_SUBTREE, "(objectClass=*)", None)[0][1]["member"]
         if "uid=%s,ou=users,%s"%(u.name,u.rootdn) in memlist:
             u.admin = True

@@ -1,6 +1,5 @@
-from detect import *
-from utils import *
-from errors import *
+from arkos.utilities.detect import *
+from arkos.utilities.utils import *
 
 __all__ = [
     "dictfilter",
@@ -15,7 +14,5 @@ __all__ = [
     "can_be_int",
     "str_fsize",
     "detect_architecture",
-    "detect_platform",
-    "process_exception",
-    "MalformedObject"
+    "detect_platform"
 ]

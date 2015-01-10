@@ -1,8 +1,8 @@
 import glob
 import os
 
+from arkos import conns
 from arkos.utilities import shell
-from arkos.connections import systemd, supervisor
 
 
 class Service(object):
@@ -14,32 +14,33 @@ class Service(object):
 
     def start(self):
         if self.stype == 'supervisor':
-            supervisor.startProcess(self.name)
+            conns.Supervisor.startProcess(self.name)
         else:
-            systemd.StartUnit(self.name+".service", "replace")
+            conns.SystemD.StartUnit(self.name+".service", "replace")
     
     def stop(self):
         if self.stype == 'supervisor':
-            supervisor.stopProcess(self.name)
+            conns.Supervisor.stopProcess(self.name)
         else:
-            systemd.StopUnit(self.name+".service", "replace")
+            conns.SystemD.StopUnit(self.name+".service", "replace")
+        self.state = "stopped"
     
     def restart(self):
         if self.stype == 'supervisor':
-            supervisor.stopProcess(self.name, wait=True)
-            supervisor.startProcess(self.name)
+            conns.Supervisor.stopProcess(self.name, wait=True)
+            conns.Supervisor.startProcess(self.name)
         else:
-            systemd.ReloadOrRestartUnit(self.name+".service", "replace")
+            conns.SystemD.ReloadOrRestartUnit(self.name+".service", "replace")
 
     def real_restart(self):
         if self.stype == 'supervisor':
             self.restart()
         else:
-            systemd.RestartUnit(self.name+".service", "replace")
+            conns.SystemD.RestartUnit(self.name+".service", "replace")
     
     def get_log(self):
         if self.stype == 'supervisor':
-            s = supervisor.tailProcessStdoutLog(self.name)
+            s = conns.Supervisor.tailProcessStdoutLog(self.name)
         else:
             s = shell("systemctl --no-ask-password status {}.service".format(self.name))["stdout"]
         return s
@@ -52,40 +53,50 @@ class Service(object):
                     os.path.join('/etc/supervisor.d', self.name+'.ini'))
             if not svd.state == "running":
                 svd.start()
-            supervisor.addProcessGroup(self.name)
+            conns.Supervisor.addProcessGroup(self.name)
             self.start()
+            self.state = "running"
         else:
-            systemd.EnableUnitFiles([self.name+".service"], False, True)
+            conns.SystemD.EnableUnitFiles([self.name+".service"], False, True)
+        self.enabled = True
 
     def disable(self):
         if self.stype == 'supervisor':
             self.stop()
-            supervisor.removeProcessGroup(self.name)
+            conns.Supervisor.removeProcessGroup(self.name)
             os.rename(os.path.join('/etc/supervisor.d', self.name+'.ini'),
                 os.path.join('/etc/supervisor.d', self.name+'.ini.disabled'))
+            self.state = "stopped"
         else:
-            systemd.DisableUnitFiles([self.name+".service"], False)
+            conns.SystemD.DisableUnitFiles([self.name+".service"], False)
+        self.enabled = False
 
     def delete(self):
         if self.stype == 'supervisor':
             self.stop()
-            supervisor.removeProcessGroup(self.name)
+            conns.Supervisor.removeProcessGroup(self.name)
             try:
                 os.unlink(os.path.join('/etc/supervisor.d', self.name+'.ini'))
                 os.unlink(os.path.join('/etc/supervisor.d', self.name+'.ini.disabled'))
             except:
                 pass
+            self.state = "stopped"
+            self.enabled = False
 
 
-def get(self, name=None):
+def get(name=None):
     svcs = []
 
-    for unit in systemd.ListUnits():
+    for unit in conns.SystemD.ListUnits():
         if not unit[0].endswith(".service"):
             continue
+        try:
+            enabled = conns.SystemD.GetUnitFileState(unit[0])=="enabled"
+        except:
+            enabled = False
         s = Service(name=unit[0].split(".service")[0], stype="system",
             state="running" if unit[3]=="active" else "stopped",
-            enabled=systemd.GetUnitFileState(s.name+".service")==0)
+            enabled=enabled)
         if name == s.name:
             return s
         svcs.append(s)
@@ -94,7 +105,7 @@ def get(self, name=None):
         os.mkdir('/etc/supervisor.d')
     for x in os.listdir('/etc/supervisor.d'):
         s = Service(name=x.split(".ini")[0], stype="supervisor",
-            state=supervisor.getProcessInfo(s.name)["statename"].lower(),
+            state=conns.Supervisor.getProcessInfo(s.name)["statename"].lower(),
             enabled=not x.endswith("disabled"))
         if name == s.name:
             return s

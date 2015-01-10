@@ -1,7 +1,7 @@
 import ldap
 import ldap.modlist
 
-from arkos.connections import db_ldap
+from arkos import conns
 
 
 class Domain(object):
@@ -13,22 +13,22 @@ class Domain(object):
     
     def add(self):
         try:
-            ldif = db_ldap.search_s("virtualdomain=%s,ou=domains,%s" % (self.name,self.rootdn),
+            ldif = conns.LDAP.search_s("virtualdomain=%s,ou=domains,%s" % (self.name,self.rootdn),
                 ldap.SCOPE_SUBLIST, "(objectClass=*)", None)
             raise Exception("This domain is already present here")
         except ldap.NO_SUCH_OBJECT:
-            continue
+            pass
         ldif = {"virtualdomain": self.name, "objectClass": ["mailDomain", "top"]}
-        db_ldap.add_s("virtualdomain=%s,ou=domains,%s" % (self.name,self.rootdn),
+        conns.LDAP.add_s("virtualdomain=%s,ou=domains,%s" % (self.name,self.rootdn),
             ldap.modlist.addModlist(ldif))
     
     def remove_domain(self):
-        db_ldap.delete_s("virtualdomain=%s,ou=domains,%s" % (self.name,self.rootdn))
+        conns.LDAP.delete_s("virtualdomain=%s,ou=domains,%s" % (self.name,self.rootdn))
 
 
-def get(self, name=None):
+def get(name=None):
     results = []
-    qset = db_ldap.search_s("ou=domains,%s" % self.rootdn,
+    qset = conns.LDAP.search_s("ou=domains,%s" % self.rootdn,
         ldap.SCOPE_SUBTREE, "virtualdomain=*", ["virtualdomain"])
     for x in qset:
         d = Domain()
