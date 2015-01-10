@@ -18,7 +18,7 @@ setup(
         'psutil',
         'netifaces',
         'GitPython',
-        'redis'
+        'python-gnupg'
     ],
     description='arkOS core system management libraries',
     author='CitizenWeb',

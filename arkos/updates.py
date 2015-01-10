@@ -1,12 +1,29 @@
-from arkos import storage, config
+import json
+import gnupg
+
+from arkos import storage, config, logger
 from arkos.utilities import api, DefaultMessage
 
 
 def check_updates():
+    updates = []
+    gpg = gnupg.GPG()
     server = config.get("general", "repo_server")
     current = config.get("updates", "current_update", 0)
     data = api("https://%s/updates/%s" % (server, current), crit=True)
-    storage.updates.set("updates", data)
+    for x in data:
+        ustr, u = x, json.loads(x)
+        sig = api("https://%s/signatures/%s" % (server, u["id"]), 
+            returns="raw", crit=True)
+        with open("/tmp/%s.sig" % u["id"], "w") as f:
+            f.write(sig)
+        v = gpg.verify("/tmp/%s.sig" % u["id"], ustr)
+        if not v.trust_level or not v.trust_level >= v.TRUST_FULLY:
+            logger.error("Update %s signature verification failed" % u["id"])
+            break
+        else:
+            updates.append(u)
+    storage.updates.set("updates", updates)
 
 def install_updates(message=DefaultMessage()):
     updates = storage.updates.get("updates")
