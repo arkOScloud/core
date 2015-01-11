@@ -8,7 +8,7 @@ import shutil
 import crypto
 import losetup
 
-from arkos import config
+from arkos import config, storage
 from arkos.utilities import shell
 
 libc = ctypes.CDLL(ctypes.util.find_library("libc"), use_errno=True)
@@ -16,13 +16,13 @@ libc = ctypes.CDLL(ctypes.util.find_library("libc"), use_errno=True)
 
 class DiskPartition(object):
     def __init__(
-            self, name="", path="", mountpoint="", size=0, geometry=2048, 
+            self, name="", path="", mountpoint="", size=0, fstype="", 
             crypt=False):
         self.name = name
         self.path = path
         self.mountpoint = mountpoint
         self.size = size
-        self.geometry = geometry
+        self.fstype = fstype
         self.crypt = crypt
 
     def mount(self, passwd=None):
@@ -30,25 +30,30 @@ class DiskPartition(object):
             s = crypto.luks_open(self.path, self.name, passwd)
             if s != 0:
                 raise Exception('Failed to decrypt %s with errno %s' % (self.name, str(s)))
-            s = self.libc.mount(os.path.join("/dev/mapper", self.name), 
-                os.path.join('/media', self.name), self.geometry, 0, None)
+            s = libc.mount(ctypes.c_char_p(os.path.join("/dev/mapper", self.name)), 
+                ctypes.c_char_p(os.path.join('/media', self.name)), 
+                ctypes.c_char_p(self.fstype), 0, ctypes.c_char_p(""))
             if s == -1:
                 crypto.luks_close(self.name)
-                raise Exception('Failed to mount %s: %s' % (self.name, os.strerror(ctypes.errorno())))
+                raise Exception('Failed to mount %s: %s' % (self.name, os.strerror(ctypes.get_errno())))
         elif self.crypt and not passwd:
             raise Exception("Must provide password to decrypt encrypted disk")
         else:
-            s = self.libc.mount(self.path, os.path.join('/media', self.name), self.geometry, 0, None)
+            s = libc.mount(ctypes.c_char_p(self.path), 
+                ctypes.c_char_p(os.path.join('/media', self.name)), 
+                ctypes.c_char_p(self.fstype), 0, ctypes.c_char_p(""))
             if s == -1:
-                raise Exception('Failed to mount %s: %s'%(self.name, os.strerror(ctypes.errorno())))
+                raise Exception('Failed to mount %s: %s'%(self.name, os.strerror(ctypes.get_errno())))
         self.mountpoint = os.path.join('/media', self.name)
+        storage.points.append("points", PointOfInterest(self.name, self.mountpoint,
+            "crypt" if self.crypt else "disk", "gen-storage"))
     
     def umount(self):
         if not self.mountpoint:
             return
-        s = self.libc.umount2(self.mountpoint, 0)
+        s = libc.umount2(ctypes.c_char_p(self.mountpoint), 0)
         if s == -1:
-            raise Exception('Failed to unmount %s: %s'%(self.name, os.strerror(ctypes.errorno())))
+            raise Exception('Failed to unmount %s: %s'%(self.name, os.strerror(ctypes.get_errno())))
         if self.crypt:
             crypto.luks_close(self.name)
         self.remove_point_of_interest_by_path(self.mountpoint)
@@ -57,27 +62,27 @@ class DiskPartition(object):
 
 class VirtualDisk(object):
     def __init__(
-            self, name="", path="", mountpoint="", size=0, geometry=2048,
+            self, name="", path="", mountpoint="", size=0, fstype="ext4",
             crypt=False):
         self.name = name
         self.path = path
         self.mountpoint = mountpoint
         self.size = size
-        self.geometry = geometry
+        self.fstype = fstype
         self.crypt = crypt
     
     def create(self, mount=False):
-        self.path = os.path.join(config.get("filesystems", "vdisk_dir"), self.name+'.img')
+        self.path = str(os.path.join(config.get("filesystems", "vdisk_dir"), self.name+'.img'))
         if os.path.exists(self.path):
             raise Exception("This virtual disk already exists")
         with open(self.path, 'wb') as f:
             written = 0
             with file('/dev/zero', 'r') as zero:
-                while size > written:
+                while self.size > written:
                     written += 1024
                     f.write(zero.read(1024))
         l = losetup.find_unused_loop_device()
-        l.mount(self.path)
+        l.mount(str(self.path))
         s = shell('mkfs.ext4 %s' % l.device)
         if s["code"] != 0:
             raise Exception('Failed to format loop device: %s' % s["stderr"])
@@ -86,34 +91,35 @@ class VirtualDisk(object):
             self.mount()
     
     def mount(self, passwd=None):
-        if mountpoint:
+        if self.mountpoint:
             raise Exception("Virtual disk already mounted")
         if not os.path.isdir(os.path.join('/media', self.name)):
             os.makedirs(os.path.join('/media', self.name))
         dev = losetup.find_unused_loop_device()
-        dev.mount(self.path)
-        p = parted.Disk(parted.getDevice(dev.device)).getPrimaryPartitions()[0]
-        self.geometry = parted.probeFileSystem(p.geometry)
+        dev.mount(str(self.path), offset=1048576)
         if self.crypt and passwd:
             s = crypto.luks_open(dev.device, self.name, passwd)
             if s != 0:
                 dev.unmount()
                 raise Exception('Failed to decrypt %s with errno %s' % (self.name, str(s)))
-            s = self.libc.mount(os.path.join("/dev/mapper", self.name), 
-                os.path.join('/media', self.name), self.geometry, 0, None)
+            s = libc.mount(ctypes.c_char_p(os.path.join("/dev/mapper", self.name)), 
+                ctypes.c_char_p(os.path.join('/media', self.name)), 
+                ctypes.c_char_p(self.fstype), 0, ctypes.c_char_p(""))
             if s == -1:
                 crypto.luks_close(self.name)
                 dev.unmount()
-                raise Exception('Failed to mount %s: %s' % (self.name, os.strerror(ctypes.errorno())))
+                raise Exception('Failed to mount %s: %s' % (self.name, os.strerror(ctypes.get_errno())))
         elif self.crypt and not passwd:
             raise Exception("Must provide password to decrypt encrypted container")
         else:
-            s = self.libc.mount(dev.device, os.path.join('/media', self.name), 
-                self.geometry, 0, None)
+            s = libc.mount(ctypes.c_char_p(dev.device), ctypes.c_char_p(os.path.join('/media', self.name)), 
+                ctypes.c_char_p(self.fstype), 0, ctypes.c_char_p(""))
             if s == -1:
                 dev.unmount()
-                raise Exception('Failed to mount %s: %s' % (self.name, os.strerror(ctypes.errorno())))
-        self.mountpoint = os.path.join("/dev/mapper", self.name)
+                raise Exception('Failed to mount %s: %s' % (self.name, os.strerror(ctypes.get_errno())))
+        self.mountpoint = os.path.join('/media', self.name)
+        storage.points.append("points", PointOfInterest(self.name, self.mountpoint,
+            "crypt" if self.crypt else "vdisk", "gen-storage"))
     
     def umount(self):
         if not self.mountpoint:
@@ -123,28 +129,27 @@ class VirtualDisk(object):
             if l[x].is_used() and l[x].get_filename() == self.path:
                 dev = l[x]
                 break
-        s = self.libc.umount2(self.mountpoint, 0)
+        s = libc.umount2(ctypes.c_char_p(self.mountpoint), 0)
         if s == -1:
-            raise Exception('Failed to unmount %s: %s'%(self.name, os.strerror(ctypes.errorno())))
+            raise Exception('Failed to unmount %s: %s'%(self.name, os.strerror(ctypes.get_errno())))
         if self.crypt:
             crypto.luks_close(self.name)
         if dev:
             dev.unmount()
-        self.remove_point_of_interest_by_path(self.mountpoint)
+        storage.points.remove("points", self.name)
         self.mountpoint = ""
     
     def encrypt(self, passwd, cipher="aes-xts-plain64", keysize=256, mount=False):
         os.rename(self.path, os.path.join(config.get("filesystems", "vdisk_dir"), self.name+'.crypt'))
         self.path = os.path.join(config.get("filesystems", "vdisk_dir"), self.name+'.crypt')
         dev = losetup.find_unused_loop_device()
-        dev.mount(self.path)
+        dev.mount(str(self.path), offset=1048576)
         s = crypto.luks_format(dev.device, passwd, cipher, keysize)
         if s != 0:
             if move:
                 dev.unmount()
                 os.rename(self.path, os.path.join(config.get("filesystems", "vdisk_dir"), self.name+'.img'))
             raise Exception('Failed to encrypt %s with errno %s'%(self.name, str(s)))
-        fs["type"] = 'crypt'
         s = crypto.luks_open(dev.device, self.name, passwd)
         if s != 0:
             dev.unmount()
@@ -178,13 +183,16 @@ def get_disk_partitions(name=None):
             x = x.split()
             mps[x[0]] = x[1]
     for d in parted.getAllDevices():
-        for p in parted.Disk(d).getPrimaryPartitions():
-            if path.split("/")[-1].startswith("loop"):
+        try:
+            parts = parted.Disk(d).getPrimaryPartitions()
+        except:
+            continue
+        for p in parts:
+            if p.path.split("/")[-1].startswith("loop"):
                 continue
             dev = DiskPartition(name=p.path.split("/")[-1], path=p.path, 
                 mountpoint=mps.get(p.path) or None, size=p.getSize("B"),
-                geometry=parted.probeFileSystem(p.geometry), 
-                crypt=crypto.is_luks(p.path))
+                geometry=parted.probeFileSystem(p.geometry), crypt=crypto.is_luks(p.path))
             if name == dev.name:
                 return dev
             devs.append(dev)
@@ -196,15 +204,23 @@ def get_virtual_disks(name=None):
         for x in f.readlines():
             x = x.split()
             mps[x[0]] = x[1]
-    for x in glob.glob(os.path.join(self.vdisk_dir, '*')):
+    for x in losetup.get_loop_devices():
+        try:
+            s = x.get_status()
+        except:
+            continue
+        if "/dev/loop%s" % s.lo_number in mps:
+            mps[s.lo_filename] = mps["/dev/loop%s" % s.lo_number]
+    for x in glob.glob(os.path.join(config.get("filesystems", "vdisk_dir"), '*')):
         if not x.endswith((".img", ".crypt")):
             continue
-        dev = VirtualDisk(name=os.path.splitext(os.path.split(x)[1])[0],
-            path=x, mountpoint=mps.get(dev.path) or None, size=os.path.getsize(x),
-            crypt=x.endswith(".crypt"))
+        name = os.path.splitext(os.path.split(x)[1])[0]
+        dev = VirtualDisk(name=name, path=x, size=os.path.getsize(x),
+        mountpoint=mps.get(x) or mps.get("/dev/mapper/%s" % name) or None, 
+        crypt=x.endswith(".crypt"))
         if name == dev.name:
             return dev
-        vdevs.append(dev)
+        devs.append(dev)
     return sorted(devs, key=lambda x: x.name) if not name else None
 
 def get_points_of_interest(name=None):
@@ -220,7 +236,7 @@ def get_points_of_interest(name=None):
         if name == p.name:
             return p
         points.append(p)
-    for x in self.sites.get():
+    for x in storage.sites.get("sites"):
         if x.stype == 'ReverseProxy':
             continue
         p = PointOfInterest(name=x.name, path=x.path, stype="site", icon=x.icon)
