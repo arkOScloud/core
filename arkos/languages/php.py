@@ -4,7 +4,7 @@ import urllib2
 
 from distutils.spawn import find_executable
 
-from arkos.core.utilities import shell
+from arkos.utilities import shell
 
 
 def install_composer(self):

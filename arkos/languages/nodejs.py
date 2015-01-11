@@ -1,6 +1,6 @@
 import os
 
-from arkos.core.utilities import shell
+from arkos.utilities import shell
 
 
 def install(self, *mods, **kwargs):

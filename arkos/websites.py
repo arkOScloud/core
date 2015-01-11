@@ -298,7 +298,7 @@ class Site:
         nginx_reload()
 
     def update(self, message=DefaultMessage()):
-        if self.version == self.meta.version.rsplit("-", 1)[0]
+        if self.version == self.meta.version.rsplit("-", 1)[0]:
             raise Exception("Website is already at the latest version")
         elif self.version in [None, "None"]:
             raise Exception("Updates not supported for this website type")
@@ -387,10 +387,10 @@ def get():
         if not os.path.exists(path):
             continue
         rport = re.compile('(\\d+)\s*(.*)')
-		g = ConfigParser.SafeConfigParser()
+        g = ConfigParser.SafeConfigParser()
         if not g.read(os.path.join(path, ".arkos")):
             continue
-		s = get_engine(g.get('website', 'stype'))
+        s = get_engine(g.get('website', 'stype'))
         s = s(name=g.get('website', 'name'))
         try:
             ssl = None

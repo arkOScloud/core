@@ -2,34 +2,34 @@ import datetime
 import logging
 import sys
 
-from arkos import config
 from errors import DefaultException
 
 
 class DefaultMessage:
+    PRINT = False
+
     def __init__(self, cls="", msg=""):
-        self.speak = config.get("enviro", "print_messages", False)
         if cls == "error" and msg:
             raise DefaultException(str(msg))
-        elif self.speak and cls == "warning" and msg:
+        elif self.PRINT and cls == "warning" and msg:
             print "\033[33m%s\033[0m" % msg
-        elif self.speak and msg:
+        elif self.PRINT and msg:
             print "\033[32m%s\033[0m" % msg
     
     def update(self, cls, msg):
         if cls == "error":
             raise DefaultException(str(msg))
-        elif self.speak and cls == "warning":
+        elif self.PRINT and cls == "warning":
             print "\033[33m%s\033[0m" % msg
-        elif self.speak:
+        elif self.PRINT:
             print "\033[32m%s\033[0m" % msg
     
     def complete(self, cls, msg):
         if cls == "error":
             raise DefaultException(str(msg))
-        elif self.speak and cls == "warning":
+        elif self.PRINT and cls == "warning":
             print "\033[33m%s\033[0m" % msg
-        elif self.speak:
+        elif self.PRINT:
             print "\033[32m%s\033[0m" % msg
 
 

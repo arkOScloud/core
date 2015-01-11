@@ -25,7 +25,7 @@ def get(policies={}):
         services["custom"] = {}
         for x in policies["custom"]:
             services["custom"][x] = policies["custom"][x]
-    for p in storage.apps.get("installed")
+    for p in storage.apps.get("installed"):
         for s in p.services:
             policy = policies[p.id][s["binary"]] if policies.has_key(p.id) \
                 and policies[p.id].has_key(s["binary"]) else 2

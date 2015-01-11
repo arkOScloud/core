@@ -1,5 +1,6 @@
 from arkos.utilities.detect import *
 from arkos.utilities.utils import *
+from arkos.utilities.logs import *
 
 __all__ = [
     "dictfilter",
@@ -14,5 +15,7 @@ __all__ = [
     "can_be_int",
     "str_fsize",
     "detect_architecture",
-    "detect_platform"
+    "detect_platform",
+    "new_logger",
+    "DefaultMessage"
 ]

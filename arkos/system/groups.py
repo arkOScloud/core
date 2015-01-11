@@ -6,7 +6,7 @@ from arkos import conns
 from arkos.utilities import shell
 
 
-class Group(object):
+class Group:
     def __init__(self, name="", gid=0, users=[], rootdn="dc=arkos-servers,dc=org"):
         self.name = name
         self.gid = gid or get_next_gid()
@@ -45,10 +45,11 @@ class Group(object):
         conns.LDAP.delete_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn))
 
 
-class SystemGroup(object):
-    name = ""
-    gid = 0
-    users = []
+class SystemGroup:    
+    def __init__(self, name="", gid=0, users=[]):
+        self.name = name
+        self.gid = gid
+        self.users = users
 
     def add(self):
         shell("groupadd %s" % self.name)

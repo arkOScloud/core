@@ -128,7 +128,7 @@ def get_updatable():
     if not storage.apps.get("available"):
         storage.apps.set("available", get_available())
     if not storage.apps.get("installed"):
-        storage.apps.set("installed", get_installed())
+        storage.apps.set("installed", get())
     for x in storage.apps.get("available"):
         for y in storage.apps.get("installed"):
             if x.id == y.id and x.version != y.version:
@@ -144,7 +144,7 @@ def verify_app_dependencies():
                 if not dep["package"] in [y.id for y in apps]:
                     x.loadable = False
                     x.error = "Depends on %s, which is not installed" % dep["name"]
-                    self.app.logger.debug("*** Verify failed for %s -- dependent on %s which is not installed" % (x.name,dep["name"]))
+                    logger.debug("*** Verify failed for %s -- dependent on %s which is not installed" % (x.name,dep["name"]))
                     for z in get_dependent(x.id, "remove"):
                         z = storage.apps.get("installed", z)
                         z.loadable = False
@@ -152,7 +152,7 @@ def verify_app_dependencies():
                 elif not storage.apps.get("installed", dep["package"]).loadable:
                     x.loadable = False
                     x.error = "Depends on %s, which also failed" % dep["name"]
-                    self.app.logger.debug("*** Verify failed for %s -- dependent on %s which failed to load" % (x.name,dep["name"]))
+                    logger.debug("*** Verify failed for %s -- dependent on %s which failed to load" % (x.name,dep["name"]))
                     for z in get_dependent(x.id, "remove"):
                         z = storage.apps.get("installed", z)
                         z.loadable = False
@@ -167,13 +167,13 @@ def get_dependent(id, op):
             for dep in i.dependencies:
                 if dep['type'] == 'app' and dep['package'] == id:
                     metoo.append(i)
-                    metoo += self.verify_operation(i.id, 'remove')
+                    metoo += get_dependent(i.id, 'remove')
     elif op == 'install':
         i = next(x for x in avail if x["id"] == id)
         for dep in i["dependencies"]:
             if dep["type"] == 'app' and dep['package'] not in [x["pid"] for x in inst]:
                 metoo.append(dep['package'])
-                metoo += self.verify_operation(dep['package'], 'install')
+                metoo += get_dependent(dep['package'], 'install')
     return metoo
 
 def install(id, install_deps=True, message=DefaultMessage()):

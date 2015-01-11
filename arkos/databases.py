@@ -26,6 +26,7 @@ class DatabaseUser:
         self.name = name
     
     def chperm(self):
+        pass
     
     def remove(self):
         pass
@@ -45,7 +46,7 @@ class DatabaseManager:
     
     def get_users(self):
         pass
-    
+
 
 def get():
     dbs = []
