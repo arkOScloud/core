@@ -8,11 +8,11 @@ import sys
 
 import groups
 
-from arkos import conns
+from arkos import conns, config
 from arkos.utilities import hashpw
 
 
-class User(object):
+class User:
     def __init__(
             self, name="", first_name="", last_name="", uid=0, domain="", 
             rootdn="dc=arkos-servers,dc=org", admin=False, sudo=False):
@@ -28,7 +28,7 @@ class User(object):
     def add(self, passwd):
         try:
             ldif = conns.LDAP.search_s("uid=%s,ou=users,%s" % (self.name,self.rootdn),
-                ldap.SCOPE_SUBLIST, "(objectClass=*)", None)
+                ldap.SCOPE_SUBTREE, "(objectClass=*)", None)
             raise Exception("A user with this name already exists")
         except ldap.NO_SUCH_OBJECT:
             pass
@@ -43,8 +43,8 @@ class User(object):
             "mail": self.name+"@"+self.domain,
             "maildrop": self.name,
             "userPassword": hashpw(passwd, "crypt"),
-            "gidNumber": self.uid,
-            "uidNumber": self.uid,
+            "gidNumber": str(self.uid),
+            "uidNumber": str(self.uid),
             "homeDirectory": "/home/%s" % self.name,
             "loginShell": "/usr/bin/bash"
             }
@@ -55,7 +55,7 @@ class User(object):
     def update(self):
         try:
             ldif = conns.LDAP.search_s("uid=%s,ou=users,%s" % (self.name,self.rootdn),
-                ldap.SCOPE_SUBLIST, "(objectClass=*)", None)
+                ldap.SCOPE_SUBTREE, "(objectClass=*)", None)
         except ldap.NO_SUCH_OBJECT:
             raise Exception("This user does not exist")
 
@@ -75,29 +75,27 @@ class User(object):
         self.update_adminsudo()
 
     def update_adminsudo(self):
-        nldif = conns.LDAP.search_s("cn=admins,ou=groups,%s" % self.rootdn,
+        ldif = conns.LDAP.search_s("cn=admins,ou=groups,%s" % self.rootdn,
             ldap.SCOPE_SUBTREE, "(objectClass=*)", None)[0][1]
-        memlist = nldif["member"]
+        memlist = ldif["member"]
         
-        if admin and "uid=%s,ou=users,%s"%(self.name,self.rootdn) not in memlist:
-            memlist += "uid=%s,ou=users,%s" % (self.name,self.rootdn)
-            nldif = ldap.modlist.modifyModlist(nldif, {"member": memlist}, 
-                ignore_oldexistent=1)
-            conns.LDAP.modify_ext_s("cn=admins,ou=groups,%s" % self.rootdn, nldif)
-        elif not admin and "uid=%s,ou=users,%s"%(self.name,self.rootdn) in memlist:
+        if self.admin and "uid=%s,ou=users,%s"%(self.name,self.rootdn) not in memlist:
+            memlist += ["uid=%s,ou=users,%s" % (self.name,self.rootdn)]
+            conns.LDAP.modify_ext_s("cn=admins,ou=groups,%s" % self.rootdn,
+                [(1, "member", None), (0, "member", memlist)])
+        elif not self.admin and "uid=%s,ou=users,%s"%(self.name,self.rootdn) in memlist:
             memlist.remove("uid=%s,ou=users,%s" % (self.name,self.rootdn))
-            nldif = ldap.modlist.modifyModlist(nldif, {"member": memlist},
-                ignore_oldexistent=1)
-            conns.LDAP.modify_ext_s("cn=admins,ou=groups,%s" % self.rootdn, nldif)
+            conns.LDAP.modify_ext_s("cn=admins,ou=groups,%s" % self.rootdn,
+                [(1, "member", None), (0, "member", memlist)])
 
         try:
             conns.LDAP.search_s("cn=%s,ou=sudo,%s" % (self.name,self.rootdn),
-                ldap.SCOPE_SUBLIST, "(objectClass=*)", None)
+                ldap.SCOPE_SUBTREE, "(objectClass=*)", None)
             is_sudo = True
         except ldap.NO_SUCH_OBJECT:
             is_sudo = False
 
-        if sudo and not is_sudo:
+        if self.sudo and not is_sudo:
             nldif = {
                 "objectClass": ["sudoRole", "top"],
                 "cn": self.name,
@@ -108,7 +106,7 @@ class User(object):
             }
             nldif = ldap.modlist.addModlist(nldif)
             conns.LDAP.add_s("cn=%s,ou=sudo,%s" % (self.name, self.rootdn), nldif)
-        elif not sudo and is_sudo:
+        elif not self.sudo and is_sudo:
             conns.LDAP.delete_s("cn=%s,ou=sudo,%s" % (self.name, self.rootdn))
     
     def verify_passwd(self, passwd):
@@ -116,7 +114,7 @@ class User(object):
             c = ldap.initialize("ldap://localhost")
             c.simple_bind_s("uid=%s,ou=users,%s" % (self.name, self.rootdn), passwd)
             data = c.search_s("cn=admins,ou=groups,%s" % self.rootdn,
-                ldap.SCOPE_SUBTREE, "(objectClass=*)", ["member"])[0]["member"]
+                ldap.SCOPE_SUBTREE, "(objectClass=*)", ["member"])[0][1]["member"]
             if "uid=%s,ou=users,%s" % (self.name, self.rootdn) not in data:
                 return False
             return True
@@ -127,13 +125,14 @@ class User(object):
         self.admin, self.sudo = False, False
         self.update_adminsudo()
         if delete_home:
-            hdir = conns.LDAP.search_s("uid=%s,ou=users,%s" % (v,self.rootdn),
-                ldap.SCOPE_SUBTREE, "(objectClass=*)", ["homeDirectory"])[0][1]["homeDirectory"]
-            shutil.rmtree(hdir)
-        conns.LDAP.delete_s("uid=%s,ou=users,%s" % (v,self.rootdn))
+            hdir = conns.LDAP.search_s("uid=%s,ou=users,%s" % (self.name,self.rootdn),
+                ldap.SCOPE_SUBTREE, "(objectClass=*)", ["homeDirectory"])[0][1]["homeDirectory"][0]
+            if os.path.exists(hdir):
+                shutil.rmtree(hdir)
+        conns.LDAP.delete_s("uid=%s,ou=users,%s" % (self.name,self.rootdn))
 
 
-class SystemUser(object):
+class SystemUser:
     def __init__(self, name="", uid=0, groups=[]):
         self.name = name
         self.uid = uid or get_next_uid()
@@ -155,20 +154,23 @@ class SystemUser(object):
 
 def get(uid=None):
     r = []
-    for x in conns.LDAP.search_s("ou=users,%s" % self.rootdn, ldap.SCOPE_SUBTREE,
-         "(objectClass=inetOrgPerson)", None):
+    for x in conns.LDAP.search_s("ou=users,%s" % config.get("general", "ldap_rootdn", "dc=arkos-servers,dc=org"), 
+            ldap.SCOPE_SUBTREE, "(objectClass=inetOrgPerson)", None):
+        for y in x[1]:
+            if type(x[1][y]) == list and len(x[1][y]) == 1:
+                x[1][y] = x[1][y][0]
         u = User(name=x[1]["uid"], uid=int(x[1]["uidNumber"]), 
             first_name=x[1]["givenName"], last_name=x[1]["sn"],
             domain=x[1]["mail"].split("@")[1], rootdn=x[0].split("ou=users,")[1])
 
         try:
-            conns.LDAP.search_s("cn=%s,ou=sudo,%s" % (self.name,self.rootdn),
-                ldap.SCOPE_SUBLIST, "(objectClass=*)", None)
+            conns.LDAP.search_s("cn=%s,ou=sudo,%s" % (u.name,u.rootdn),
+                ldap.SCOPE_SUBTREE, "(objectClass=*)", None)
             u.sudo = True
         except ldap.NO_SUCH_OBJECT:
             u.sudo = False
 
-        memlist = conns.LDAP.search_s("cn=admins,ou=groups,%s" % self.rootdn,
+        memlist = conns.LDAP.search_s("cn=admins,ou=groups,%s" % u.rootdn,
             ldap.SCOPE_SUBTREE, "(objectClass=*)", None)[0][1]["member"]
         if "uid=%s,ou=users,%s"%(u.name,u.rootdn) in memlist:
             u.admin = True
@@ -182,15 +184,18 @@ def get(uid=None):
 
 def get_system(uid=None):
     r = []
+    grps = groups.get()
     for x in pwd.getpwall():
+        if x.pw_name == "root":
+            continue
         su = SystemUser(name=x.pw_name, uid=x.pw_uid)
-        for y in groups.get():
+        for y in grps:
             if su.name in y.users:
                 su.groups.append(y.name)
         if uid == su.name:
             return su
         r.append(su)
-    return sorted(r, key=su.uid) if not uid else None
+    return sorted(r, key=lambda x: x.uid) if not uid else None
 
 def get_next_uid():
     return max([x.uid for x in get_system()]) + 1

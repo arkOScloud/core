@@ -2,7 +2,7 @@ import grp
 import ldap
 import ldap.modlist
 
-from arkos import conns
+from arkos import conns, config
 from arkos.utilities import shell
 
 
@@ -16,7 +16,7 @@ class Group:
     def add(self):
         try:
             ldif = conns.LDAP.search_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn),
-                ldap.SCOPE_SUBLIST, "(objectClass=*)", None)
+                ldap.SCOPE_SUBTREE, "(objectClass=*)", None)
             raise Exception("A group with this name already exists")
         except ldap.NO_SUCH_OBJECT:
             pass
@@ -24,7 +24,7 @@ class Group:
             "objectClass": ["posixGroup", "top"],
             "cn": self.name,
             "gidNumber": str(self.gid),
-            "memberUid": users
+            "memberUid": self.users
         }
         ldif = ldap.modlist.addModlist(ldif)
         conns.LDAP.add_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn), ldif)
@@ -32,14 +32,16 @@ class Group:
     def update(self):
         try:
             ldif = conns.LDAP.search_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn),
-                ldap.SCOPE_SUBLIST, "(objectClass=*)", None)
+                ldap.SCOPE_SUBTREE, "(objectClass=*)", None)
         except ldap.NO_SUCH_OBJECT:
             raise Exception("This group does not exist")
 
-        ldif = ldif[0][1]
-        attrs = {"memberUid": self.users}
-        nldif = ldap.modlist.modifyModlist(ldif, attrs, ignore_oldexistent=1)
-        conns.LDAP.modify_ext_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn), nldif)
+        if "memberUid" in ldif[0][1]:
+            conns.LDAP.modify_ext_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn),
+                [(1, "memberUid", None), (0, "memberUid", self.users)])
+        else:
+            conns.LDAP.modify_ext_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn),
+                [(0, "memberUid", self.users)])
     
     def delete(self):
         conns.LDAP.delete_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn))
@@ -68,10 +70,13 @@ class SystemGroup:
 
 def get(gid=None):
     r = []
-    for x in conns.LDAP.search_s("ou=groups,%s" % self.rootdn, ldap.SCOPE_SUBTREE,
-         "(objectClass=*)", None):
-        g = Group(name=x[1]["cn"], gid=x[1]["gidNumber"], users=x[1]["memberUid"],
-            rootdn=x[0].split("ou=users,")[1])
+    for x in conns.LDAP.search_s("ou=groups,%s" % config.get("general", "ldap_rootdn", "dc=arkos-servers,dc=org"), 
+            ldap.SCOPE_SUBTREE, "(objectClass=posixGroup)", None):
+        for y in x[1]:
+            if type(x[1][y]) == list and len(x[1][y]) == 1 and y != "memberUid":
+                x[1][y] = x[1][y][0]
+        g = Group(name=x[1]["cn"], gid=int(x[1]["gidNumber"]), users=x[1].get("memberUid") or [],
+            rootdn=x[0].split("ou=groups,")[1])
         if g.name == gid:
             return g
         r.append(g)
@@ -86,5 +91,5 @@ def get_system(gid=None):
         r.append(g)
     return r if not gid else None
 
-def get_next_gid(self):
+def get_next_gid():
     return max([x.gid for x in get_system()]) + 1
