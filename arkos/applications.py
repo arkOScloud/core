@@ -20,13 +20,7 @@ class App:
         self.error = ""
 
     def get_module(self, mtype):
-        if mtype == "kraken":
-            return self._kraken if hasattr(self, "_kraken") else None
-        elif mtype == "genesis":
-            return self._genesis if hasattr(self, "_genesis") else None
-        elif mtype == "cli":
-            return self._cli if hasattr(self, "_cli") else None
-        return None
+        return getattr(self, "_%s"%mtype) if hasattr(self, "_%s"%mtype) else None
     
     def verify_dependencies(self):
         verify, error = True, ""
@@ -89,7 +83,7 @@ class App:
                     exclude.append(item["package"])
         for item in self.dependencies:
             if item["type"] == "system" and not item["package"] in exclude:
-                if item["daemon"]:
+                if item.has_key("daemon") and item["daemon"]:
                     services.stop(item["daemon"])
                     services.disable(item["daemon"])
                 packages.remove([item["package"]], purge=config.get("apps", "purge", False))
@@ -115,7 +109,19 @@ def get():
                 data = json.loads(f.read())
         except Exception, e:
             continue
-        apps.append(App(**data))
+        a = App(**data)
+        try:
+            for x in a.modules:
+                mod = imp.load_module(x, *imp.find_module(x, [os.path.join(config.get("apps", "app_dir"), app)]))
+                if a.modules[x]:
+                    setattr(a, "_%s"%x) = getattr(mod, a.modules[x]) if hasattr(mod, a.modules[x]) else None
+                else:
+                    setattr(a, "_%s"%x) = mod
+        except Exception, e:
+            a.loadable = False
+            a.error = "Module error: %s" % str(e)
+            logger.warn("Failed to load %s -- %s" % (a.name, str(e)))
+        apps.append(a)
         applist.remove(app)
     return apps
 

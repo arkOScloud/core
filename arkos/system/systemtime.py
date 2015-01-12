@@ -30,7 +30,7 @@ def get_idatetime():
 def set_datetime(dt=0):
     dt = int(dt) if dt else int(get_idatetime())
     librt = ctypes.CDLL(ctypes.util.find_library("rt"))
-    ts = self.timespec()
+    ts = timespec()
     ts.tv_sec, ts.tv_nsec = dt, dt * 1000000
     librt.clock_settime(0, ctypes.byref(ts))
 

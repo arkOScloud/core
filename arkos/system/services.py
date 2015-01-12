@@ -1,3 +1,4 @@
+import ConfigParser
 import glob
 import os
 
@@ -5,12 +6,24 @@ from arkos import conns
 from arkos.utilities import shell
 
 
-class Service(object):
-    def __init__(self, name="", stype="", state=False, enabled=False):
+class Service:
+    def __init__(self, name="", stype="", state=False, enabled=False, cfg={}):
         self.name = name
         self.stype = stype
         self.state = state
         self.enabled = enabled
+        self.cfg = cfg
+    
+    def add(self, enable=True):
+        title = 'program:%s' % self.name
+        c = ConfigParser.RawConfigParser()
+        c.add_section(title)
+        for x in self.cfg:
+            c.set(title, x, self.cfg[x])
+        with open(os.path.join('/etc/supervisor.d', name+'.ini'), 'w') as f:
+            c.write(f)
+        if enable:
+            self.enable()
 
     def start(self):
         if self.stype == 'supervisor':
@@ -55,7 +68,6 @@ class Service(object):
                 svd.start()
             conns.Supervisor.addProcessGroup(self.name)
             self.start()
-            self.state = "running"
         else:
             conns.SystemD.EnableUnitFiles([self.name+".service"], False, True)
         self.enabled = True
@@ -104,9 +116,14 @@ def get(name=None):
     if not os.path.exists('/etc/supervisor.d'):
         os.mkdir('/etc/supervisor.d')
     for x in os.listdir('/etc/supervisor.d'):
+        c = ConfigParser.RawConfigParser()
+        c.load(os.path.join("/etc/supervisor.d", x))
+        cfg = {}
+        for x in c.items(c.sections()[0]):
+            cfg[x[0]] = x[1]
         s = Service(name=x.split(".ini")[0], stype="supervisor",
             state=conns.Supervisor.getProcessInfo(s.name)["statename"].lower(),
-            enabled=not x.endswith("disabled"))
+            enabled=not x.endswith("disabled"), cfg=cfg)
         if name == s.name:
             return s
         svcs.append(s)

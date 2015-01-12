@@ -6,7 +6,7 @@ import time
 from arkos import config
 
 
-def get_all(self):
+def get_all():
     return {
         "load": get_load(),
         "temp": get_temp(),

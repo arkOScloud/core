@@ -34,7 +34,8 @@ class DefaultMessage:
 
 
 class ConsoleHandler(logging.StreamHandler):
-    def __init__(self, stream, debug):
+    def __init__(self, stream, debug, tstamp=True):
+        self.tstamp = tstamp
         self.debug = debug
         logging.StreamHandler.__init__(self, stream)
 
@@ -43,8 +44,9 @@ class ConsoleHandler(logging.StreamHandler):
             return logging.StreamHandler.handle(self, record)
 
         s = ''
-        d = datetime.datetime.fromtimestamp(record.created)
-        s += d.strftime("\033[37m%d.%m.%Y %H:%M \033[0m")
+        if self.tstamp:
+            d = datetime.datetime.fromtimestamp(record.created)
+            s += d.strftime("\033[37m%d.%m.%Y %H:%M \033[0m")
         if self.debug:
             s += ('%s:%s'%(record.filename,record.lineno)).ljust(30)
         l = ''
@@ -64,7 +66,7 @@ class ConsoleHandler(logging.StreamHandler):
 
 def new_logger(log_level=logging.INFO, debug=False):
     logger = logging.getLogger("arkos")
-    stdout = ConsoleHandler(sys.stdout, debug)
+    stdout = ConsoleHandler(sys.stdout, debug, False)
     stdout.setLevel(log_level)
     dformatter = logging.Formatter('%(asctime)s [%(levelname)s] %(module)s: %(message)s')
     stdout.setFormatter(dformatter)

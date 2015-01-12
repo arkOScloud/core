@@ -9,7 +9,7 @@ from arkos.utilities import DefaultMessage
 
 
 if not groups.get_system("ssl-cert"):
-    groups.add_system("ssl-cert")
+    groups.SystemGroup("ssl-cert").add()
 gid = groups.get_system("ssl-cert").gid
 
 

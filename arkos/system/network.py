@@ -9,7 +9,7 @@ import sys
 from arkos.utilities import shell
 
 
-class Connection(object):
+class Connection:
     def __init__(self, name="", connected=False, enabled=False, config={}):
         self.name = name
         self.connected = connected
@@ -46,10 +46,18 @@ class Connection(object):
             os.unlink(os.path.join("/etc/netctl", self.name))
     
     def connect(self):
-        shell('netctl start %s' % self.name)
+        s = shell('netctl start %s' % self.name)
+        if s["code"] == 0:
+            self.connected = True
+        else:
+            raise Exception("Network connection failed")
     
     def disconnect(self):
-        shell('netctl stop %s' % self.name)
+        s = shell('netctl stop %s' % self.name)
+        if s["code"] == 0:
+            self.connected = False
+        else:
+            raise Exception("Network disconnection failed")
     
     def toggle(self):
         if self.connected:
@@ -58,13 +66,21 @@ class Connection(object):
             self.connect()
     
     def enable(self):
-        shell('netctl enable %s' % self.name)
+        s = shell('netctl enable %s' % self.name)
+        if s["code"] == 0:
+            self.enabled = True
+        else:
+            raise Exception("Network enable failed")
     
     def disable(self):
-        shell('netctl disable %s' % self.name)
+        s = shell('netctl disable %s' % self.name)
+        if s["code"] == 0:
+            self.enabled = False
+        else:
+            raise Exception("Network disable failed")
 
 
-class Interface(object):
+class Interface:
     def __init__(self, name="", itype="", up=False, ip=[], rx=0, tx=0):
         self.name = name
         self.itype = itype
