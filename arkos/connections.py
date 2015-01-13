@@ -7,7 +7,12 @@ import xmlrpclib
 
 from dbus import SystemBus, Interface
 
-from arkos import config
+
+class ConnectionsManager:
+    def __init__(self, config):
+        self.LDAP = ldap_connect(config=config)
+        self.SystemD = systemd_connect()
+        self.Supervisor = supervisor_connect()
 
 
 def ldap_connect(uri="", rootdn="", dn="cn=admin", config=None, passwd=""):

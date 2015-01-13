@@ -6,7 +6,7 @@ import sys
 from arkos import storage, security
 from arkos.utilities import dictfilter
 
-COMMON_PORTS = [3000, 3306, 5222, 5223, 8000, 8080, 8765]
+COMMON_PORTS = [3000, 3306, 5222, 5223, 5232, 8000, 8080, 8765]
 
 
 def get(policies={}):

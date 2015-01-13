@@ -113,10 +113,13 @@ def get():
         try:
             for x in a.modules:
                 mod = imp.load_module(x, *imp.find_module(x, [os.path.join(config.get("apps", "app_dir"), app)]))
-                if a.modules[x]:
-                    setattr(a, "_%s"%x) = getattr(mod, a.modules[x]) if hasattr(mod, a.modules[x]) else None
+                if x == "database" and a.modules[x]:
+                    for y in a.modules[x]:
+                        setattr(a, "_%s_%s"%(x,y), getattr(mod, a.modules[x][y]) if hasattr(mod, a.modules[x][y]) else None)
+                elif a.modules[x]:
+                    setattr(a, "_%s"%x, getattr(mod, a.modules[x]) if hasattr(mod, a.modules[x]) else None)
                 else:
-                    setattr(a, "_%s"%x) = mod
+                    setattr(a, "_%s"%x, mod)
         except Exception, e:
             a.loadable = False
             a.error = "Module error: %s" % str(e)

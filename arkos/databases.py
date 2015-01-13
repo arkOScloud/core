@@ -1,12 +1,10 @@
-import imp
-
 from arkos import storage
 
 
 class Database:
-    def __init__(self, name="", user=None):
+    def __init__(self, name="", manager=None):
         self.name = name
-        self.user = user
+        self.manager = manager
     
     def add(self):
         pass
@@ -14,16 +12,17 @@ class Database:
     def remove(self):
         pass
     
-    def chperm(self):
-        pass
-    
     def execute(self):
         pass
 
 
 class DatabaseUser:
-    def __init__(self, name=""):
+    def __init__(self, name="", passwd=""):
         self.name = name
+        self.passwd = passwd
+    
+    def add(self):
+        pass
     
     def chperm(self):
         pass
@@ -33,10 +32,10 @@ class DatabaseUser:
 
 
 class DatabaseManager:
-    def __init__(self, id="", name="", conn=None):
+    def __init__(self, id="", name=""):
         self.id = id
         self.name = name
-        self.conn = conn
+        self.connect()
     
     def connect(self):
         pass
@@ -70,10 +69,9 @@ def get_users():
 
 def get_managers():
     mgrs = []
-    for x in storage.apps.get():
-        if x.atype == "database":
-            dbm = imp.load_module(x["id"]+".dbengine."+x["name"], *imp.find_module(x["id"], [config.get("apps", "app_dir")]))
-            mgrs.append(dbm())
+    for x in storage.apps.get("installed"):
+        if x.type == "database":
+            mgrs.append(x._database_manager())
     return mgrs
 
 def get_types():
