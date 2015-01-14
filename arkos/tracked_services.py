@@ -1,11 +1,22 @@
 import json
-import os
 import random
-import sys
 
-from arkos import config, applications, websites, security
+from arkos import config, security
 
 COMMON_PORTS = [3000, 3306, 5222, 5223, 5232, 8000, 8080, 8765]
+
+
+with open(config.get("general", "policy_path"), "r") as f:
+    policies = json.loads(f.read())
+policy = policies["arkos"]["arkos"] if policies.has_key("arkos") \
+    and policies["arkos"].has_key("arkos") else 2
+storage.policies.append("policies", SecurityPolicy("arkos", "arkos", 
+    "System Management (Genesis/APIs)", "gen-arkos-round", 
+    [("tcp", int(config.get("genesis", "port"))), ("tcp", 8765)], policy))
+if policies.has_key("custom"):
+    for x in policies["custom"]:
+        storage.policies.append("policies", SecurityPolicy("custom", x["id"], 
+            x["name"], x["icon"], x["ports"], x["policy"]))
 
 
 class SecurityPolicy:
@@ -30,6 +41,7 @@ class SecurityPolicy:
                 indent=4, separators=(',', ': ')))
         if config.get("general", "firewall", True) and fw:
             security.regen_fw(get(policies=policies))
+        storage.policies.append("policies", self)
     
     def remove(self, fw=True):
         with open(config.get("general", "policy_path"), "r") as f:
@@ -43,12 +55,11 @@ class SecurityPolicy:
                 indent=4, separators=(',', ': ')))
         if config.get("general", "firewall", True) and fw:
             security.regen_fw(get(policies=policies))
+        storage.policies.remove("policies", self)
 
 
-def get(type=None, policies={}):
+def get(type=None):
     data = storage.policies.get("policies")
-    if not data:
-        data = scan(policies)
     if type:
         tlist = []
         for x in data:
@@ -59,38 +70,34 @@ def get(type=None, policies={}):
         return None
     return data
 
-def scan(policies={}):
-    # Get policies
-    if not policies:
-        with open(config.get("general", "policy_path"), "r") as f:
-            policies = json.loads(f.read())
-    # Get services
-    services = []
-    policy = policies["arkos"]["kraken"] if policies.has_key("arkos") \
-        and policies["arkos"].has_key("arkos") else 2
-    services.append(SecurityPolicy("arkos", "arkos", "System Management (Genesis/APIs)",
-        "gen-arkos-round", [("tcp", int(config.get("genesis", "port"))), ("tcp", 8765)], policy))
-    if policies.has_key("custom"):
-        for x in policies["custom"]:
-            services.append(SecurityPolicy("custom", x["id"], x["name"], x["icon"], x["ports"], x["policy"]))
-    for p in applications.get():
-        for s in p.services:
-            policy = policies[p.id][s["binary"]] if policies.has_key(p.id) \
-                and policies[p.id].has_key(s["binary"]) else 2
-            services.append(SecurityPolicy(p.id, s["binary"], s["name"], p.icon,
-                s["ports"], policy))
-    for s in websites.get():
-        policy = policies[s.meta.id][s.name] if policies.has_key(s.meta.id) \
-            and policies[s.meta.id].has_key(s.name) else 2
-        services.append(SecurityPolicy(s.meta.id, s.name, s.name, s.icon,
-            [("tcp", s.port)], policy))
-    storage.policies.set("policies", services)
-    return services
+def register(type, id, name, icon, ports, policy=0, fw=True):
+    with open(config.get("general", "policy_path"), "r") as f:
+        policies = json.loads(f.read())
+    if not policy:
+        if policies.has_key(type) and policies[type].has_key(id):
+            policy = policies[type][id]
+        else:
+            policy = 2
+    for x in get(x.type):
+        if x.id == id:
+            storage.policies.remove("policies", x)
+    svc = SecurityPolicy(type, id, name, icon, ports, policy)
+    svc.save(fw)
+
+def deregister(type, id="", fw=True):
+    for x in get(type):
+        if not id:
+            x.remove(fw=False)
+        elif x.id == id:
+            x.remove(fw=False)
+            break
+    if config.get("general", "firewall", True) and fw:
+        security.regen_fw(get())
 
 def refresh_policies():
     with open(config.get("general", "policy_path"), "r") as f:
         policies = json.loads(f.read())
-    svcs = scan(policies=policies)
+    svcs = get()
     newpolicies = {}
     for x in policies:
         if x == "custom":

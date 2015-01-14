@@ -45,8 +45,7 @@ class DiskPartition(object):
             if s == -1:
                 raise Exception('Failed to mount %s: %s'%(self.name, os.strerror(ctypes.get_errno())))
         self.mountpoint = os.path.join('/media', self.name)
-        storage.points.append("points", PointOfInterest(self.name, self.mountpoint,
-            "crypt" if self.crypt else "disk", "gen-storage"))
+        register_point(self.name, self.mountpoint, "crypt" if self.crypt else "disk")
     
     def umount(self):
         if not self.mountpoint:
@@ -56,7 +55,7 @@ class DiskPartition(object):
             raise Exception('Failed to unmount %s: %s'%(self.name, os.strerror(ctypes.get_errno())))
         if self.crypt:
             crypto.luks_close(self.name)
-        self.remove_point_of_interest_by_path(self.mountpoint)
+        deregister_point(self.name)
         self.mountpoint = ""
 
 
@@ -118,8 +117,7 @@ class VirtualDisk(object):
                 dev.unmount()
                 raise Exception('Failed to mount %s: %s' % (self.name, os.strerror(ctypes.get_errno())))
         self.mountpoint = os.path.join('/media', self.name)
-        storage.points.append("points", PointOfInterest(self.name, self.mountpoint,
-            "crypt" if self.crypt else "vdisk", "gen-storage"))
+        register_point(self.name, self.mountpoint, "crypt" if self.crypt else "vdisk")
     
     def umount(self):
         if not self.mountpoint:
@@ -136,7 +134,7 @@ class VirtualDisk(object):
             crypto.luks_close(self.name)
         if dev:
             dev.unmount()
-        storage.points.remove("points", self.name)
+        deregister_point(self.name)
         self.mountpoint = ""
     
     def encrypt(self, passwd, cipher="aes-xts-plain64", keysize=256, mount=False):
@@ -174,6 +172,13 @@ class PointOfInterest(object):
         self.path = path
         self.stype = stype
         self.icon = icon
+    
+    def add(self):
+        deregister_point(path=self.path)
+        storage.points.append("points", self)
+    
+    def remove(self):
+        storage.points.remove("points", self)
 
 
 def get_disk_partitions(name=None):
@@ -193,6 +198,8 @@ def get_disk_partitions(name=None):
             dev = DiskPartition(name=p.path.split("/")[-1], path=p.path, 
                 mountpoint=mps.get(p.path) or None, size=p.getSize("B"),
                 geometry=parted.probeFileSystem(p.geometry), crypt=crypto.is_luks(p.path))
+            if dev.mountpoint and not get_points(path=dev.mountpoint):
+                register_point(dev.name, dev.mountpoint, "crypt" if dev.crypt else "disk")
             if name == dev.name:
                 return dev
             devs.append(dev)
@@ -216,34 +223,34 @@ def get_virtual_disks(name=None):
             continue
         name = os.path.splitext(os.path.split(x)[1])[0]
         dev = VirtualDisk(name=name, path=x, size=os.path.getsize(x),
-        mountpoint=mps.get(x) or mps.get("/dev/mapper/%s" % name) or None, 
-        crypt=x.endswith(".crypt"))
+            mountpoint=mps.get(x) or mps.get("/dev/mapper/%s" % name) or None, 
+            crypt=x.endswith(".crypt"))
+        if dev.mountpoint and not get_points(path=dev.mountpoint):
+            register_point(dev.name, dev.mountpoint, "crypt" if dev.crypt else "disk")
         if name == dev.name:
             return dev
         devs.append(dev)
     return sorted(devs, key=lambda x: x.name) if not name else None
 
-def get_points_of_interest(name=None):
-    points = []
-    for x in get_virtual_disks() + get_disk_partitions():
-        if not x.mountpoint or (x.mountpoint == '/' or x.mountpoint.startswith('/boot')):
-            continue
-        if isinstance(x, VirtualDisk):
-            stype = "crypt" if crypt else "vdisk"
-        else:
-            stype = "crypt" if crypt else "disk"
-        p = PointOfInterest(name=x.name, path=x.path, stype=stype, icon="gen-storage")
-        if name == p.name:
-            return p
-        points.append(p)
-    for x in storage.sites.get("sites"):
-        if x.stype == 'ReverseProxy':
-            continue
-        p = PointOfInterest(name=x.name, path=x.path, stype="site", icon=x.icon)
-        if name == p.name:
-            return p
-        points.append(p)
-    return sorted(points, key=lambda x: x.name) if not name else None
+def get_points(id=None, path=None):
+    points = storage.points.get("points")
+    if id:
+        for x in points:
+            if x.name == id:
+                return x
+    elif path:
+        for x in points:
+            if x.path == path:
+                return x
+    return points
+
+def register_point(name, path, stype, icon="gen-storage"):
+    p = PointOfInterest(name, path, stype, icon)
+    p.add()
+
+def deregister_point(id=None, path=None):
+    p = get_points(id=id, path=path)
+    if (id or path) and p: p.remove()
 
 
 class FstabEntry:

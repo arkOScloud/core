@@ -7,10 +7,10 @@ import tarfile
 
 from distutils.spawn import find_executable
 
-from arkos import config, storage, logger, security
+from arkos import config, storage, logger, security, tracked_services
 from arkos.system import packages, services
 from arkos.languages import python
-from arkos.utilities import api, dictfilter, DefaultMessage
+from arkos.utilities import api, DefaultMessage
 
 
 class App:
@@ -94,7 +94,7 @@ class App:
             if x["ports"]:
                 regen_fw = True
         if regen_fw:
-            tracked_services.remove_policy(self.id)
+            tracked_services.deregister(self.id)
 
 
 def get(id=None, type=None, verify=True):
@@ -142,6 +142,10 @@ def scan(verify=True):
             logger.warn("Failed to load %s -- %s" % (a.name, str(e)))
         if verify:
             a.verify_dependencies()
+        for s in a.services:
+            if s["ports"]:
+                tracked_services.register(a.id, s["binary"], s["name"], 
+                    a.icon, s["ports"], fw=False)
         apps.append(a)
         applist.remove(app)
     storage.apps.set("installed", applist)
@@ -255,10 +259,12 @@ def install(id, install_deps=True, message=DefaultMessage()):
         else:
             raise
     regen_fw = False
-    for x in storage.apps.get("installed", id).services:
+    a = get(id)
+    for x in a.services:
         if x["ports"]:
             regen_fw = True
-            tracked_services.update_policy(id, x["binary"], 2, False)
+            tracked_services.register(a.id, x["binary"], x["name"], a.icon, 
+                x["ports"], fw=False)
     if regen_fw:
         security.regen_fw(tracked_services.get())
 
@@ -274,4 +280,6 @@ def _install(id):
     os.unlink(os.path.join(config.get("apps", "app_dir"), 'plugin.tar.gz'))
     with open(os.path.join(config.get("apps", "app_dir"), id, "manifest.json")) as f:
         data = json.loads(f.read())
-        storage.apps.append("installed", App(**data))
+        app = App(**data)
+    app.verify_dependencies()
+    storage.apps.append("installed", app)
