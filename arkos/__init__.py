@@ -1,10 +1,10 @@
 import os
 import sys
 
-from arkos.connections import *
 from arkos.config import Config
 from arkos.storage import Storage
 from arkos.utilities import new_logger
+from arkos.connections import ConnectionsManager
 
 
 class StorageControl:

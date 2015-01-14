@@ -7,7 +7,7 @@ import tarfile
 
 from distutils.spawn import find_executable
 
-from arkos import config, storage, logger, security, tracked_services
+from arkos import config, storage, logger, tracked_services
 from arkos.system import packages, services
 from arkos.languages import python
 from arkos.utilities import api, DefaultMessage
@@ -258,15 +258,11 @@ def install(id, install_deps=True, message=DefaultMessage()):
             return
         else:
             raise
-    regen_fw = False
     a = get(id)
     for x in a.services:
         if x["ports"]:
             regen_fw = True
-            tracked_services.register(a.id, x["binary"], x["name"], a.icon, 
-                x["ports"], fw=False)
-    if regen_fw:
-        security.regen_fw(tracked_services.get())
+            tracked_services.register(a.id, x["binary"], x["name"], a.icon, x["ports"])
 
 def _install(id):
     data = api('https://%s/apps/%s' % (config.get("general", "repo_server"), id), crit=True)
@@ -282,4 +278,4 @@ def _install(id):
         data = json.loads(f.read())
         app = App(**data)
     app.verify_dependencies()
-    storage.apps.append("installed", app)
+    storage.apps.add("installed", app)

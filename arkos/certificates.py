@@ -186,7 +186,7 @@ def upload_certificate(id, cert, key, chain=''):
     os.chmod(c.cert_path, 0660)
     os.chown(c.key_path, -1, gid)
     os.chmod(c.key_path, 0660)
-    storage.certs.append("certificates", c)
+    storage.certs.add("certificates", c)
     return c
 
 def generate_certificate(
@@ -242,7 +242,7 @@ def generate_certificate(
         cert_path=os.path.join(conf.get("certificates", "cert_dir"), c.id+'.crt'),
         key_path=os.path.join(conf.get("certificates", "key_dir"), c.id+'.key'),
         sha1=sha1, md5=md5, expiry=crt.get_notAfter(), assign=[])
-    storage.certs.append("certificates", c)
+    storage.certs.add("certificates", c)
     return c
 
 def generate_authority(domain):
@@ -272,7 +272,7 @@ def generate_authority(domain):
     with open(ca.key_path, "wt") as f:
         f.write(OpenSSL.crypto.dump_privatekey(OpenSSL.crypto.FILETYPE_PEM, key))
     ca.expiry = crt.get_notAfter()
-    storage.certs.append("authorities", ca)
+    storage.certs.add("authorities", ca)
     return ca
 
 def get_key_hashes(key):

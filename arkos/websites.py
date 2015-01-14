@@ -146,9 +146,10 @@ class Site:
                     os.chmod(os.path.join(r, x), 0644)
                     os.chown(os.path.join(r, x), uid, gid)
             extra_vars["datadir"] = self.data_path
+        elif hasattr(self, "website_default_data_subdir"):
+            self.data_path = os.path.join(self.path, self.website_default_data_subdir)
         else:
-            self.data_path = os.path.join(self.path, self.website_default_data_subdir) \ 
-                if self.website_default_data_subdir else self.path
+            self.data_path = self.path
 
         # Setup the webapp and create an nginx serverblock
         try:
@@ -202,7 +203,7 @@ class Site:
         tracked_services.register(self.meta.id if self.meta else "website", 
             self.id, self.id, "gen-earth", [("tcp", self.port)], 2)
         self.installed = True
-        storage.sites.append("sites", self)
+        storage.sites.add("sites", self)
         if specialmsg:
             return specialmsg
     
@@ -462,7 +463,7 @@ class ReverseProxy:
         tracked_services.register("website", self.id, self.name, 
             "gen-earth", [("tcp", self.port)], 2)
         self.installed = True
-        storage.sites.append("sites", self)
+        storage.sites.add("sites", self)
 
     def remove(self, message=None):
         shutil.rmtree(self.path)

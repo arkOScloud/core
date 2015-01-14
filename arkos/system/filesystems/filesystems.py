@@ -175,7 +175,7 @@ class PointOfInterest(object):
     
     def add(self):
         deregister_point(path=self.path)
-        storage.points.append("points", self)
+        storage.points.add("points", self)
     
     def remove(self):
         storage.points.remove("points", self)
