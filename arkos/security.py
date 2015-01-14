@@ -1,7 +1,7 @@
 import ConfigParser
 import iptc
 
-from arkos import storage
+from arkos import applications
 from arkos.system import network
 from arkos.utilities import shell, cidr_to_netmask
 
@@ -203,7 +203,7 @@ def get_defense_rules():
     remove = []
     cfg = get_jail_config()
     fcfg = ConfigParser.SafeConfigParser()
-    for c in storage.apps.get("installed"):
+    for c in applications.get():
         if hasattr(c, 'f2b') and hasattr(c, 'f2b_name'):
             lst.append({'name': c.f2b_name,
                 'icon': c.f2b_icon,

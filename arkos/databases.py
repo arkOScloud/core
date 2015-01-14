@@ -1,4 +1,4 @@
-from arkos import storage
+from arkos import storage, applications
 
 
 class Database:
@@ -17,9 +17,10 @@ class Database:
 
 
 class DatabaseUser:
-    def __init__(self, name="", passwd=""):
+    def __init__(self, name="", passwd="", manager=None):
         self.name = name
         self.passwd = passwd
+        self.manager = manager
     
     def add(self):
         pass
@@ -47,37 +48,69 @@ class DatabaseManager:
         pass
 
 
-def get():
+def get(id=None, type=None):
+    data = storage.dbs.get("databases")
+    if not data:
+        data = scan()
+    if id or type:
+        tlist = []
+        for x in data:
+            if x.id == id:
+                return x
+            elif x.manager.id == type:
+                tlist.append(x)
+        if tlist:
+            return tlist
+        return None
+    return data
+
+def scan():
     dbs = []
-    managers = storage.dbs.get("managers")
-    if not managers:
-        managers = get_managers()
-        storage.dbs.set("managers", managers)
-    for x in managers:
+    for x in get_managers():
         dbs += x.get_dbs()
+    storage.dbs.set("databases", dbs)
     return dbs
 
-def get_users():
+def get_user(name=None, type=None):
+    data = storage.dbs.get("users")
+    if not data:
+        data = scan_users()
+    if name or type:
+        tlist = []
+        for x in data:
+            if x.name == name:
+                return x
+            elif x.manager.id == type:
+                tlist.append(x)
+        if tlist:
+            return tlist
+        return None
+    return data
+
+def scan_users():
     users = []
-    managers = storage.dbs.get("managers")
-    if not managers:
-        managers = get_managers()
-        storage.dbs.set("managers", managers)
-    for x in managers:
+    for x in get_managers():
         users += x.get_users()
+    storage.dbs.set("users", users)
     return users
 
-def get_managers():
+def get_managers(id=None):
+    data = storage.dbs.get("managers")
+    if not data:
+        data = scan_managers()
+    if id:
+        for x in data:
+            if x.id == id:
+                return x
+        return None
+    return data
+
+def scan_managers():
     mgrs = []
-    for x in storage.apps.get("installed"):
-        if x.type == "database":
-            mgrs.append(x._database_manager())
+    for x in applications.get(type="database"):
+        mgrs.append(x._database_manager())
+    storage.dbs.set("managers", mgrs)
     return mgrs
 
 def get_types():
-    types = []
-    managers = storage.dbs.get("managers")
-    if not managers:
-        managers = get_managers()
-        storage.dbs.set("managers", managers)
-    return [x.name for x in managers]
+    return [x.name for x in get_managers()]

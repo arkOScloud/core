@@ -15,6 +15,7 @@ class StorageControl:
         self.dbs = Storage(["databases", "users", "managers"])
         self.points = Storage(["points"])
         self.updates = Storage(["updates"])
+        self.policies = Storage(["policies"])
 
 
 config = Config()

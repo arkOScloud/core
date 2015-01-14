@@ -15,9 +15,9 @@ gid = groups.get_system("ssl-cert").gid
 
 class Certificate:
     def __init__(
-            self, name="", cert_path="", key_path="", keytype="", keylength=0,
+            self, id="", cert_path="", key_path="", keytype="", keylength=0,
             assign=[], expiry=None, sha1="", md5=""):
-        self.name = name
+        self.id = id
         self.cert_path = cert_path
         self.key_path = key_path
         self.keytype = keytype
@@ -27,7 +27,7 @@ class Certificate:
         self.sha1 = sha1
         self.md5 = md5
     
-    def assign(self, atype, name=""):
+    def assign(self, atype, id=""):
         nginx_reload = False
         if atype == 'genesis':
             config.set('genesis', 'cert_file', self.cert_path)
@@ -36,21 +36,21 @@ class Certificate:
             config.save()
             self.assign.append({"type": "genesis"})
         elif atype == 'website':
-            storage.sites.get(name).ssl_enable(self)
-            self.assign.append({"type": "website", "name": name})
+            websites.get(id).ssl_enable(self)
+            self.assign.append({"type": "website", "id": id})
             nginx_reload = True
         else:
-            storage.apps.get(name).ssl_enable(self)
-            self.assign.append({"type": "app", "name": name})
+            applications.get(id).ssl_enable(self)
+            self.assign.append({"type": "app", "id": id})
         if nginx_reload:
             storage.sites.nginx_reload()
         return self
     
-    def unassign(self, atype, name=""):
+    def unassign(self, atype, id=""):
         nginx_reload = False
         if atype == "website":
-            storage.sites.get(name).ssl_disable()
-            self.assign.remove({"type": atype, "name": name})
+            websites.get(id).ssl_disable()
+            self.assign.remove({"type": atype, "id": id})
             nginx_reload = True
         elif atype == "genesis":
             config.set("genesis", "cert_file", "")
@@ -59,15 +59,15 @@ class Certificate:
             config.save()
             self.assign.remove({"type": "genesis"})
         else:
-            storage.apps.get(name).ssl_disable()
-            self.assign.remove({"type": atype, "name": name})
+            applications.get(id).ssl_disable()
+            self.assign.remove({"type": atype, "id": id})
         if nginx_reload:
             self.app.sites.nginx_reload()
         return None
     
     def remove(self):
         for x in self.assign:
-            self.unassign(x["type"], x.get("name"))
+            self.unassign(x["type"], x.get("id"))
         if os.path.exists(self.cert_path):
             os.unlink(self.cert_path)
         if os.path.exists(self.key_path):
@@ -76,7 +76,7 @@ class Certificate:
     
     def as_dict(self):
         return {
-            "name": self.name,
+            "id": self.id,
             "domain": self.domain,
             "keytype": self.keytype,
             "keylength": self.keylength,
@@ -88,7 +88,7 @@ class Certificate:
 
 
 class CertificateAuthority(object):
-    name = ""
+    id = ""
     cert_path = ""
     key_path = ""
     expiry = None
@@ -100,7 +100,18 @@ class CertificateAuthority(object):
             os.unlink(self.key_path)
 
 
-def get_certificates():
+def get(id=None):
+    data = storage.certs.get("certificates")
+    if not data:
+        data = scan()
+    if id:
+        for x in data:
+            if x.id == id:
+                return x
+        return None
+    return data
+
+def scan():
     certs, assigns = [], {}
     if config.get("genesis", "ssl"):
         ssl = os.path.splitext(os.path.basename(config.get('genesis', 'cert_file', '')))[0]
@@ -109,32 +120,44 @@ def get_certificates():
         elif ssl:
             assigns[ssl] = [{'type': 'genesis'}]
     for x in glob.glob(os.path.join(config.get("certificates", "cert_dir"), '*.crt')):
-        name = os.path.splitext(os.path.basename(x))[0]
+        id = os.path.splitext(os.path.basename(x))[0]
         with open(c.cert_path, 'r') as f:
             crt = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, f.read())
         with open(c.key_path, 'r') as f:
             key = OpenSSL.crypto.load_privatekey(OpenSSL.crypto.FILETYPE_PEM, f.read())
         sha1, md5 = get_key_hashes(key)
-        c = Certificate(name=name, cert_path=x, key_path=os.path.join(config.get("certificates", "key_dir"), name+'.key'),
+        c = Certificate(id=id, cert_path=x, key_path=os.path.join(config.get("certificates", "key_dir"), id+'.key'),
             keytype="RSA" if k.type() == OpenSSL.crypto.TYPE_RSA else ("DSA" if k.type() == OpenSSL.crypto.TYPE_DSA else "Unknown"),
             keylength=int(k.bits()), domain=crt.get_subject().CN,
-            assign=assigns.get(name) or [], expiry=c.get_notafter(),
+            assign=assigns.get(id) or [], expiry=c.get_notafter(),
             sha1=sha1, md5=md5)
         certs.append(c)
+    storage.certs.set("certificates", certs)
     return certs
 
-def get_authorities():
+def get(id=None):
+    data = storage.certs.get("authorities")
+    if not data:
+        data = scan_authorities()
+    if id:
+        for x in data:
+            if x.id == id:
+                return x
+        return None
+    return data
+
+def scan_authorities():
     certs = []
     for x in glob.glob(os.path.join(config.get("certificates", "ca_cert_dir"), '*.pem')):
-        name = os.path.splitext(os.path.split(x)[1])[0]
+        id = os.path.splitext(os.path.split(x)[1])[0]
         with open(x, 'r') as f:
             cert = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, f.read())
-        ca = CertificateAuthority(name=name, cert_path=x, expiry=cert.get_notAfter(),
-            key_path=os.path.join(config.get("certificates", "ca_key_dir"), name+'.key'))
+        ca = CertificateAuthority(id=id, cert_path=x, expiry=cert.get_notAfter(),
+            key_path=os.path.join(config.get("certificates", "ca_key_dir"), id+'.key'))
         certs.append(ca)
     return certs
 
-def upload_certificate(name, cert, key, chain=''):
+def upload_certificate(id, cert, key, chain=''):
     try:
         crt = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, cert)
     except Exception, e:
@@ -145,8 +168,8 @@ def upload_certificate(name, cert, key, chain=''):
         raise Exception("Could not read private keyfile. Please make sure you've selected the proper file.", e)
 
     sha1, md5 = get_key_hashes(ky)
-    c = Certificate(name=name, cert_path=os.path.join(config.get("certificates", "cert_dir"), name+'.crt'),
-        key_path=os.path.join(config.get("certificates", "key_dir"), name+'.key'),
+    c = Certificate(id=id, cert_path=os.path.join(config.get("certificates", "cert_dir"), id+'.crt'),
+        key_path=os.path.join(config.get("certificates", "key_dir"), id+'.key'),
         keytype="RSA" if ky.type() == OpenSSL.crypto.TYPE_RSA else ("DSA" if ky.type() == OpenSSL.crypto.TYPE_DSA else "Unknown"),
         keylength=int(ky.bits()), domain=crt.get_subject().CN, expiry=crt.get_notAfter(),
         sha1=sha1, md5=md5)
@@ -167,12 +190,12 @@ def upload_certificate(name, cert, key, chain=''):
     return c
 
 def generate_certificate(
-        name, domain, country, state="", locale="", email="",
+        id, domain, country, state="", locale="", email="",
         keytype="RSA", keylength=2048, message=DefaultMessage()):
     # Check to see that we have a CA ready
     basehost = ".".join(c.domain.split(".")[-2:])
-    if not get_authorities(name=basehost):
-        cs = create_authority(name=basehost)
+    if not get_authorities(id=basehost):
+        cs = create_authority(id=basehost)
     with open(ca.cert_path, "r") as f:
         ca_cert = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, f.read())
     with open(ca.key_path, "r") as f:
@@ -215,16 +238,16 @@ def generate_certificate(
     os.chmod(key_path, 0660)
     
     sha1, md5 = get_key_hashes(key)
-    c = Certificate(name=name, domain=domain, keytype=keytype, keylength=keylength,
-        cert_path=os.path.join(conf.get("certificates", "cert_dir"), c.name+'.crt'),
-        key_path=os.path.join(conf.get("certificates", "key_dir"), c.name+'.key'),
+    c = Certificate(id=id, domain=domain, keytype=keytype, keylength=keylength,
+        cert_path=os.path.join(conf.get("certificates", "cert_dir"), c.id+'.crt'),
+        key_path=os.path.join(conf.get("certificates", "key_dir"), c.id+'.key'),
         sha1=sha1, md5=md5, expiry=crt.get_notAfter(), assign=[])
     storage.certs.append("certificates", c)
     return c
 
 def generate_authority(domain):
-    ca = CertificateAuthority(name=domain, cert_path=os.path.join(config.get("certificates", "ca_cert_dir"), domain+'.pem'),
-        key_path=os.path.join(config.get("certificates", "ca_key_dir"), hostname+'.key'))
+    ca = CertificateAuthority(id=domain, cert_path=os.path.join(config.get("certificates", "ca_cert_dir"), domain+'.pem'),
+        key_path=os.path.join(config.get("certificates", "ca_key_dir"), domain+'.key'))
     key = OpenSSL.crypto.PKey()
     key.generate_key(OpenSSL.crypto.TYPE_RSA, 2048)
 

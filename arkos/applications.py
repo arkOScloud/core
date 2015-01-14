@@ -97,7 +97,23 @@ class App:
             tracked_services.remove_policy(self.id)
 
 
-def get():
+def get(id=None, type=None, verify=True):
+    data = storage.apps.get("installed")
+    if not data:
+        data = scan(verify)
+    if id or type:
+        tlist = []
+        for x in data:
+            if x.id == id:
+                return x
+            elif x.type == type:
+                tlist.append(x)
+        if tlist:
+            return tlist
+        return None
+    return data
+
+def scan(verify=True):
     apps = []
     applist = [app for app in os.listdir(config.get("apps", "app_dir")) if not app.startswith(".")]
     applist = list(set(applist))
@@ -124,15 +140,44 @@ def get():
             a.loadable = False
             a.error = "Module error: %s" % str(e)
             logger.warn("Failed to load %s -- %s" % (a.name, str(e)))
+        if verify:
+            a.verify_dependencies()
         apps.append(a)
         applist.remove(app)
-    return apps
+    storage.apps.set("installed", applist)
+    if verify:
+        verify_app_dependencies()
+    return storage.apps.get("installed")
 
-def get_available():
-    return api('https://%s/' % config.get("general", "repo_server"), 
-        post={'get': 'list'}, returns='raw', crit=True)
+def get_available(id=None):
+    data = storage.apps.get("available")
+    if not data:
+        data = scan_available()
+    if id:
+        for x in data:
+            if x["id"] == id:
+                return x
+        return None
+    return data
 
-def get_updatable():
+def scan_available():
+    data = api('https://%s/apps' % config.get("general", "repo_server"), 
+        returns='raw', crit=True)
+    storage.apps.set("available", data)
+    return data
+
+def get_updatable(id=None):
+    data = storage.apps.get("updatable")
+    if not data:
+        data = scan_updatable()
+    if id:
+        for x in data:
+            if x.id == id:
+                return x
+        return None
+    return data
+
+def scan_updatable():
     upgradeable = []
     if not storage.apps.get("available"):
         storage.apps.set("available", get_available())
@@ -140,7 +185,7 @@ def get_updatable():
         storage.apps.set("installed", get())
     for x in storage.apps.get("available"):
         for y in storage.apps.get("installed"):
-            if x.id == y.id and x.version != y.version:
+            if x["id"] == y.id and x["version"] != y.version:
                 upgradeable.append(x)
                 break
     return upgradeable

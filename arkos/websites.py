@@ -5,15 +5,34 @@ import nginx
 import re
 import shutil
 
-from arkos import config, storage, databases
+from arkos import config, storage, applications, certificates, databases
 from tracked_services import update_policy, refresh_policies
 from arkos.utilities import shell, random_string, DefaultMessage
+
+
+# If no cipher preferences set, use the default ones
+# As per Mozilla recommendations, but substituting 3DES for RC4
+ciphers = ':'.join([
+    'ECDHE-RSA-AES128-GCM-SHA256', 'ECDHE-ECDSA-AES128-GCM-SHA256',
+    'ECDHE-RSA-AES256-GCM-SHA384', 'ECDHE-ECDSA-AES256-GCM-SHA384',
+    'kEDH+AESGCM', 'ECDHE-RSA-AES128-SHA256', 
+    'ECDHE-ECDSA-AES128-SHA256', 'ECDHE-RSA-AES128-SHA', 
+    'ECDHE-ECDSA-AES128-SHA', 'ECDHE-RSA-AES256-SHA384',
+    'ECDHE-ECDSA-AES256-SHA384', 'ECDHE-RSA-AES256-SHA', 
+    'ECDHE-ECDSA-AES256-SHA', 'DHE-RSA-AES128-SHA256',
+    'DHE-RSA-AES128-SHA', 'DHE-RSA-AES256-SHA256', 
+    'DHE-DSS-AES256-SHA', 'AES128-GCM-SHA256', 'AES256-GCM-SHA384',
+    'ECDHE-RSA-DES-CBC3-SHA', 'ECDHE-ECDSA-DES-CBC3-SHA',
+    'EDH-RSA-DES-CBC3-SHA', 'EDH-DSS-DES-CBC3-SHA', 
+    'DES-CBC3-SHA', 'HIGH', '!aNULL', '!eNULL', '!EXPORT', '!DES',
+    '!RC4', '!MD5', '!PSK'
+    ])
 
 
 class Site:
     def __init__(
             self, name="", path="", addr="", port=80, php=False, version="", 
-            cert=None, db=None, enabled=False):
+            cert=None, db=None, block=[], enabled=False):
         self.name = name
         self.path = path
         self.addr = addr
@@ -24,12 +43,10 @@ class Site:
         self.db = None
         self.meta = None
         self.enabled = enabled
-        self.addtoblock = []
+        self.addtoblock = block
         self.installed = False
     
     def install(self, extra_vars={}, enable=True, message=DefaultMessage()):
-        if self.installed:
-            raise Exception("Site is already installed")
         if message:
             message.update("info", "Preparing site install...")
         specialmsg = ''
@@ -128,14 +145,13 @@ class Site:
                 s.add(*[x for x in add])
             c.add(s)
             nginx.dumpf(c, os.path.join('/etc/nginx/sites-available', self.name))
-            # Write configuration file with info Genesis needs to know the site
             c = ConfigParser.SafeConfigParser()
             c.add_section('website')
             c.set('website', 'name', self.name)
-            c.set('website', 'stype', self.meta.name)
+            c.set('website', 'type', self.meta.name)
             c.set('website', 'ssl', '')
             c.set('website', 'version', self.version)
-            c.set('website', 'dbengine', self.meta.selected_dbengine or '')
+            c.set('website', 'dbengine', self.selected_dbengine or '')
             with open(os.path.join(self.path, ".arkos"), 'w') as f:
                 c.write(f)
         except Exception, e:
@@ -164,27 +180,11 @@ class Site:
                 raise ReloadError('PHP-FPM')
         update_policy(self.meta.id, self.name, 2)
         self.installed = True
+        storage.sites.append("sites", self)
         if specialmsg:
             return specialmsg
     
     def ssl_enable(self):
-        # If no cipher preferences set, use the default ones
-        # As per Mozilla recommendations, but substituting 3DES for RC4
-        ciphers = ':'.join([
-            'ECDHE-RSA-AES128-GCM-SHA256', 'ECDHE-ECDSA-AES128-GCM-SHA256',
-            'ECDHE-RSA-AES256-GCM-SHA384', 'ECDHE-ECDSA-AES256-GCM-SHA384',
-            'kEDH+AESGCM', 'ECDHE-RSA-AES128-SHA256', 
-            'ECDHE-ECDSA-AES128-SHA256', 'ECDHE-RSA-AES128-SHA', 
-            'ECDHE-ECDSA-AES128-SHA', 'ECDHE-RSA-AES256-SHA384',
-            'ECDHE-ECDSA-AES256-SHA384', 'ECDHE-RSA-AES256-SHA', 
-            'ECDHE-ECDSA-AES256-SHA', 'DHE-RSA-AES128-SHA256',
-            'DHE-RSA-AES128-SHA', 'DHE-RSA-AES256-SHA256', 
-            'DHE-DSS-AES256-SHA', 'AES128-GCM-SHA256', 'AES256-GCM-SHA384',
-            'ECDHE-RSA-DES-CBC3-SHA', 'ECDHE-ECDSA-DES-CBC3-SHA',
-            'EDH-RSA-DES-CBC3-SHA', 'EDH-DSS-DES-CBC3-SHA', 
-            'DES-CBC3-SHA', 'HIGH', '!aNULL', '!eNULL', '!EXPORT', '!DES',
-            '!RC4', '!MD5', '!PSK'
-            ])
         if config.get("certificates", "ciphers"):
             ciphers = config.get("certificates", "ciphers")
         else:
@@ -375,12 +375,176 @@ class Site:
             "certificate": self.cert.as_dict() if self.cert else None,
             "database": self.db.as_dict() if self.db else None,
             "php": self.php,
-            "enabled": self.enabled,
-            "installed": self.installed
+            "enabled": self.enabled
         }
 
 
-def get():
+class ReverseProxy:
+    def __init__(
+            self, name="", path="", addr="", port=80, base_path="", block=[], 
+            type="internal"):
+        self.name = name
+        self.addr = addr
+        self.path = path
+        self.port = port
+        self.base_path = base_path
+        self.block = block
+        self.type = type
+        self.installed = False
+
+    def install(self, extra_vars={}, enable=True, message=None):
+        site_dir = config.get("websites", "site_dir")
+        self.path = self.path or os.path.join(site_dir, self.name)
+        if extra_vars:
+			if not extra_vars.get('rp-type') or not vars.get('rp-pass'):
+				raise Exception('Must enter ReverseProxy type and location to pass to')
+			elif extra_vars.get('rp-type') in ['fastcgi', 'uwsgi']:
+				self.block = [nginx.Location(vars.get('rp-lregex', '/'), 
+					nginx.Key('%s_pass'%vars.get('rp-type'), 
+						'%s'%vars.get('rp-pass')),
+					nginx.Key('include', '%s_params'%vars.get('rp-type'))
+					)]
+			else:
+				self.block = [nginx.Location(extra_vars.get('rp-lregex', '/'), 
+					nginx.Key('proxy_pass', '%s'%extra_vars.get('rp-pass')),
+					nginx.Key('proxy_redirect', 'off'),
+					nginx.Key('proxy_buffering', 'off'),
+					nginx.Key('proxy_set_header', 'Host $host')
+					)]
+			if vars.getvalue('rp-xrip', '') == '1':
+				self.block[0].add(nginx.Key('proxy_set_header', 'X-Real-IP $remote_addr'))
+			if vars.getvalue('rp-xff', '') == '1':
+				self.block[0].add(nginx.Key('proxy_set_header', 'X-Forwarded-For $proxy_add_x_forwarded_for'))
+        c = nginx.Conf()
+        s = nginx.Server(
+            nginx.Key('listen', self.port),
+            nginx.Key('server_name', self.addr),
+            nginx.Key('root', self.base_path or self.path),
+            nginx.Key('index', 'index.'+('php' if self.php else 'html'))
+        )
+        if add:
+            s.add(*[x for x in add])
+        c.add(s)
+        nginx.dumpf(c, os.path.join('/etc/nginx/sites-available', self.name))
+        c = ConfigParser.SafeConfigParser()
+        c.add_section('website')
+        c.set('website', 'name', self.name)
+        c.set('website', 'type', "ReverseProxy")
+        c.set('website', 'extra', self.type)
+        c.set('website', 'ssl', '')
+        with open(os.path.join(self.path, ".arkos"), 'w') as f:
+            c.write(f)
+        update_policy("reverseproxy", self.name, 2)
+        self.installed = True
+        storage.sites.append("sites", self)
+
+    def remove(self, message=None):
+        shutil.rmtree(self.path)
+        self.nginx_disable(reload=True)
+        refresh_policies()
+        try:
+            os.unlink(os.path.join('/etc/nginx/sites-available', self.name))
+        except:
+            pass
+    
+    def ssl_enable(self):
+        if config.get("certificates", "ciphers"):
+            ciphers = config.get("certificates", "ciphers")
+        else:
+            config.set("certificates", "ciphers", ciphers)
+            config.save()
+
+        c = nginx.loadf(os.path.join('/etc/nginx/sites-available/', self.name))
+        s = c.servers[0]
+        l = s.filter('Key', 'listen')[0]
+        if l.value == '80':
+            l.value = '443 ssl'
+            c.add(nginx.Server(
+                nginx.Key('listen', '80'),
+                nginx.Key('server_name', self.addr),
+                nginx.Key('return', '301 https://%s$request_uri' % self.addr)
+            ))
+            for x in c.servers:
+                if x.filter('Key', 'listen')[0].value == '443 ssl':
+                    s = x
+                    break
+        else:
+            l.value = l.value.split(' ssl')[0] + ' ssl'
+        for x in s.all():
+            if type(x) == nginx.Key and x.name.startswith('ssl_'):
+                s.remove(x)
+        s.add(
+            nginx.Key('ssl_certificate', self.cert.cert_path),
+            nginx.Key('ssl_certificate_key', self.cert.key_path),
+            nginx.Key('ssl_protocols', 'TLSv1 TLSv1.1 TLSv1.2'),
+            nginx.Key('ssl_ciphers', ciphers),
+            nginx.Key('ssl_session_timeout', '5m'),
+            nginx.Key('ssl_prefer_server_ciphers', 'on'),
+            nginx.Key('ssl_session_cache', 'shared:SSL:50m'),
+            )
+        nginx.dumpf(c, os.path.join('/etc/nginx/sites-available/', self.name))
+    
+    def ssl_disable(self):
+        c = nginx.loadf(os.path.join('/etc/nginx/sites-available/', self.name))
+        if len(c.servers) > 1:
+            for x in c.servers:
+                if not 'ssl' in x.filter('Key', 'listen')[0].value \
+                and x.filter('key', 'return'):
+                    c.remove(x)
+                    break
+        s = c.servers[0]
+        l = s.filter('Key', 'listen')[0]
+        if l.value == '443 ssl':
+            l.value = '80'
+        else:
+            l.value = l.value.rstrip(' ssl')
+        s.remove(*[x for x in s.filter('Key') if x.name.startswith('ssl_')])
+        nginx.dumpf(c, os.path.join('/etc/nginx/sites-available/', self.name))
+    
+    def nginx_enable(self, reload=True):
+        origin = os.path.join('/etc/nginx/sites-available', self.name)
+        target = os.path.join('/etc/nginx/sites-enabled', self.name)
+        if not os.path.exists(target):
+            os.symlink(origin, target)
+            self.enabled = True
+        if reload == True:
+            nginx_reload()
+    
+    def nginx_disable(self, reload=True):
+        os.unlink(os.path.join('/etc/nginx/sites-enabled', self.name))
+        self.enabled = False
+        if reload == True:
+            nginx_reload()
+    
+    def as_dict(self):
+        return {
+            "name": self.name,
+            "path": self.path,
+            "type": self.type,
+            "addr": self.addr,
+            "port": self.port,
+            "certificate": self.cert.as_dict() if self.cert else None,
+            "enabled": self.enabled
+        }
+
+
+def get(name=None, type=None, verify=True):
+    data = storage.sites.get("sites")
+    if not data:
+        data = scan()
+    if id or type:
+        tlist = []
+        for x in data:
+            if x.name == name:
+                return x
+            elif x.meta.id == type:
+                tlist.append(x)
+        if tlist:
+            return tlist
+        return None
+    return data
+
+def scan():
     sites = []
     for site in os.listdir('/etc/nginx/sites-available'):
         path = os.path.join('/etc/nginx/sites-available', site)
@@ -405,7 +569,7 @@ def get():
                 n = c.servers[0]
             s.port, ssl = re.match(rport, n.filter('Key', 'listen')[0].value).group(1, 2)
             if ssl:
-                s.cert = storage.certs.get(os.path.splitext(os.path.split(n.filter('Key', 'ssl_certificate')[0].value)[1])[0])
+                s.cert = certificates.get(os.path.splitext(os.path.split(n.filter('Key', 'ssl_certificate')[0].value)[1])[0])
                 s.cert.assign.append({"type": "website", "name": s.name})
             s.port = int(s.port)
             s.addr = n.filter('Key', 'server_name')[0].value
@@ -415,11 +579,12 @@ def get():
             pass
         s.version = g.get('website', 'version', None)
         if g.get('website', 'dbengine', None):
-            s.db = storage.dbs.get(g.get("website", "dbname"))
+            s.db = databases.get(g.get("website", "dbname"))
         s.enabled = True if os.path.exists(os.path.join('/etc/nginx/sites-enabled', g.get('website', 'name'))) else False
-        s.meta = applications.get(id=self.meta.id)
+        s.meta = applications.get("installed", self.meta.id) if self.meta else None
         s.installed = True
         sites.append(s)
+    storage.sites.set("sites", sites)
     return sites
 
 def nginx_reload():
