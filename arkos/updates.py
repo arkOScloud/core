@@ -24,6 +24,7 @@ def check_updates():
         else:
             updates.append(u)
     storage.updates.set("updates", updates)
+    return updates
 
 def install_updates(message=DefaultMessage()):
     updates = storage.updates.get("updates")

@@ -22,6 +22,28 @@ class App:
     def get_module(self, mtype):
         return getattr(self, "_%s"%mtype) if hasattr(self, "_%s"%mtype) else None
     
+    def load(self, verify=True):
+        try:
+            for x in self.modules:
+                mod = imp.load_module(x, *imp.find_module(x, [os.path.join(config.get("apps", "app_dir"), self.id)]))
+                if x == "database" and self.modules[x]:
+                    for y in self.modules[x]:
+                        setattr(self, "_%s_%s"%(x,y), getattr(mod, self.modules[x][y]) if self.modules[x][y] and hasattr(mod, self.modules[x][y]) else None)
+                elif self.modules[x]:
+                    setattr(self, "_%s"%x, getattr(mod, self.modules[x]) if hasattr(mod, self.modules[x]) else None)
+                else:
+                    setattr(self, "_%s"%x, mod)
+            if verify:
+                self.verify_dependencies()
+            for s in self.services:
+                if s["ports"]:
+                    tracked_services.register(self.id, s["binary"], s["name"], 
+                        self.icon, s["ports"], fw=False)
+        except Exception, e:
+            self.loadable = False
+            self.error = "Module error: %s" % str(e)
+            logger.warn("Failed to load %s -- %s" % (self.name, str(e)))
+    
     def verify_dependencies(self):
         verify, error = True, ""
         for dep in self.dependencies:
@@ -116,41 +138,21 @@ def get(id=None, type=None, verify=True):
 def scan(verify=True):
     apps = []
     applist = [app for app in os.listdir(config.get("apps", "app_dir")) if not app.startswith(".")]
-    applist = list(set(applist))
 
-    while len(applist) > 0:
-        app = applist[-1]
+    for app in applist:
         try:
             with open(os.path.join(config.get("apps", "app_dir"), app, "manifest.json"), "r") as f:
                 data = json.loads(f.read())
-        except Exception, e:
+        except ValueError:
+            logger.warn("Failed to load %s due to a JSON parsing error" % app)
             continue
+        logger.debug(" *** Loading %s" % data["id"])
         a = App(**data)
-        try:
-            for x in a.modules:
-                mod = imp.load_module(x, *imp.find_module(x, [os.path.join(config.get("apps", "app_dir"), app)]))
-                if x == "database" and a.modules[x]:
-                    for y in a.modules[x]:
-                        setattr(a, "_%s_%s"%(x,y), getattr(mod, a.modules[x][y]) if hasattr(mod, a.modules[x][y]) else None)
-                elif a.modules[x]:
-                    setattr(a, "_%s"%x, getattr(mod, a.modules[x]) if hasattr(mod, a.modules[x]) else None)
-                else:
-                    setattr(a, "_%s"%x, mod)
-        except Exception, e:
-            a.loadable = False
-            a.error = "Module error: %s" % str(e)
-            logger.warn("Failed to load %s -- %s" % (a.name, str(e)))
-        if verify:
-            a.verify_dependencies()
-        for s in a.services:
-            if s["ports"]:
-                tracked_services.register(a.id, s["binary"], s["name"], 
-                    a.icon, s["ports"], fw=False)
+        a.load()
         apps.append(a)
-        applist.remove(app)
-    storage.apps.set("installed", applist)
-    if verify:
-        verify_app_dependencies()
+    storage.apps.set("installed", apps)
+    #if verify:
+        #verify_app_dependencies()
     return storage.apps.get("installed")
 
 def get_available(id=None):
@@ -234,14 +236,14 @@ def get_dependent(id, op):
                 metoo += get_dependent(dep['package'], 'install')
     return metoo
 
-def install(id, install_deps=True, message=DefaultMessage()):
+def install(id, install_deps=True, load=True, message=DefaultMessage()):
     deps = get_dependent(id, "install")
     if install_deps and deps:
         if message:
             message.update("info", "Installing dependencies for %s..." % id)
         for x in deps:
             try:
-                _install(x)
+                _install(x, load=load)
             except Exception, e:
                 if message:
                     message.complete("error", str(e))
@@ -251,7 +253,7 @@ def install(id, install_deps=True, message=DefaultMessage()):
     if message:
         message.update("info", "Installing %s..." % id)
     try:
-        _install(id)
+        _install(id, load=load)
     except Exception, e:
         if message:
             message.complete("error", str(e))
@@ -264,7 +266,7 @@ def install(id, install_deps=True, message=DefaultMessage()):
             regen_fw = True
             tracked_services.register(a.id, x["binary"], x["name"], a.icon, x["ports"])
 
-def _install(id):
+def _install(id, load=True):
     data = api('https://%s/apps/%s' % (config.get("general", "repo_server"), id), crit=True)
     if data['status'] == 200:
         with open(os.path.join(config.get("apps", "app_dir"), 'plugin.tar.gz'), 'wb') as f:
@@ -276,6 +278,7 @@ def _install(id):
     os.unlink(os.path.join(config.get("apps", "app_dir"), 'plugin.tar.gz'))
     with open(os.path.join(config.get("apps", "app_dir"), id, "manifest.json")) as f:
         data = json.loads(f.read())
-        app = App(**data)
-    app.verify_dependencies()
+    app = App(**data)
+    if load:
+        app.load()
     storage.apps.add("installed", app)

@@ -67,7 +67,7 @@ class ConsoleHandler(logging.StreamHandler):
 def new_logger(log_level=logging.INFO, debug=False):
     logger = logging.getLogger("arkos")
     stdout = ConsoleHandler(sys.stdout, debug, False)
-    stdout.setLevel(log_level)
+    stdout.setLevel(logging.DEBUG if debug else log_level)
     dformatter = logging.Formatter('%(asctime)s [%(levelname)s] %(module)s: %(message)s')
     stdout.setFormatter(dformatter)
     logger.addHandler(stdout)

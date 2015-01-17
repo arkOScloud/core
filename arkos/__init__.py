@@ -24,5 +24,5 @@ if os.path.exists(os.path.join(sys.path[0], "settings.json")):
 elif os.path.exists("/etc/arkos/settings.json"):
     config.load("/etc/arkos/settings.json")
 storage = StorageControl()
-logger = new_logger(20, debug=False)
+logger = new_logger(20, debug=True)
 conns = ConnectionsManager(config)

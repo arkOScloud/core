@@ -2,7 +2,8 @@ from arkos import storage, applications
 
 
 class Database:
-    def __init__(self, name="", manager=None):
+    def __init__(self, id=0, name="", manager=None):
+        self.id = id or get_new_db_id()
         self.name = name
         self.manager = manager
     
@@ -14,10 +15,18 @@ class Database:
     
     def execute(self):
         pass
+    
+    def as_dict(self):
+        return {
+            "name": self.name,
+            "type": self.manager.id,
+            "size": self.get_size()
+        }
 
 
 class DatabaseUser:
-    def __init__(self, name="", passwd="", manager=None):
+    def __init__(self, id=0, name="", passwd="", manager=None):
+        self.id = id or get_new_dbuser_id()
         self.name = name
         self.passwd = passwd
         self.manager = manager
@@ -30,6 +39,13 @@ class DatabaseUser:
     
     def remove(self):
         pass
+
+    def as_dict(self):
+        return {
+            "name": self.name,
+            "type": self.manager.id,
+            "permissions": self.chperm("check")
+        }
 
 
 class DatabaseManager:
@@ -114,3 +130,9 @@ def scan_managers():
 
 def get_types():
     return [x.name for x in get_managers()]
+
+def get_new_db_id():
+    return max([x.id for x in get()]) + 1
+
+def get_new_dbuser_id():
+    return max([x.id for x in get_users()]) + 1

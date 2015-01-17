@@ -31,9 +31,10 @@ ciphers = ':'.join([
 
 class Site:
     def __init__(
-            self, id="", path="", addr="", port=80, php=False, version="", 
+            self, id=0, name="", addr="", port=80, path="", php=False, version="", 
             cert=None, db=None, data_path="", block=[], enabled=False):
-        self.id = id
+        self.id = id or get_new_id()
+        self.name = name
         self.path = path
         self.addr = addr
         self.port = port
@@ -52,7 +53,7 @@ class Site:
             message.update("info", "Preparing site install...")
         specialmsg = ''
         site_dir = config.get("websites", "site_dir")
-        self.path = self.path or os.path.join(site_dir, self.id)
+        self.path = self.path or os.path.join(site_dir, self.name)
 
         if not self.download_url:
             ending = ''
@@ -81,13 +82,13 @@ class Site:
             if message:
                 message.update("info", "Creating database...")
             try:
-                self.db = databases.new(self.meta.selected_dbengine, self.id)
+                self.db = databases.new(self.meta.selected_dbengine, self.name)
             except Exception, e:
                 raise InstallError('Databases could not be created - %s' % str(e))
 
         # Make sure the target directory exists, but is empty
         # Testing for sites with the same name should have happened by now
-        pkg_path = '/tmp/'+self.id+ending
+        pkg_path = '/tmp/'+self.name+ending
         if os.path.isdir(self.path):
             shutil.rmtree(self.path)
         os.makedirs(self.path)
@@ -106,9 +107,9 @@ class Site:
             if ending in ['.tar.gz', '.tgz', '.tar.bz2']:
                 extract_cmd = 'tar '
                 extract_cmd += 'xzf' if ending in ['.tar.gz', '.tgz'] else 'xjf'
-                extract_cmd += ' /tmp/%s -C %s --strip 1' % (self.id+ending, self.path)
+                extract_cmd += ' /tmp/%s -C %s --strip 1' % (self.name+ending, self.path)
             else:
-                extract_cmd = 'unzip -d %s /tmp/%s' % (self.path, self.id+ending)
+                extract_cmd = 'unzip -d %s /tmp/%s' % (self.path, self.name+ending)
 
             if message:
                 message.update("info", "Installing site...")
@@ -163,10 +164,10 @@ class Site:
             if add:
                 s.add(*[x for x in add])
             c.add(s)
-            nginx.dumpf(c, os.path.join('/etc/nginx/sites-available', self.id))
+            nginx.dumpf(c, os.path.join('/etc/nginx/sites-available', self.name))
             c = ConfigParser.SafeConfigParser()
             c.add_section('website')
-            c.set('website', 'name', self.id)
+            c.set('website', 'name', self.name)
             c.set('website', 'type', self.meta.id)
             c.set('website', 'ssl', '')
             c.set('website', 'version', self.version)
@@ -199,9 +200,9 @@ class Site:
                 php_reload()
             except:
                 raise ReloadError('PHP-FPM')
-        filesystems.register_point(self.id, self.data_path, "site", self.meta.icon)
+        filesystems.register_point(self.name, self.data_path, "site", self.meta.icon)
         tracked_services.register(self.meta.id if self.meta else "website", 
-            self.id, self.id, "gen-earth", [("tcp", self.port)], 2)
+            self.name, self.name, "gen-earth", [("tcp", self.port)], 2)
         self.installed = True
         storage.sites.add("sites", self)
         if specialmsg:
@@ -214,7 +215,7 @@ class Site:
             config.set("certificates", "ciphers", ciphers)
             config.save()
 
-        c = nginx.loadf(os.path.join('/etc/nginx/sites-available/', self.id))
+        c = nginx.loadf(os.path.join('/etc/nginx/sites-available/', self.name))
         s = c.servers[0]
         l = s.filter('Key', 'listen')[0]
         if l.value == '80':
@@ -242,11 +243,11 @@ class Site:
             nginx.Key('ssl_prefer_server_ciphers', 'on'),
             nginx.Key('ssl_session_cache', 'shared:SSL:50m'),
             )
-        nginx.dumpf(c, os.path.join('/etc/nginx/sites-available/', self.id))
+        nginx.dumpf(c, os.path.join('/etc/nginx/sites-available/', self.name))
         self.enable_ssl()
     
     def ssl_disable(self):
-        c = nginx.loadf(os.path.join('/etc/nginx/sites-available/', self.id))
+        c = nginx.loadf(os.path.join('/etc/nginx/sites-available/', self.name))
         if len(c.servers) > 1:
             for x in c.servers:
                 if not 'ssl' in x.filter('Key', 'listen')[0].value \
@@ -260,12 +261,12 @@ class Site:
         else:
             l.value = l.value.rstrip(' ssl')
         s.remove(*[x for x in s.filter('Key') if x.name.startswith('ssl_')])
-        nginx.dumpf(c, os.path.join('/etc/nginx/sites-available/', self.id))
+        nginx.dumpf(c, os.path.join('/etc/nginx/sites-available/', self.name))
         self.disable_ssl()
     
     def nginx_enable(self, reload=True):
-        origin = os.path.join('/etc/nginx/sites-available', self.id)
-        target = os.path.join('/etc/nginx/sites-enabled', self.id)
+        origin = os.path.join('/etc/nginx/sites-available', self.name)
+        target = os.path.join('/etc/nginx/sites-enabled', self.name)
         if not os.path.exists(target):
             os.symlink(origin, target)
             self.enabled = True
@@ -273,14 +274,14 @@ class Site:
             nginx_reload()
     
     def nginx_disable(self, reload=True):
-        os.unlink(os.path.join('/etc/nginx/sites-enabled', self.id))
+        os.unlink(os.path.join('/etc/nginx/sites-enabled', self.name))
         self.enabled = False
         if reload == True:
             nginx_reload()
     
     def edit(self, oldname=""):
         # Update the nginx serverblock
-        c = nginx.loadf(os.path.join('/etc/nginx/sites-available', oldname or self.id))
+        c = nginx.loadf(os.path.join('/etc/nginx/sites-available', oldname or self.name))
         s = c.servers[0]
         if self.cert and self.port == 443:
             for x in c.servers:
@@ -298,18 +299,18 @@ class Site:
                 nginx.Key('return', '301 https://%s$request_uri'%self.addr)
             ))
         # If the name was changed, rename the folder and files
-        if oldname and self.id != oldname:
+        if oldname and self.name != oldname:
             if self.path.endswith('_site'):
-                self.path = os.path.join(config.get("websites", "site_dir"), self.id, '_site')
+                self.path = os.path.join(config.get("websites", "site_dir"), self.name, '_site')
             elif self.path.endswith('htdocs'):
-                self.path = os.path.join(config.get("websites", "site_dir"), self.id, 'htdocs')
+                self.path = os.path.join(config.get("websites", "site_dir"), self.name, 'htdocs')
             else:
-                self.path = os.path.join(config.get("websites", "site_dir"), self.id)
+                self.path = os.path.join(config.get("websites", "site_dir"), self.name)
             if os.path.exists(self.path):
                 shutil.rmtree(self.path)
             shutil.move(os.path.join(config.get("websites", "site_dir"), oldname), self.path)
             shutil.move(os.path.join('/etc/nginx/sites-available', oldname),
-                os.path.join('/etc/nginx/sites-available', self.id))
+                os.path.join('/etc/nginx/sites-available', self.name))
             os.unlink(os.path.join("/etc/nginx/sites-available", oldname))
             self.nginx_enable(reload=False)
         s.filter('Key', 'listen')[0].value = str(self.port)+' ssl' if self.cert else str(self.port)
@@ -318,7 +319,7 @@ class Site:
         s.filter('Key', 'index')[0].value = 'index.php' if self.php else 'index.html'
         nginx.dumpf(c, os.path.join('/etc/nginx/sites-available', oldname))
         tracked_services.register(self.meta.id if self.meta else "website", 
-            self.id, self.id, self.icon, [("tcp", self.port)], 2)
+            self.name, self.name, self.icon, [("tcp", self.port)], 2)
         nginx_reload()
 
     def update(self, message=DefaultMessage()):
@@ -346,7 +347,7 @@ class Site:
         if self.download_url and ending == '.git':
             pkg_path = self.download_url 
         elif self.download_url:
-            pkg_path = os.path.join('/tmp', self.id+ending)
+            pkg_path = os.path.join('/tmp', self.name+ending)
             try:
                 download(self.meta.download_url, file=pkg_path, crit=True)
             except Exception, e:
@@ -382,15 +383,16 @@ class Site:
             self.db.remove()
             self.db.usermod('del', '')
         self.nginx_disable(reload=True)
-        tracked_services.deregister(self.meta.id if self.meta else "website", self.id)
+        tracked_services.deregister(self.meta.id if self.meta else "website", self.name)
         try:
-            os.unlink(os.path.join('/etc/nginx/sites-available', self.id))
+            os.unlink(os.path.join('/etc/nginx/sites-available', self.name))
         except:
             pass
     
     def as_dict(self):
         return {
             "id": self.id,
+            "name": self.name,
             "path": self.path,
             "addr": self.addr,
             "port": self.port,
@@ -405,10 +407,11 @@ class Site:
 
 class ReverseProxy:
     def __init__(
-            self, id="", name="", path="", addr="", port=80, base_path="", block=[], 
-            type="internal"):
-        self.id = id
+            self, id=0, name="", pretty_name="", path="", addr="", port=80, 
+            base_path="", block=[], type="internal"):
+        self.id = id or get_new_id()
         self.name = name
+        self.pretty_name = pretty_name
         self.addr = addr
         self.path = path
         self.port = port
@@ -453,14 +456,14 @@ class ReverseProxy:
         nginx.dumpf(c, os.path.join('/etc/nginx/sites-available', self.name))
         c = ConfigParser.SafeConfigParser()
         c.add_section('website')
-        c.set('website', 'name', self.id)
-        c.set('website', 'pretty_name', self.name)
+        c.set('website', 'name', self.name)
+        c.set('website', 'pretty_name', self.pretty_name)
         c.set('website', 'type', "ReverseProxy")
         c.set('website', 'extra', self.type)
         c.set('website', 'ssl', '')
         with open(os.path.join(self.path, ".arkos"), 'w') as f:
             c.write(f)
-        tracked_services.register("website", self.id, self.name, 
+        tracked_services.register("website", self.name, self.pretty_name, 
             "gen-earth", [("tcp", self.port)], 2)
         self.installed = True
         storage.sites.add("sites", self)
@@ -468,7 +471,7 @@ class ReverseProxy:
     def remove(self, message=None):
         shutil.rmtree(self.path)
         self.nginx_disable(reload=True)
-        tracked_services.deregister("website", self.id)
+        tracked_services.deregister("website", self.name)
         try:
             os.unlink(os.path.join('/etc/nginx/sites-available', self.name))
         except:
@@ -547,6 +550,7 @@ class ReverseProxy:
         return {
             "id": self.id,
             "name": self.name,
+            "pretty_name": self.pretty_name,
             "path": self.path,
             "type": self.type,
             "addr": self.addr,
@@ -585,14 +589,14 @@ def scan():
         stype = g.get('website', 'type')
         if stype != "ReverseProxy":
             cls = applications.get(stype)
-            s = cls._website(id=g.get('website', 'name'))
+            s = cls._website(name=g.get('website', 'name'))
             s.meta = cls
             s.data_path = c.get("website", "data_path", "")
             if s.data_path:
                 filesystems.register_point(g.get('website', 'name'), s.data_path, 
                     "site", cls.icon if cls else "gen-earth")
         else:
-            s = ReverseProxy(id=g.get('website', 'name'))
+            s = ReverseProxy(name=g.get('website', 'name'))
             s.name = g.get("website", "pretty_name")
             s.type = g.get("website", "extra")
             s.meta = None
@@ -610,7 +614,7 @@ def scan():
             s.port, ssl = re.match(rport, n.filter('Key', 'listen')[0].value).group(1, 2)
             if ssl:
                 s.cert = certificates.get(os.path.splitext(os.path.split(n.filter('Key', 'ssl_certificate')[0].value)[1])[0])
-                s.cert.assign.append({"type": "website", "name": s.id})
+                s.cert.assign.append({"type": "website", "name": s.name})
             s.port = int(s.port)
             s.addr = n.filter('Key', 'server_name')[0].value
             s.path = n.filter('Key', 'root')[0].value
@@ -623,8 +627,8 @@ def scan():
         s.enabled = True if os.path.exists(os.path.join('/etc/nginx/sites-enabled', g.get('website', 'name'))) else False
         s.installed = True
         sites.append(s)
-        tracked_services.register(s.meta.id if s.meta else "website", s.id, 
-            s.name if hasattr(s, "name") and s.name else s.id, 
+        tracked_services.register(s.meta.id if s.meta else "website", s.name, 
+            s.pretty_name if hasattr(s, "pretty_name") and s.pretty_name else s.name, 
             s.meta.icon if s.meta else "gen-earth", [("tcp", s.port)])
     storage.sites.set("sites", sites)
     return sites
@@ -644,3 +648,6 @@ def php_reload():
     status = shell('systemctl restart php-fpm')
     if status["code"] >= 1:
         raise Exception('PHP FastCGI failed to reload.')
+
+def get_new_id():
+    return max([x.id for x in get()]) + 1

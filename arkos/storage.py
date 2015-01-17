@@ -15,7 +15,7 @@ class Storage:
         if id:
             for x in storage:
                 if id == x.id:
-                    return [x]
+                    return x
             return None
         return storage
     

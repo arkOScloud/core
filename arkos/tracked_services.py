@@ -16,22 +16,22 @@ class SecurityPolicy:
         self.icon = icon
         self.ports = ports
         self.policy = policy
-    
+
     def save(self, fw=True):
-        with open(policy_file, "r") as f:
+        with open(policy_path, "r") as f:
             policies = json.loads(f.read())
         if policies.has_key(self.type):
             policies[self.type][self.id] = policy
         else:
             policies[self.type] = {}
             policies[self.type][self.id] = policy
-        with open(policy_file, "w") as f:
+        with open(policy_path, "w") as f:
             f.write(json.dumps(policies, sort_keys=True, 
                 indent=4, separators=(',', ': ')))
         if config.get("general", "firewall", True) and fw:
             security.regen_fw(get())
         storage.policies.add("policies", self)
-    
+
     def remove(self, fw=True):
         with open(policy_path, "r") as f:
             policies = json.loads(f.read())
@@ -45,6 +45,16 @@ class SecurityPolicy:
         if config.get("general", "firewall", True) and fw:
             security.regen_fw(get())
         storage.policies.remove("policies", self)
+    
+    def as_dict(self):
+        return {
+            "type": self.type,
+            "id": self.id,
+            "name": self.name,
+            "icon": self.icon,
+            "ports": self.ports,
+            "policy": self.policy
+        }
 
 
 def get(type=None):
@@ -60,16 +70,18 @@ def get(type=None):
     return data
 
 def register(type, id, name, icon, ports, policy=0, fw=True):
-    with open(policy_file, "r") as f:
+    with open(policy_path, "r") as f:
         policies = json.loads(f.read())
     if not policy:
         if policies.has_key(type) and policies[type].has_key(id):
             policy = policies[type][id]
         else:
             policy = 2
-    for x in get(x.type):
-        if x.id == id:
-            storage.policies.remove("policies", x)
+    pget = get(type)
+    if pget:
+        for x in pget:
+            if x.id == id:
+                storage.policies.remove("policies", x)
     svc = SecurityPolicy(type, id, name, icon, ports, policy)
     svc.save(fw)
 
@@ -84,7 +96,7 @@ def deregister(type, id="", fw=True):
         security.regen_fw(get())
 
 def refresh_policies():
-    with open(policy_file, "r") as f:
+    with open(policy_path, "r") as f:
         policies = json.loads(f.read())
     svcs = get()
     newpolicies = {}
@@ -98,7 +110,7 @@ def refresh_policies():
                 for s in policies[x]:
                     if s == y.id:
                         newpolicies[x][s] = policies[x][s]
-    with open(policy_file, "w") as f:
+    with open(policy_path, "w") as f:
         f.write(json.dumps(newpolicies, sort_keys=True, 
             indent=4, separators=(',', ': ')))
 

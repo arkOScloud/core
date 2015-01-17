@@ -3,6 +3,7 @@ from arkos.utilities.utils import *
 from arkos.utilities.logs import *
 
 __all__ = [
+    "version",
     "dictfilter",
     "cidr_to_netmask",
     "netmask_to_cidr",
