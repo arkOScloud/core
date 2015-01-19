@@ -45,6 +45,13 @@ class Group:
     
     def delete(self):
         conns.LDAP.delete_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn))
+    
+    def as_dict(self):
+        return {
+            "id": self.gid,
+            "name": self.name,
+            "users": self.users
+        }
 
 
 class SystemGroup:    

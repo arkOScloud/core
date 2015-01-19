@@ -11,6 +11,7 @@ def get_all():
         "load": get_load(),
         "temp": get_temp(),
         "ram": get_ram(),
+        "cpu": get_cpu(),
         "swap": get_swap(),
         "uptime": get_uptime()
     }
@@ -31,6 +32,9 @@ def get_ram():
     s = psutil.virtual_memory()
     a = int(s.used) - (int(s.cached) + int(s.buffers))
     return (a, int(s.total), int(s.percent))
+
+def get_cpu():
+    return psutil.cpu_percent(interval=1)
 
 def get_swap():
     s = psutil.swap_memory()

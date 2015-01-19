@@ -22,8 +22,11 @@ class Domain(object):
         conns.LDAP.add_s("virtualdomain=%s,ou=domains,%s" % (self.name,self.rootdn),
             ldap.modlist.addModlist(ldif))
     
-    def remove_domain(self):
+    def remove(self):
         conns.LDAP.delete_s("virtualdomain=%s,ou=domains,%s" % (self.name,self.rootdn))
+
+    def as_dict(self):
+        return {"name": self.name}
 
 
 def get(name=None):

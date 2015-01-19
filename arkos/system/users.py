@@ -52,7 +52,7 @@ class User:
         conns.LDAP.add_s("uid=%s,ou=users,%s" % (self.name,self.rootdn), ldif)
         self.update_adminsudo()
     
-    def update(self):
+    def update(self, newpasswd=""):
         try:
             ldif = conns.LDAP.search_s("uid=%s,ou=users,%s" % (self.name,self.rootdn),
                 ldap.SCOPE_SUBTREE, "(objectClass=*)", None)
@@ -70,6 +70,8 @@ class User:
             "cn": "%s %s" % (self.first_name, self.last_name),
             "mail": self.name+"@"+self.domain
         }
+        if newpasswd:
+            attrs["userPassword"] = hashpw(newpasswd, "crypt")
         nldif = ldap.modlist.modifyModlist(ldif, attrs, ignore_oldexistent=1)
         conns.LDAP.modify_ext_s("uid=%s,ou=users,%s" % (self.name,self.rootdn), nldif)
         self.update_adminsudo()
@@ -130,6 +132,17 @@ class User:
             if os.path.exists(hdir):
                 shutil.rmtree(hdir)
         conns.LDAP.delete_s("uid=%s,ou=users,%s" % (self.name,self.rootdn))
+    
+    def as_dict(self):
+        return {
+            "id": self.uid,
+            "name": self.name,
+            "first_name": self.first_name,
+            "last_name": self.last_name,
+            "domain": self.mail.split("@")[1],
+            "admin": self.admin,
+            "sudo": self.sudo
+        }
 
 
 class SystemUser:
@@ -150,6 +163,13 @@ class SystemUser:
     
     def delete(self):
         shell("userdel %s" % self.name)
+    
+    def as_dict(self):
+        return {
+            "id": self.uid,
+            "name": self.name,
+            "groups": self.groups
+        }
 
 
 def get(uid=None):

@@ -26,12 +26,15 @@ class DiskPartition(object):
         self.crypt = crypt
 
     def mount(self, passwd=None):
+        if self.mountpoint and os.path.ismount(self.mountpoint):
+            raise Exception("Disk partition already mounted")
+        mount_point = self.mountpoint if self.mountpoint else os.path.join('/media', self.name)
         if self.crypt and passwd:
             s = crypto.luks_open(self.path, self.name, passwd)
             if s != 0:
                 raise Exception('Failed to decrypt %s with errno %s' % (self.name, str(s)))
             s = libc.mount(ctypes.c_char_p(os.path.join("/dev/mapper", self.name)), 
-                ctypes.c_char_p(os.path.join('/media', self.name)), 
+                ctypes.c_char_p(mount_point), 
                 ctypes.c_char_p(self.fstype), 0, ctypes.c_char_p(""))
             if s == -1:
                 crypto.luks_close(self.name)
@@ -40,11 +43,11 @@ class DiskPartition(object):
             raise Exception("Must provide password to decrypt encrypted disk")
         else:
             s = libc.mount(ctypes.c_char_p(self.path), 
-                ctypes.c_char_p(os.path.join('/media', self.name)), 
+                ctypes.c_char_p(mount_point), 
                 ctypes.c_char_p(self.fstype), 0, ctypes.c_char_p(""))
             if s == -1:
                 raise Exception('Failed to mount %s: %s'%(self.name, os.strerror(ctypes.get_errno())))
-        self.mountpoint = os.path.join('/media', self.name)
+        self.mountpoint = mount_point
         register_point(self.name, self.mountpoint, "crypt" if self.crypt else "disk")
     
     def umount(self):
@@ -57,6 +60,16 @@ class DiskPartition(object):
             crypto.luks_close(self.name)
         deregister_point(self.name)
         self.mountpoint = ""
+    
+    def as_dict(self):
+        return {
+            "name": self.name,
+            "path": self.path,
+            "mountpoint": self.mountpoint,
+            "size": self.size,
+            "fstype": self.fstype,
+            "crypt": self.crypt
+        }
 
 
 class VirtualDisk(object):
@@ -90,10 +103,11 @@ class VirtualDisk(object):
             self.mount()
     
     def mount(self, passwd=None):
-        if self.mountpoint:
+        if self.mountpoint and os.path.ismount(self.mountpoint):
             raise Exception("Virtual disk already mounted")
         if not os.path.isdir(os.path.join('/media', self.name)):
             os.makedirs(os.path.join('/media', self.name))
+        mount_point = self.mountpoint if self.mountpoint else os.path.join('/media', self.name)
         dev = losetup.find_unused_loop_device()
         dev.mount(str(self.path), offset=1048576)
         if self.crypt and passwd:
@@ -102,7 +116,7 @@ class VirtualDisk(object):
                 dev.unmount()
                 raise Exception('Failed to decrypt %s with errno %s' % (self.name, str(s)))
             s = libc.mount(ctypes.c_char_p(os.path.join("/dev/mapper", self.name)), 
-                ctypes.c_char_p(os.path.join('/media', self.name)), 
+                ctypes.c_char_p(mount_path), 
                 ctypes.c_char_p(self.fstype), 0, ctypes.c_char_p(""))
             if s == -1:
                 crypto.luks_close(self.name)
@@ -111,12 +125,12 @@ class VirtualDisk(object):
         elif self.crypt and not passwd:
             raise Exception("Must provide password to decrypt encrypted container")
         else:
-            s = libc.mount(ctypes.c_char_p(dev.device), ctypes.c_char_p(os.path.join('/media', self.name)), 
+            s = libc.mount(ctypes.c_char_p(dev.device), ctypes.c_char_p(mount_point), 
                 ctypes.c_char_p(self.fstype), 0, ctypes.c_char_p(""))
             if s == -1:
                 dev.unmount()
                 raise Exception('Failed to mount %s: %s' % (self.name, os.strerror(ctypes.get_errno())))
-        self.mountpoint = os.path.join('/media', self.name)
+        self.mountpoint = mount_path
         register_point(self.name, self.mountpoint, "crypt" if self.crypt else "vdisk")
     
     def umount(self):
@@ -164,6 +178,16 @@ class VirtualDisk(object):
     def remove(self):
         self.umount()
         os.unlink(self.path)
+    
+    def as_dict(self):
+        return {
+            "name": self.name,
+            "path": self.path,
+            "mountpoint": self.mountpoint,
+            "size": self.size,
+            "fstype": self.fstype,
+            "crypt": self.crypt
+        }
 
 
 class PointOfInterest(object):
@@ -179,6 +203,14 @@ class PointOfInterest(object):
     
     def remove(self):
         storage.points.remove("points", self)
+    
+    def as_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "type": self.stype,
+            "icon": self.icon
+        }
 
 
 def get_disk_partitions(name=None):

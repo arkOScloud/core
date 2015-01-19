@@ -83,7 +83,7 @@ class Service:
             conns.SystemD.DisableUnitFiles([self.name+".service"], False)
         self.enabled = False
 
-    def delete(self):
+    def remove(self):
         if self.stype == 'supervisor':
             self.stop()
             conns.Supervisor.removeProcessGroup(self.name)
@@ -94,6 +94,15 @@ class Service:
                 pass
             self.state = "stopped"
             self.enabled = False
+    
+    def as_dict(self):
+        return {
+            "name": self.name,
+            "type": self.stype,
+            "state": self.state,
+            "enabled": self.enabled,
+            "cfg": self.cfg
+        }
 
 
 def get(name=None):

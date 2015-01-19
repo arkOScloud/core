@@ -78,6 +78,14 @@ class Connection:
             self.enabled = False
         else:
             raise Exception("Network disable failed")
+    
+    def as_dict(self):
+        return {
+            "name": self.name,
+            "connected": self.connected,
+            "enabled": self.enabled,
+            "config": self.config
+        }
 
 
 class Interface:
