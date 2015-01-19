@@ -49,9 +49,10 @@ class DatabaseUser:
 
 
 class DatabaseManager:
-    def __init__(self, id="", name=""):
+    def __init__(self, id="", name="", meta=None):
         self.id = id
         self.name = name
+        self.meta = meta
         self.connect()
     
     def connect(self):
@@ -60,7 +61,13 @@ class DatabaseManager:
     def get_dbs(self):
         pass
     
+    def add_db(self, name):
+        pass
+    
     def get_users(self):
+        pass
+    
+    def add_user(self, name, passwd):
         pass
 
 
@@ -124,12 +131,12 @@ def get_managers(id=None):
 def scan_managers():
     mgrs = []
     for x in applications.get(type="database"):
-        mgrs.append(x._database_manager())
+        mgrs.append(x._database_mgr(id=x.id, name=x.name, meta=x))
     storage.dbs.set("managers", mgrs)
     return mgrs
 
 def get_types():
-    return [x.name for x in get_managers()]
+    return [(x.id, x.name) for x in get_managers()]
 
 def get_new_db_id():
     return max([x.id for x in get()]) + 1

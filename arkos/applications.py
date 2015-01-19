@@ -1,5 +1,6 @@
 import base64
 import imp
+import inspect
 import json
 import os
 import shutil
@@ -24,15 +25,29 @@ class App:
     
     def load(self, verify=True):
         try:
+            module = imp.load_module(self.id, *imp.find_module(self.id, [os.path.join(config.get("apps", "app_dir"))]))
             for x in self.modules:
-                mod = imp.load_module(x, *imp.find_module(x, [os.path.join(config.get("apps", "app_dir"), self.id)]))
-                if x == "database" and self.modules[x]:
-                    for y in self.modules[x]:
-                        setattr(self, "_%s_%s"%(x,y), getattr(mod, self.modules[x][y]) if self.modules[x][y] and hasattr(mod, self.modules[x][y]) else None)
-                elif self.modules[x]:
-                    setattr(self, "_%s"%x, getattr(mod, self.modules[x]) if hasattr(mod, self.modules[x]) else None)
+                submod = imp.load_module("%s.%s"%(self.id,x), *imp.find_module(x, [os.path.join(config.get("apps", "app_dir"), self.id)]))
+                classes = inspect.getmembers(submod, inspect.isclass)
+                mgr = None
+                for y in classes:
+                    if y[0] in ["DatabaseManager", "Site", "BackupController"]:
+                        mgr = y[1]
+                        break
+                if x == "database":
+                    for y in classes:
+                        if issubclass(y[1], mgr) and y[1] != mgr:
+                            setattr(self, "_database_mgr", y[1])
+                elif x == "website":
+                    for y in classes:
+                        if issubclass(y[1], mgr) and y[1] != mgr:
+                            setattr(self, "_website", y[1])
+                elif x == "backup":
+                    for y in classes:
+                        if issubclass(y[1], mgr) and y[1] != mgr:
+                            setattr(self, "_backup", y[1])
                 else:
-                    setattr(self, "_%s"%x, mod)
+                    setattr(self, "_%s"%x, submod)
             if verify:
                 self.verify_dependencies()
             for s in self.services:

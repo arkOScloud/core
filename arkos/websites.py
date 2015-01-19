@@ -5,7 +5,8 @@ import nginx
 import re
 import shutil
 
-from arkos import config, storage, applications, certificates, databases, tracked_services
+from arkos import config, storage, applications, backup, certificates
+from arkos import databases, tracked_services
 from arkos.system import users, groups, filesystems
 from arkos.utilities import shell, random_string, DefaultMessage
 
@@ -203,6 +204,8 @@ class Site:
         filesystems.register_point(self.name, self.data_path, "site", self.meta.icon)
         tracked_services.register(self.meta.id if self.meta else "website", 
             self.name, self.name, "gen-earth", [("tcp", self.port)], 2)
+        self.backup = self.meta.get_module("backup") or backup.BackupController
+        self.backup = self.backup(self.name, self)
         self.installed = True
         storage.sites.add("sites", self)
         if specialmsg:
@@ -320,6 +323,8 @@ class Site:
         nginx.dumpf(c, os.path.join('/etc/nginx/sites-available', oldname))
         tracked_services.register(self.meta.id if self.meta else "website", 
             self.name, self.name, self.icon, [("tcp", self.port)], 2)
+        self.backup = self.meta.get_module("backup") or backup.BackupController
+        self.backup = self.backup(self.name, self)
         nginx_reload()
 
     def update(self, message=DefaultMessage()):
@@ -418,6 +423,7 @@ class ReverseProxy:
         self.base_path = base_path
         self.block = block
         self.type = type
+        self.backup = None
         self.installed = False
 
     def install(self, extra_vars={}, enable=True, message=None):
@@ -591,6 +597,8 @@ def scan():
             cls = applications.get(stype)
             s = cls._website(name=g.get('website', 'name'))
             s.meta = cls
+            s.backup = cls.get_module("backup") or backup.BackupController
+            s.backup = s.backup(s.name, s)
             s.data_path = c.get("website", "data_path", "")
             if s.data_path:
                 filesystems.register_point(g.get('website', 'name'), s.data_path, 
@@ -600,6 +608,7 @@ def scan():
             s.name = g.get("website", "pretty_name")
             s.type = g.get("website", "extra")
             s.meta = None
+            s.backup = None
         try:
             ssl = None
             c = nginx.loadf(path)
