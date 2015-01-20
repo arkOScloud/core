@@ -3,7 +3,7 @@ import shutil
 import StringIO
 import tarfile
 
-from arkos import config
+from arkos import config, applications, websites
 from arkos.system import systemtime
 from arkos.utilities import random_string
 
@@ -32,13 +32,13 @@ class BackupController:
             data += self.get_data()
         return data
     
-    def backup(self, data=True):
+    def backup(self, data=True, backup_location="/var/lib/arkos/backups"):
         if self.ctype == "site":
             self.pre_backup(self.site)
         else:
             self.pre_backup()
         
-        backup_dir = os.path.join(config.get("websites", "site_dir"), self.id)
+        backup_dir = os.path.join(backup_location, self.id)
         try:
             os.makedirs(backup_dir)
         except:
@@ -137,13 +137,55 @@ def get(backup_location="/var/lib/arkos/backups"):
         backups[x] = []
         archives = os.listdir(os.path.join(backup_location, x))
         archives = sorted(archives, key=lambda y: int(y.split("-")[1].split(".tar.gz")[0]))
-        id = 0
         for y in archives:
             if not y.endswith(".tar.gz"):
                 continue
-            id = id + 1
             time = y.split("-")[1].split(".tar.gz")[0]
             path = os.path.join(backup_location, x, y)
-            backups[x].append({"id": id, "time": time, "path": path, 
-                "size": os.path.getsize(path)})
+            backups[x][time] = {"id": x, "time": time, "path": path, 
+                "size": os.path.getsize(path)}
     return backups
+
+def get_able():
+    able = []
+    for x in applications.get():
+        if app.type != "website" and hasattr(x, "_backup"):
+            able.append({"type": "app", "id": x.id})
+    for x in websites.get():
+        able.append({"type": "site", "id": x.name})
+    return able
+
+def create(name, data=True):
+    controller = None
+    app = applications.get(name)
+    if app and app.type != "website" and hasattr(app, "_backup"):
+        controller = app._backup()
+    else:
+        sites = websites.get()
+        for x in sites:
+            if x.name == name:
+                controller = x.backup
+                break
+    if not controller:
+        raise Exception("No backup controller found")
+    controller.backup(data=data)
+
+def restore(backup, data=True):
+    controller = None
+    app = applications.get(backup["id"])
+    if app and app.type != "website" and hasattr(app, "_backup"):
+        controller = app._backup()
+    else:
+        sites = websites.get()
+        for x in sites:
+            if x.name == backup["id"]:
+                controller = x.backup
+                break
+    if not controller:
+        raise Exception("No backup controller found")
+    controller.restore(backup["path"])
+
+def remove(id, time, backup_location="/var/lib/arkos/backups"):
+    backups = get()
+    if id in backups and time in backups[id]:
+        os.unlink(backups[id][time]["path"])

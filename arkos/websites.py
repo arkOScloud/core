@@ -5,7 +5,7 @@ import nginx
 import re
 import shutil
 
-from arkos import config, storage, applications, backup, certificates
+from arkos import config, storage, applications, certificates
 from arkos import databases, tracked_services
 from arkos.system import users, groups, filesystems
 from arkos.utilities import shell, random_string, DefaultMessage
@@ -50,6 +50,7 @@ class Site:
         self.installed = False
     
     def install(self, extra_vars={}, enable=True, message=DefaultMessage()):
+        from arkos import backup
         if message:
             message.update("info", "Preparing site install...")
         specialmsg = ''
@@ -284,6 +285,7 @@ class Site:
     
     def edit(self, oldname=""):
         # Update the nginx serverblock
+        from arkos import backup
         c = nginx.loadf(os.path.join('/etc/nginx/sites-available', oldname or self.name))
         s = c.servers[0]
         if self.cert and self.port == 443:
