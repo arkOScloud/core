@@ -56,7 +56,7 @@ def install_updates(message=DefaultMessage()):
                     break
         if getout and message:
             message.complete("error", "Installation of update %s failed. See logs for details." % z[1]["id"])
-            break
+            raise
         if not getout:
             config.set("updates", "current_update", z[1]["id"])
     else:

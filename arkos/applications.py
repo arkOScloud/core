@@ -110,7 +110,7 @@ class App:
         exclude = ['openssl', 'openssh', 'nginx', 'python2', 'git']
         for app in storage.apps.get("installed"):
             for item in app.dependencies:
-                if item["type"] == "app" and item["package"] == id and not force:
+                if item["type"] == "app" and item["package"] == self.id and not force:
                     if message:
                         message.complete("error", "Cannot remove, %s depends on this application" % item["package"])
                         return
@@ -124,7 +124,7 @@ class App:
                     services.stop(item["daemon"])
                     services.disable(item["daemon"])
                 packages.remove([item["package"]], purge=config.get("apps", "purge", False))
-        shutil.rmtree(os.path.join(config.get("apps", "app_dir"), id))
+        shutil.rmtree(os.path.join(config.get("apps", "app_dir"), self.id))
         storage.apps.remove("installed", self)
         regen_fw = False
         for x in self.services:
