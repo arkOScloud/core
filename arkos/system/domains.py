@@ -1,7 +1,7 @@
 import ldap
 import ldap.modlist
 
-from arkos import conns
+from arkos import config, conns
 
 
 class Domain(object):
@@ -31,7 +31,7 @@ class Domain(object):
 
 def get(name=None):
     results = []
-    qset = conns.LDAP.search_s("ou=domains,%s" % self.rootdn,
+    qset = conns.LDAP.search_s("ou=domains,%s" % config.get("general", "ldap_rootdn", "dc=arkos-servers,dc=org"),
         ldap.SCOPE_SUBTREE, "virtualdomain=*", ["virtualdomain"])
     for x in qset:
         d = Domain()

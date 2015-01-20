@@ -116,7 +116,7 @@ class VirtualDisk(object):
                 dev.unmount()
                 raise Exception('Failed to decrypt %s with errno %s' % (self.name, str(s)))
             s = libc.mount(ctypes.c_char_p(os.path.join("/dev/mapper", self.name)), 
-                ctypes.c_char_p(mount_path), 
+                ctypes.c_char_p(mount_point), 
                 ctypes.c_char_p(self.fstype), 0, ctypes.c_char_p(""))
             if s == -1:
                 crypto.luks_close(self.name)
@@ -130,7 +130,7 @@ class VirtualDisk(object):
             if s == -1:
                 dev.unmount()
                 raise Exception('Failed to mount %s: %s' % (self.name, os.strerror(ctypes.get_errno())))
-        self.mountpoint = mount_path
+        self.mountpoint = mount_point
         register_point(self.name, self.mountpoint, "crypt" if self.crypt else "vdisk")
     
     def umount(self):
@@ -158,9 +158,8 @@ class VirtualDisk(object):
         dev.mount(str(self.path), offset=1048576)
         s = crypto.luks_format(dev.device, passwd, cipher, keysize)
         if s != 0:
-            if move:
-                dev.unmount()
-                os.rename(self.path, os.path.join(config.get("filesystems", "vdisk_dir"), self.name+'.img'))
+            dev.unmount()
+            os.rename(self.path, os.path.join(config.get("filesystems", "vdisk_dir"), self.name+'.img'))
             raise Exception('Failed to encrypt %s with errno %s'%(self.name, str(s)))
         s = crypto.luks_open(dev.device, self.name, passwd)
         if s != 0:
@@ -229,13 +228,13 @@ def get_disk_partitions(name=None):
                 continue
             dev = DiskPartition(name=p.path.split("/")[-1], path=p.path, 
                 mountpoint=mps.get(p.path) or None, size=p.getSize("B"),
-                geometry=parted.probeFileSystem(p.geometry), crypt=crypto.is_luks(p.path))
+                fstype=parted.probeFileSystem(p.geometry), crypt=crypto.is_luks(p.path)==0)
             if dev.mountpoint and not get_points(path=dev.mountpoint):
                 register_point(dev.name, dev.mountpoint, "crypt" if dev.crypt else "disk")
             if name == dev.name:
                 return dev
             devs.append(dev)
-    return sorted(devs, key=lambda x: x.name) if not name else None
+    return devs if not name else None
 
 def get_virtual_disks(name=None):
     devs, mps = [], {}
@@ -253,16 +252,16 @@ def get_virtual_disks(name=None):
     for x in glob.glob(os.path.join(config.get("filesystems", "vdisk_dir"), '*')):
         if not x.endswith((".img", ".crypt")):
             continue
-        name = os.path.splitext(os.path.split(x)[1])[0]
-        dev = VirtualDisk(name=name, path=x, size=os.path.getsize(x),
-            mountpoint=mps.get(x) or mps.get("/dev/mapper/%s" % name) or None, 
+        dname = os.path.splitext(os.path.split(x)[1])[0]
+        dev = VirtualDisk(name=dname, path=x, size=os.path.getsize(x),
+            mountpoint=mps.get(x) or mps.get("/dev/mapper/%s" % dname) or None, 
             crypt=x.endswith(".crypt"))
         if dev.mountpoint and not get_points(path=dev.mountpoint):
             register_point(dev.name, dev.mountpoint, "crypt" if dev.crypt else "disk")
         if name == dev.name:
             return dev
         devs.append(dev)
-    return sorted(devs, key=lambda x: x.name) if not name else None
+    return devs if not name else None
 
 def get_points(id=None, path=None):
     points = storage.points.get("points")

@@ -132,6 +132,13 @@ class App:
                 regen_fw = True
         if regen_fw:
             tracked_services.deregister(self.id)
+    
+    def as_dict(self):
+        data = {}
+        for x in self.__dict__:
+            if not x.startswith("_"):
+                data[x] = self.__dict__[x]
+        return data
 
 
 def get(id=None, type=None, verify=True):

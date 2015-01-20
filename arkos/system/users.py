@@ -139,7 +139,7 @@ class User:
             "name": self.name,
             "first_name": self.first_name,
             "last_name": self.last_name,
-            "domain": self.mail.split("@")[1],
+            "domain": self.domain,
             "admin": self.admin,
             "sudo": self.sudo
         }

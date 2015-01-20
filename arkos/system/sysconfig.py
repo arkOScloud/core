@@ -10,7 +10,7 @@ def set_hostname(name):
         f.write(name)
 
 def get_timezone():
-    zone = os.path.realpath('/etc/localtime').split('/usr/share/zoneinfo/')
+    zone = os.path.realpath('/etc/localtime').split('/usr/share/zoneinfo/')[1]
     zone = zone.split("/")
     return {"region": zone[0], "zone": zone[1] if len(zone) > 1 else None}
 
