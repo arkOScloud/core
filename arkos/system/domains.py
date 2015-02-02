@@ -2,6 +2,7 @@ import ldap
 import ldap.modlist
 
 from arkos import config, conns
+from arkos.system import users
 
 
 class Domain:
@@ -24,6 +25,8 @@ class Domain:
             ldap.modlist.addModlist(ldif))
     
     def remove(self):
+        if self.name in [x.domain for x in users.get()]:
+            raise Exception("A user is still using this domain")
         conns.LDAP.delete_s("virtualdomain=%s,ou=domains,%s" % (self.name,self.rootdn))
 
     def as_dict(self):
