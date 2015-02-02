@@ -8,9 +8,9 @@ from arkos.utilities import shell
 
 class Group:
     def __init__(self, name="", gid=0, users=[], rootdn="dc=arkos-servers,dc=org"):
-        self.name = name
+        self.name = str(name)
         self.gid = gid or get_next_gid()
-        self.users = users
+        self.users = [str(user) for user in users]
         self.rootdn = rootdn
     
     def add(self):
@@ -84,7 +84,7 @@ def get(gid=None):
                 x[1][y] = x[1][y][0]
         g = Group(name=x[1]["cn"], gid=int(x[1]["gidNumber"]), users=x[1].get("memberUid") or [],
             rootdn=x[0].split("ou=groups,")[1])
-        if g.name == gid:
+        if g.gid == gid:
             return g
         r.append(g)
     return r if not gid else None

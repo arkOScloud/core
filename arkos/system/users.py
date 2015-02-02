@@ -16,12 +16,12 @@ class User:
     def __init__(
             self, name="", first_name="", last_name="", uid=0, domain="", 
             rootdn="dc=arkos-servers,dc=org", admin=False, sudo=False):
-        self.name = name
-        self.first_name = first_name
-        self.last_name = last_name
+        self.name = str(name)
+        self.first_name = str(first_name)
+        self.last_name = str(last_name)
         self.uid = uid or get_next_uid()
-        self.domain = domain
-        self.rootdn = rootdn
+        self.domain = str(domain)
+        self.rootdn = str(rootdn)
         self.admin = admin
         self.sudo = sudo
     
@@ -58,11 +58,11 @@ class User:
                 ldap.SCOPE_SUBTREE, "(objectClass=*)", None)
         except ldap.NO_SUCH_OBJECT:
             raise Exception("This user does not exist")
+        self.first_name = str(self.first_name)
+        self.last_name = str(self.last_name)
+        self.domain = str(self.domain)
 
         ldif = ldif[0][1]
-        for x in ldif:
-            if type(ldif[x]) == list and len(ldif[x]) == 1:
-                ldif[x] = ldif[x][0]
         attrs = {
             "givenName": self.first_name,
             "sn": self.last_name,
@@ -197,7 +197,7 @@ def get(uid=None):
         else:
             u.admin = False
 
-        if u.name == uid:
+        if u.uid == uid:
             return u
         r.append(u)
     return r if not uid else None
