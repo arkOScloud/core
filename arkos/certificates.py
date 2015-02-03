@@ -1,3 +1,4 @@
+import datetime
 import glob
 import hashlib
 import OpenSSL
@@ -72,22 +73,23 @@ class Certificate:
             os.unlink(self.cert_path)
         if os.path.exists(self.key_path):
             os.unlink(self.key_path)
-        storage.certs.remove("certs", self)
+        storage.certs.remove("certificates", self)
     
-    def as_dict(self):
+    def as_dict(self, ready=True):
         return {
             "id": self.id,
             "domain": self.domain,
             "keytype": self.keytype,
             "keylength": self.keylength,
             "assign": self.assign,
-            "expiry": self.expiry,
+            "expiry": datetime.datetime.strptime(self.expiry, "%Y%m%d%H%M%SZ").isoformat(),
             "sha1": self.sha1,
-            "md5": self.md5
+            "md5": self.md5,
+            "is_ready": ready
         }
 
 
-class CertificateAuthority(object):
+class CertificateAuthority:
     def __init__(self, id="", cert_path="", key_path="", expiry=None):
         self.id = id
         self.cert_path = cert_path
@@ -99,11 +101,12 @@ class CertificateAuthority(object):
             os.unlink(self.cert_path)
         if os.path.exists(self.key_path):
             os.unlink(self.key_path)
+        storage.certs.remove("authorities", self)
     
     def as_dict(self):
         return {
             "id": self.id,
-            "expiry": self.expiry
+            "expiry": datetime.datetime.strptime(self.expiry, "%Y%m%d%H%M%SZ").isoformat()
         }
 
 
@@ -128,15 +131,15 @@ def scan():
             assigns[ssl] = [{'type': 'genesis'}]
     for x in glob.glob(os.path.join(config.get("certificates", "cert_dir"), '*.crt')):
         id = os.path.splitext(os.path.basename(x))[0]
-        with open(c.cert_path, 'r') as f:
+        with open(x, 'r') as f:
             crt = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, f.read())
-        with open(c.key_path, 'r') as f:
+        with open(os.path.join(config.get("certificates", "key_dir"), id+'.key'), 'r') as f:
             key = OpenSSL.crypto.load_privatekey(OpenSSL.crypto.FILETYPE_PEM, f.read())
         sha1, md5 = get_cert_hashes(crt)
         c = Certificate(id=id, cert_path=x, key_path=os.path.join(config.get("certificates", "key_dir"), id+'.key'),
-            keytype="RSA" if k.type() == OpenSSL.crypto.TYPE_RSA else ("DSA" if k.type() == OpenSSL.crypto.TYPE_DSA else "Unknown"),
-            keylength=int(k.bits()), domain=crt.get_subject().CN,
-            assign=assigns.get(id) or [], expiry=c.get_notafter(),
+            keytype="RSA" if key.type() == OpenSSL.crypto.TYPE_RSA else ("DSA" if key.type() == OpenSSL.crypto.TYPE_DSA else "Unknown"),
+            keylength=int(key.bits()), domain=crt.get_subject().CN,
+            assign=assigns.get(id) or [], expiry=crt.get_notAfter(),
             sha1=sha1, md5=md5)
         certs.append(c)
     storage.certs.set("certificates", certs)

@@ -29,8 +29,8 @@ class Domain:
             raise Exception("A user is still using this domain")
         conns.LDAP.delete_s("virtualdomain=%s,ou=domains,%s" % (self.name,self.rootdn))
 
-    def as_dict(self):
-        return {"id": self.name}
+    def as_dict(self, ready=True):
+        return {"id": self.name, "is_ready": ready}
 
 
 def get(id=None):

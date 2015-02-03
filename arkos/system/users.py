@@ -133,7 +133,7 @@ class User:
                 shutil.rmtree(hdir)
         conns.LDAP.delete_s("uid=%s,ou=users,%s" % (self.name,self.rootdn))
     
-    def as_dict(self):
+    def as_dict(self, ready=True):
         return {
             "id": self.uid,
             "name": self.name,
@@ -141,7 +141,8 @@ class User:
             "last_name": self.last_name,
             "domain": self.domain,
             "admin": self.admin,
-            "sudo": self.sudo
+            "sudo": self.sudo,
+            "is_ready": ready
         }
 
 

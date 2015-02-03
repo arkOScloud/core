@@ -36,21 +36,19 @@ class Group:
         except ldap.NO_SUCH_OBJECT:
             raise Exception("This group does not exist")
 
-        if "memberUid" in ldif[0][1]:
-            conns.LDAP.modify_ext_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn),
-                [(1, "memberUid", None), (0, "memberUid", self.users)])
-        else:
-            conns.LDAP.modify_ext_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn),
-                [(0, "memberUid", self.users)])
+        ldif = ldap.modlist.modifyModlist(ldif[0][1], {"memberUid": self.users}, 
+            ignore_oldexistent=1)
+        conns.LDAP.modify_ext_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn), ldif)
     
     def delete(self):
         conns.LDAP.delete_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn))
     
-    def as_dict(self):
+    def as_dict(self, ready=True):
         return {
             "id": self.gid,
             "name": self.name,
-            "users": self.users
+            "users": self.users,
+            "is_ready": ready
         }
 
 
