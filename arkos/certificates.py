@@ -165,6 +165,7 @@ def scan_authorities():
         ca = CertificateAuthority(id=id, cert_path=x, expiry=cert.get_notAfter(),
             key_path=os.path.join(config.get("certificates", "ca_key_dir"), id+'.key'))
         certs.append(ca)
+    storage.certs.set("authorities", certs)
     return certs
 
 def upload_certificate(id, cert, key, chain=''):
