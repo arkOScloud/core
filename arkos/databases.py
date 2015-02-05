@@ -29,8 +29,10 @@ class Database:
         return {
             "id": self.id,
             "name": self.name,
-            "type": self.manager.id,
-            "size": self.get_size()
+            "type_id": self.manager.id,
+            "type_name": self.manager.name,
+            "size": self.get_size(),
+            "is_ready": True
         }
 
 
@@ -41,16 +43,16 @@ class DatabaseUser:
         self.passwd = passwd
         self.manager = manager
     
-    def add(self):
-        self.add_user()
-        storage.dbs.add("user", self)
+    def add(self, passwd):
+        self.add_user(passwd)
+        storage.dbs.add("users", self)
     
     def add_user(self):
         pass
     
     def remove(self):
         self.remove_user()
-        storage.dbs.remove("user", self)
+        storage.dbs.remove("users", self)
     
     def remove_user(self):
         pass
@@ -62,8 +64,10 @@ class DatabaseUser:
         return {
             "id": self.id,
             "name": self.name,
-            "type": self.manager.id,
-            "permissions": self.chperm("check")
+            "type_id": self.manager.id,
+            "type_name": self.manager.name,
+            "permissions": self.chperm("check"),
+            "is_ready": True
         }
 
 
@@ -92,7 +96,8 @@ class DatabaseManager:
     def as_dict(self):
         return {
             "id": self.id,
-            "name": self.name
+            "name": self.name,
+            "supports_users": self.meta.database_multiuser
         }
 
 

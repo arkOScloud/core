@@ -49,25 +49,26 @@ class Site:
         self.addtoblock = block
         self.installed = False
     
-    def install(self, extra_vars={}, enable=True, message=DefaultMessage()):
+    def install(self, meta, extra_vars={}, enable=True, message=DefaultMessage()):
         from arkos import backup
+        self.meta = meta
         if message:
             message.update("info", "Preparing site install...")
         specialmsg = ''
         site_dir = config.get("websites", "site_dir")
         self.path = self.path or os.path.join(site_dir, self.name)
 
-        if not self.download_url:
+        if not self.meta.download_url:
             ending = ''
-        elif self.download_url.endswith('.tar.gz'):
+        elif self.meta.download_url.endswith('.tar.gz'):
             ending = '.tar.gz'
-        elif self.download_url.endswith('.tgz'):
+        elif self.meta.download_url.endswith('.tgz'):
             ending = '.tgz'
-        elif self.download_url.endswith('.tar.bz2'):
+        elif self.meta.download_url.endswith('.tar.bz2'):
             ending = '.tar.bz2'
-        elif self.download_url.endswith('.zip'):
+        elif self.meta.download_url.endswith('.zip'):
             ending = '.zip'
-        elif self.download_url.endswith('.git'):
+        elif self.meta.download_url.endswith('.git'):
             ending = '.git'
         else:
             raise InstallError('Only GIT repos, gzip, bzip, and zip packages supported for now')
@@ -98,11 +99,11 @@ class Site:
         if message:
             message.update("info", "Downloading website source...")
         # Download and extract the source package
-        if self.download_url and ending == '.git':
-            git.Repo.clone_from(self.download_url, self.path)
-        elif self.download_url:
+        if self.meta.download_url and ending == '.git':
+            git.Repo.clone_from(self.meta.download_url, self.path)
+        elif self.meta.download_url:
             try:
-                download(self.download_url, file=pkg_path, crit=True)
+                download(self.meta.download_url, file=pkg_path, crit=True)
             except Exception, e:
                 raise InstallError('Couldn\'t download - %s' % str(e))
 
