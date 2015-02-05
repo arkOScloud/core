@@ -1,16 +1,25 @@
 from arkos import storage, applications
+from arkos.utilities import random_string
 
 
 class Database:
-    def __init__(self, id=0, name="", manager=None):
-        self.id = id or get_new_db_id()
+    def __init__(self, id="", name="", manager=None):
+        self.id = id or random_string()[0:8]
         self.name = name
         self.manager = manager
     
     def add(self):
+        self.add_db()
+        storage.dbs.add("databases", self)
+    
+    def add_db(self):
         pass
     
     def remove(self):
+        self.remove_db()
+        storage.dbs.remove("databases", self)
+    
+    def remove_db(self):
         pass
     
     def execute(self):
@@ -18,6 +27,7 @@ class Database:
     
     def as_dict(self):
         return {
+            "id": self.id,
             "name": self.name,
             "type": self.manager.id,
             "size": self.get_size()
@@ -25,23 +35,32 @@ class Database:
 
 
 class DatabaseUser:
-    def __init__(self, id=0, name="", passwd="", manager=None):
-        self.id = id or get_new_dbuser_id()
+    def __init__(self, id="", name="", passwd="", manager=None):
+        self.id = id or random_string()[0:8]
         self.name = name
         self.passwd = passwd
         self.manager = manager
     
     def add(self):
+        self.add_user()
+        storage.dbs.add("user", self)
+    
+    def add_user(self):
+        pass
+    
+    def remove(self):
+        self.remove_user()
+        storage.dbs.remove("user", self)
+    
+    def remove_user(self):
         pass
     
     def chperm(self):
         pass
-    
-    def remove(self):
-        pass
 
     def as_dict(self):
         return {
+            "id": self.id,
             "name": self.name,
             "type": self.manager.id,
             "permissions": self.chperm("check")
@@ -59,16 +78,22 @@ class DatabaseManager:
         pass
 
     def get_dbs(self):
-        pass
+        return []
     
     def add_db(self, name):
         pass
     
     def get_users(self):
-        pass
+        return []
     
     def add_user(self, name, passwd):
         pass
+    
+    def as_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name
+        }
 
 
 def get(id=None, type=None):
@@ -94,14 +119,14 @@ def scan():
     storage.dbs.set("databases", dbs)
     return dbs
 
-def get_user(name=None, type=None):
+def get_user(id=None, type=None):
     data = storage.dbs.get("users")
     if not data:
         data = scan_users()
-    if name or type:
+    if id or type:
         tlist = []
         for x in data:
-            if x.name == name:
+            if x.id == id:
                 return x
             elif x.manager.id == type:
                 tlist.append(x)
@@ -134,12 +159,3 @@ def scan_managers():
         mgrs.append(x._database_mgr(id=x.id, name=x.name, meta=x))
     storage.dbs.set("managers", mgrs)
     return mgrs
-
-def get_types():
-    return [(x.id, x.name) for x in get_managers()]
-
-def get_new_db_id():
-    return max([x.id for x in get()]) + 1
-
-def get_new_dbuser_id():
-    return max([x.id for x in get_users()]) + 1
