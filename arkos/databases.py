@@ -76,7 +76,11 @@ class DatabaseManager:
         self.id = id
         self.name = name
         self.meta = meta
-        self.connect()
+        self.state = True
+        try:
+            self.connect()
+        except:
+            self.state = False
     
     def connect(self):
         pass
@@ -97,6 +101,7 @@ class DatabaseManager:
         return {
             "id": self.id,
             "name": self.name,
+            "state": self.state,
             "supports_users": self.meta.database_multiuser
         }
 
@@ -120,7 +125,8 @@ def get(id=None, type=None):
 def scan():
     dbs = []
     for x in get_managers():
-        dbs += x.get_dbs()
+        if x.state:
+            dbs += x.get_dbs()
     storage.dbs.set("databases", dbs)
     return dbs
 
@@ -143,7 +149,8 @@ def get_user(id=None, type=None):
 def scan_users():
     users = []
     for x in get_managers():
-        users += x.get_users()
+        if x.state:
+            users += x.get_users()
     storage.dbs.set("users", users)
     return users
 
