@@ -3,9 +3,8 @@ from arkos.utilities import random_string
 
 
 class Database:
-    def __init__(self, id="", name="", manager=None):
-        self.id = id or random_string()[0:8]
-        self.name = name
+    def __init__(self, id="", manager=None):
+        self.id = id
         self.manager = manager
     
     def add(self):
@@ -28,7 +27,6 @@ class Database:
     def as_dict(self):
         return {
             "id": self.id,
-            "name": self.name,
             "type_id": self.manager.id,
             "type_name": self.manager.name,
             "size": self.get_size(),
@@ -37,9 +35,8 @@ class Database:
 
 
 class DatabaseUser:
-    def __init__(self, id="", name="", passwd="", manager=None):
-        self.id = id or random_string()[0:8]
-        self.name = name
+    def __init__(self, id="", passwd="", manager=None):
+        self.id = id
         self.passwd = passwd
         self.manager = manager
     
@@ -63,7 +60,6 @@ class DatabaseUser:
     def as_dict(self):
         return {
             "id": self.id,
-            "name": self.name,
             "type_id": self.manager.id,
             "type_name": self.manager.name,
             "permissions": self.chperm("check"),
