@@ -6,7 +6,7 @@ import socket
 import struct
 import sys
 
-from arkos.utilities import shell
+from arkos.utilities import shell, netmask_to_cidr
 
 
 class Connection:
@@ -152,10 +152,11 @@ def get_interfaces(name=None):
         data = data[x] if type(data) == dict else data
         i.rx, i.tx = data[0], data[1]
         i.ip = netifaces.ifaddresses(i.name)[netifaces.AF_INET]
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-            r = fcntl.ioctl(s.fileno(), 0x8913, i.name + ("\0"*256))
-            flags, = struct.unpack("H", r[16:18])
-            up = flags & 1
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        r = fcntl.ioctl(s.fileno(), 0x8913, i.name + ("\0"*256))
+        flags, = struct.unpack("H", r[16:18])
+        up = flags & 1
+        s.close()
         i.up = up == 1
         if name == i.name:
             return i
@@ -166,16 +167,11 @@ def get_active_ranges():
     ranges = []
     for x in get_interfaces():
         for y in x.ip:
-            if '127.0.0.1' in y or '0.0.0.0' in y:
+            if '127.0.0.1' in y["addr"] or '0.0.0.0' in y["addr"]:
                 continue
-            if not '/' in y:
-                ri = y
-                rr = '32'
-            else:
-                ri, rr = y.split('/')
-            ri = ri.split('.')
+            ri = y["addr"].split('.')
             ri[3] = '0'
             ri = ".".join(ri)
-            y = ri + '/' + rr
+            y = ri + '/' + str(netmask_to_cidr(y["netmask"]))
             ranges.append(y)
     return ranges

@@ -44,19 +44,18 @@ def initialize_fw():
 def regen_fw(data, range=[]):
     # Regenerate our chain.
     # If local ranges are not provided, get them.
-    self.flush_fw()
+    flush_fw()
     range = range or network.get_active_ranges()
     for x in data:
-        for p in x["ports"]:
-            if int(x[1]) == 2:
-                add_fw(p[0], p[1], 'anywhere')
-            elif int(x[1]) == 1:
-                if x["policy"].has_key("allowed_ranges"):
-                    rng = x["policy"]["allowed_ranges"]
+        for p in x.ports:
+            if x.policy == 2:
+                add_fw(p[0], p[1], ['anywhere'])
+            elif x.policy == 1:
+                if hasattr(x, "allowed_ranges"):
+                    rng = x.allowed_ranges
                 else:
                     rng = range
-                for r in rng:
-                    add_fw(p[0], p[1], r)
+                add_fw(p[0], p[1], rng)
             else:
                 remove_fw(p[0], p[1])
     tb = iptc.Table(iptc.Table.FILTER)
@@ -77,7 +76,7 @@ def add_fw(protocol, port, ranges=[]):
         r = iptc.Rule()
         r.protocol = protocol
         if not x in ['', 'anywhere', '0.0.0.0']:
-            ip, cidr = range.split('/')
+            ip, cidr = x.split('/')
             mask = cidr_to_netmask(int(cidr))
             r.src = ip + '/' + mask
         m = iptc.Match(r, protocol)

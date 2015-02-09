@@ -66,7 +66,7 @@ def get(type=None):
                 tlist.append(data[x])
         if tlist:
             return tlist
-        return None
+        return []
     return data
 
 def register(type, id, name, icon, ports, policy=0, fw=True):
