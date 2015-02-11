@@ -11,8 +11,14 @@ from dbus import SystemBus, Interface
 class ConnectionsManager:
     def __init__(self, config):
         self.LDAP = ldap_connect(config=config)
-        self.SystemD = systemd_connect()
+        self.DBus = SystemBus()
+        self.SystemD = self.SystemDConnect("/org/freedesktop/systemd1", 
+            "org.freedesktop.systemd1.Manager")
         self.Supervisor = supervisor_connect()
+    
+    def SystemDConnect(self, path, interface):
+        systemd = self.DBus.get_object("org.freedesktop.systemd1", path)
+        return Interface(systemd, dbus_interface=interface)
 
 
 def ldap_connect(uri="", rootdn="", dn="cn=admin", config=None, passwd=""):
@@ -42,11 +48,6 @@ def ldap_connect(uri="", rootdn="", dn="cn=admin", config=None, passwd=""):
         if "%s,%s" % (dn, rootdn) not in data:
             raise Exception("User is not an administrator")        
     return c
-
-def systemd_connect():
-    bus = SystemBus()
-    systemd = bus.get_object("org.freedesktop.systemd1", "/org/freedesktop/systemd1")
-    return Interface(systemd, dbus_interface="org.freedesktop.systemd1.Manager")
 
 def supervisor_connect():
     s = xmlrpclib.Server("http://localhost:9001/RPC2")

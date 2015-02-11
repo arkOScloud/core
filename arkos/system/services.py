@@ -1,9 +1,14 @@
 import ConfigParser
 import glob
 import os
+import time
 
 from arkos import conns
 from arkos.utilities import shell
+
+
+class ActionError(Exception):
+    pass
 
 
 class Service:
@@ -29,27 +34,66 @@ class Service:
         if self.stype == 'supervisor':
             conns.Supervisor.startProcess(self.name)
         else:
+            path = conns.SystemD.LoadUnit(self.name+".service")
             conns.SystemD.StartUnit(self.name+".service", "replace")
+            timeout = 0
+            time.sleep(1)
+            while timeout < 10:
+                data = conns.SystemDConnect(path, "org.freedesktop.DBus.Properties")
+                data = data.GetAll('org.freedesktop.systemd1.Unit')
+                if str(data["ActiveState"]) == "failed":
+                    raise ActionError()
+                elif str(data["ActiveState"]) == "active":
+                    self.state = "running"
+                    break
+                timeout + 1
+                time.sleep(1)
+            else:
+                raise ActionError()
     
     def stop(self):
         if self.stype == 'supervisor':
             conns.Supervisor.stopProcess(self.name)
         else:
+            path = conns.SystemD.LoadUnit(self.name+".service")
             conns.SystemD.StopUnit(self.name+".service", "replace")
-        self.state = "stopped"
+            timeout = 0
+            time.sleep(1)
+            while timeout < 10:
+                data = conns.SystemDConnect(path, "org.freedesktop.DBus.Properties")
+                data = data.GetAll('org.freedesktop.systemd1.Unit')
+                if str(data["ActiveState"]) in ["inactive", "failed"]:
+                    self.state = "stopped"
+                    break
+                timeout + 1
+                time.sleep(1)
+            else:
+                raise ActionError()
     
-    def restart(self):
+    def restart(self, real=False):
         if self.stype == 'supervisor':
             conns.Supervisor.stopProcess(self.name, wait=True)
             conns.Supervisor.startProcess(self.name)
         else:
-            conns.SystemD.ReloadOrRestartUnit(self.name+".service", "replace")
-
-    def real_restart(self):
-        if self.stype == 'supervisor':
-            self.restart()
-        else:
-            conns.SystemD.RestartUnit(self.name+".service", "replace")
+            path = conns.SystemD.LoadUnit(self.name+".service")
+            if real:
+                conns.SystemD.RestartUnit(self.name+".service", "replace")
+            else:
+                conns.SystemD.ReloadOrRestartUnit(self.name+".service", "replace")
+            timeout = 0
+            time.sleep(1)
+            while timeout < 10:
+                data = conns.SystemDConnect(path, "org.freedesktop.DBus.Properties")
+                data = data.GetAll('org.freedesktop.systemd1.Unit')
+                if str(data["ActiveState"]) == "failed":
+                    raise ActionError()
+                elif str(data["ActiveState"]) == "active":
+                    self.state = "running"
+                    break
+                timeout + 1
+                time.sleep(1)
+            else:
+                raise ActionError()
     
     def get_log(self):
         if self.stype == 'supervisor':
@@ -97,30 +141,37 @@ class Service:
     
     def as_dict(self):
         return {
-            "name": self.name,
+            "id": self.name,
             "type": self.stype,
             "state": self.state,
+            "running": self.state=="running",
             "enabled": self.enabled,
-            "cfg": self.cfg
+            "cfg": self.cfg,
+            "is_ready": True
         }
 
 
 def get(name=None):
-    svcs = []
+    svcs, files = [], {}
+    
+    for unit in conns.SystemD.ListUnitFiles():
+        if not unit[0].endswith(".service"):
+            continue
+        sname = unit[0].split('/usr/lib/systemd/system/')[1].split(".service")[0]
+        files[sname] = Service(name=sname, stype="system", state="stopped", enabled=unit[1]=="enabled")
 
     for unit in conns.SystemD.ListUnits():
         if not unit[0].endswith(".service"):
             continue
-        try:
-            enabled = conns.SystemD.GetUnitFileState(unit[0])=="enabled"
-        except:
-            enabled = False
-        s = Service(name=unit[0].split(".service")[0], stype="system",
-            state="running" if unit[3]=="active" else "stopped",
-            enabled=enabled)
-        if name == s.name:
-            return s
-        svcs.append(s)
+        sname = unit[0].split(".service")[0]
+        if not sname in files:
+            continue
+        files[sname].state = "running" if unit[3]=="active" else "stopped"
+    
+    for unit in files:
+        if name == unit:
+            return files[unit]
+        svcs.append(files[unit])
 
     if not os.path.exists('/etc/supervisor.d'):
         os.mkdir('/etc/supervisor.d')

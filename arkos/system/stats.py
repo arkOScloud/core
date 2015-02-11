@@ -13,6 +13,7 @@ def get_all():
         "ram": get_ram(),
         "cpu": get_cpu(),
         "swap": get_swap(),
+        #"space": get_space(),
         "uptime": get_uptime()
     }
 
@@ -39,6 +40,14 @@ def get_cpu():
 def get_swap():
     s = psutil.swap_memory()
     return (int(s.used), int(s.total))
+
+def get_space():
+    result = {}
+    s = psutil.disk_partitions()
+    for x in s:
+        r = psutil.disk_usage(x.device)
+        result[x.device] = [r.used, r.total, r.percent]
+    return result
 
 def get_uptime():
     minute = 60
