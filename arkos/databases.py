@@ -76,7 +76,7 @@ class DatabaseManager:
         try:
             self.connect()
         except:
-            self.state = False
+            pass
     
     def connect(self):
         pass
@@ -103,9 +103,7 @@ class DatabaseManager:
 
 
 def get(id=None, type=None):
-    data = storage.dbs.get("databases")
-    if not data:
-        data = scan()
+    data = scan()
     if id or type:
         tlist = []
         for x in data:
@@ -121,15 +119,15 @@ def get(id=None, type=None):
 def scan():
     dbs = []
     for x in get_managers():
-        if x.state:
+        try:
             dbs += x.get_dbs()
+        except:
+            continue
     storage.dbs.set("databases", dbs)
     return dbs
 
 def get_user(id=None, type=None):
-    data = storage.dbs.get("users")
-    if not data:
-        data = scan_users()
+    data = scan_users()
     if id or type:
         tlist = []
         for x in data:
@@ -145,8 +143,10 @@ def get_user(id=None, type=None):
 def scan_users():
     users = []
     for x in get_managers():
-        if x.state:
+        try:
             users += x.get_users()
+        except:
+            continue
     storage.dbs.set("users", users)
     return users
 
