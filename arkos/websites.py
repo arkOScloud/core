@@ -299,10 +299,10 @@ class Site:
         if reload == True:
             nginx_reload()
     
-    def edit(self, oldname=""):
+    def edit(self, newname=""):
         # Update the nginx serverblock
         from arkos import backup
-        c = nginx.loadf(os.path.join('/etc/nginx/sites-available', oldname or self.id))
+        c = nginx.loadf(os.path.join('/etc/nginx/sites-available', self.id))
         s = c.servers[0]
         if self.cert and self.port == 443:
             for x in c.servers:
@@ -320,27 +320,34 @@ class Site:
                 nginx.Key('return', '301 https://%s$request_uri'%self.addr)
             ))
         # If the name was changed, rename the folder and files
-        if oldname and self.id != oldname:
+        if newname and self.id != newname:
             if self.path.endswith('_site'):
-                self.path = os.path.join(config.get("websites", "site_dir"), self.id, '_site')
+                self.path = os.path.join(config.get("websites", "site_dir"), newname, '_site')
             elif self.path.endswith('htdocs'):
-                self.path = os.path.join(config.get("websites", "site_dir"), self.id, 'htdocs')
+                self.path = os.path.join(config.get("websites", "site_dir"), newname, 'htdocs')
             else:
-                self.path = os.path.join(config.get("websites", "site_dir"), self.id)
+                self.path = os.path.join(config.get("websites", "site_dir"), newname)
             if os.path.exists(self.path):
                 shutil.rmtree(self.path)
-            shutil.move(os.path.join(config.get("websites", "site_dir"), oldname), self.path)
-            shutil.move(os.path.join('/etc/nginx/sites-available', oldname),
-                os.path.join('/etc/nginx/sites-available', self.id))
-            os.unlink(os.path.join("/etc/nginx/sites-available", oldname))
+            self.nginx_disable(reload=False)
+            shutil.move(os.path.join(config.get("websites", "site_dir"), self.id), self.path)
+            os.unlink(os.path.join("/etc/nginx/sites-available", self.id))
+            tracked_services.deregister(self.meta.id if self.meta else "website", self.id)
+            self.id = newname
+            g = ConfigParser.SafeConfigParser()
+            g.read(os.path.join(self.path, ".arkos"))
+            g.set("website", "id", self.id)
+            with open(os.path.join(self.path, ".arkos"), 'w') as f:
+                g.write(f)
             self.nginx_enable(reload=False)
         s.filter('Key', 'listen')[0].value = str(self.port)+' ssl' if self.cert else str(self.port)
         s.filter('Key', 'server_name')[0].value = self.addr
         s.filter('Key', 'root')[0].value = self.path
         s.filter('Key', 'index')[0].value = 'index.php' if self.php else 'index.html'
-        nginx.dumpf(c, os.path.join('/etc/nginx/sites-available', oldname))
+        nginx.dumpf(c, os.path.join('/etc/nginx/sites-available', self.id))
         tracked_services.register(self.meta.id if self.meta else "website", 
-            self.id, self.id, self.icon, [("tcp", self.port)], 2)
+            self.id, self.id, self.meta.icon if self.meta else "fa fa-globe", 
+            [("tcp", self.port)], 2)
         self.backup = self.meta.get_module("backup") or backup.BackupController
         self.backup = self.backup(self.id, self)
         nginx_reload()
