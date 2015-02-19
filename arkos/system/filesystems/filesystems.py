@@ -269,10 +269,12 @@ def get_points(id=None, path=None):
         for x in points:
             if x.name == id:
                 return x
+        return None
     elif path:
         for x in points:
             if x.path == path:
                 return x
+        return None
     return points
 
 def register_point(name, path, stype, icon="gen-storage"):

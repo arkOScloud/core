@@ -297,7 +297,10 @@ class Site:
             nginx_reload()
     
     def nginx_disable(self, reload=True):
-        os.unlink(os.path.join('/etc/nginx/sites-enabled', self.id))
+        try:
+            os.unlink(os.path.join('/etc/nginx/sites-enabled', self.id))
+        except:
+            pass
         self.enabled = False
         if reload == True:
             nginx_reload()
