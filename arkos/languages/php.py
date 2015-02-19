@@ -43,7 +43,7 @@ def enable_mod(self, *mod):
     with open('/etc/php/php.ini', 'w') as f:
         for line in lines:
             for x in mod:
-                f.write(re.sub(";extension=%s.so" % mod, "extension=%s.so" % mod, line))
+                f.write(re.sub(";extension=%s.so" % x, "extension=%s.so" % x, line))
 
 def disable_mod(self, *mod):
     with open('/etc/php/php.ini', 'r') as f:
@@ -51,7 +51,7 @@ def disable_mod(self, *mod):
     with open('/etc/php/php.ini', 'w') as f:
         for line in lines:
             for x in mod:
-                f.write(re.sub("extension=%s.so" % mod, ";extension=%s.so" % mod, line))
+                f.write(re.sub("extension=%s.so" % x, ";extension=%s.so" % x, line))
 
 def open_basedir(self, op, path):
     oc = []

@@ -621,6 +621,7 @@ def get(id=None, type=None, verify=True):
     return data
 
 def scan():
+    from arkos import backup
     sites = []
     for site in os.listdir('/etc/nginx/sites-available'):
         path = os.path.join('/srv/http/webapps', site)

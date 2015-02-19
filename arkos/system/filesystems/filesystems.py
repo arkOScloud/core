@@ -14,7 +14,7 @@ from arkos.utilities import shell
 libc = ctypes.CDLL(ctypes.util.find_library("libc"), use_errno=True)
 
 
-class DiskPartition(object):
+class DiskPartition:
     def __init__(
             self, name="", path="", mountpoint="", size=0, fstype="", 
             crypt=False):
@@ -72,7 +72,7 @@ class DiskPartition(object):
         }
 
 
-class VirtualDisk(object):
+class VirtualDisk:
     def __init__(
             self, name="", path="", mountpoint="", size=0, fstype="ext4",
             crypt=False):
@@ -189,7 +189,7 @@ class VirtualDisk(object):
         }
 
 
-class PointOfInterest(object):
+class PointOfInterest:
     def __init__(self, name="", path="", stype="", icon=""):
         self.name = name
         self.path = path
