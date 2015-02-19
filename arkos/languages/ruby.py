@@ -20,10 +20,20 @@ def verify_path():
 
 def install_gem(*gems, **kwargs):
     verify_path()
-    gemlist = shell('gem list', env=os.environ)["stdout"].split('\n')
+    gemlist = shell('gem list')["stdout"].split('\n')
     for x in gems:
         if not any(x==s for s in gemlist) or force:
             d = shell('gem install -N --no-user-install %s' % x)
             if d["code"] != 0:
                 logger.error('Gem install \'%s\' failed: %s'%(x,str(d["stderr"])))
                 raise Exception('Gem install \'%s\' failed. See logs for more info'%x)
+
+def update_gem(*gems, **kwargs):
+    verify_path()
+    gemlist = shell('gem list')["stdout"].split('\n')
+    for x in gems:
+        if not any(x==s for s in gemlist) or force:
+            d = shell('gem update -N --no-user-install %s' % x)
+            if d["code"] != 0:
+                logger.error('Gem update \'%s\' failed: %s'%(x,str(d["stderr"])))
+                raise Exception('Gem update \'%s\' failed. See logs for more info'%x)

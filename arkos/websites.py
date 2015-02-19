@@ -204,7 +204,7 @@ class Site:
             raise Exception('nginx serverblock couldn\'t be written - '+str(e))
 
         if message:
-            message.update("info", "Running post-installation...")
+            message.update("info", "Running post-installation. This may take a few minutes...")
         try:
             specialmsg = self.post_install(extra_vars, dbpasswd)
         except Exception, e:
