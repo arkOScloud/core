@@ -141,16 +141,16 @@ class App:
         return data
 
 
-def get(id=None, type=None, verify=True):
+def get(id=None, type=None, loadable=None, verify=True):
     data = storage.apps.get("installed")
     if not data:
         data = scan(verify)
-    if id or type:
+    if id or type or loadable:
         tlist = []
         for x in data:
-            if x.id == id:
+            if x.id == id and (x.loadable or not loadable):
                 return x
-            elif x.type == type:
+            elif x.type == type and (x.loadable or not loadable):
                 tlist.append(x)
         if tlist:
             return tlist

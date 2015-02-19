@@ -53,6 +53,7 @@ class Site:
     
     def install(self, meta, extra_vars={}, enable=True, message=DefaultMessage()):
         from arkos import backup
+        dbpasswd = ""
         self.meta = meta
         if message:
             message.update("info", "Preparing site install...")
@@ -88,7 +89,7 @@ class Site:
                 and self.meta.database_engines:
             self.meta.selected_dbengine = self.meta.database_engines[0]
 
-        if self.meta.selected_dbengine:
+        if hasattr(self.meta, "selected_dbengine") and self.meta.selected_dbengine:
             if message:
                 message.update("info", "Creating database...")
             try:
@@ -194,7 +195,9 @@ class Site:
             if hasattr(self.meta, "website_datapaths") and self.meta.website_datapaths \
                     and self.data_path:
                 c.set('website', 'data_path', self.data_path)
-            c.set('website', 'dbengine', self.meta.selected_dbengine or '')
+            c.set('website', 'dbengine', '')
+            if hasattr(self.meta, "selected_dbengine"):
+                c.set('website', 'dbengine', self.meta.selected_dbengine or '')
             with open(os.path.join(self.path, ".arkos"), 'w') as f:
                 c.write(f)
         except Exception, e:
@@ -418,6 +421,9 @@ class Site:
         self.nginx_disable(reload=True)
         tracked_services.deregister(self.meta.id if self.meta else "website", self.id)
         storage.sites.remove("sites", self)
+        if message:
+            message.update("info", "Running post-removal...")
+        self.post_remove()
         try:
             os.unlink(os.path.join('/etc/nginx/sites-available', self.id))
         except:

@@ -9,7 +9,7 @@ import sys
 import groups
 
 from arkos import conns, config
-from arkos.utilities import hashpw
+from arkos.utilities import hashpw, shell
 
 
 class User:

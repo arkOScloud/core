@@ -25,14 +25,17 @@ class Service:
         c.add_section(title)
         for x in self.cfg:
             c.set(title, x, self.cfg[x])
-        with open(os.path.join('/etc/supervisor.d', name+'.ini'), 'w') as f:
+        with open(os.path.join('/etc/supervisor.d', self.name+'.ini'), 'w') as f:
             c.write(f)
         if enable:
             self.enable()
 
     def start(self):
         if self.stype == 'supervisor':
-            conns.Supervisor.startProcess(self.name)
+            try:
+                conns.Supervisor.startProcess(self.name)
+            except:
+                raise ActionError()
         else:
             path = conns.SystemD.LoadUnit(self.name+".service")
             conns.SystemD.StartUnit(self.name+".service", "replace")
@@ -54,6 +57,7 @@ class Service:
     def stop(self):
         if self.stype == 'supervisor':
             conns.Supervisor.stopProcess(self.name)
+            self.state = "stopped"
         else:
             path = conns.SystemD.LoadUnit(self.name+".service")
             conns.SystemD.StopUnit(self.name+".service", "replace")
@@ -110,16 +114,15 @@ class Service:
                     os.path.join('/etc/supervisor.d', self.name+'.ini'))
             if not svd.state == "running":
                 svd.start()
-            conns.Supervisor.addProcessGroup(self.name)
-            self.start()
+            conns.Supervisor.restart()
         else:
             conns.SystemD.EnableUnitFiles([self.name+".service"], False, True)
         self.enabled = True
 
     def disable(self):
         if self.stype == 'supervisor':
-            self.stop()
-            conns.Supervisor.removeProcessGroup(self.name)
+            if self.state == "running":
+                self.stop()
             os.rename(os.path.join('/etc/supervisor.d', self.name+'.ini'),
                 os.path.join('/etc/supervisor.d', self.name+'.ini.disabled'))
             self.state = "stopped"
@@ -129,8 +132,8 @@ class Service:
 
     def remove(self):
         if self.stype == 'supervisor':
-            self.stop()
-            conns.Supervisor.removeProcessGroup(self.name)
+            if self.state == "running":
+                self.stop()
             try:
                 os.unlink(os.path.join('/etc/supervisor.d', self.name+'.ini'))
                 os.unlink(os.path.join('/etc/supervisor.d', self.name+'.ini.disabled'))
@@ -138,6 +141,7 @@ class Service:
                 pass
             self.state = "stopped"
             self.enabled = False
+            conns.Supervisor.restart()
     
     def as_dict(self):
         return {
@@ -151,7 +155,7 @@ class Service:
         }
 
 
-def get(name=None):
+def get(id=None):
     svcs, files = [], {}
     
     for unit in conns.SystemD.ListUnitFiles():
@@ -169,7 +173,7 @@ def get(name=None):
         files[sname].state = "running" if unit[3]=="active" else "stopped"
     
     for unit in files:
-        if name == unit:
+        if id == unit:
             return files[unit]
         svcs.append(files[unit])
 
@@ -177,14 +181,15 @@ def get(name=None):
         os.mkdir('/etc/supervisor.d')
     for x in os.listdir('/etc/supervisor.d'):
         c = ConfigParser.RawConfigParser()
-        c.load(os.path.join("/etc/supervisor.d", x))
+        c.read(os.path.join("/etc/supervisor.d", x))
         cfg = {}
-        for x in c.items(c.sections()[0]):
-            cfg[x[0]] = x[1]
-        s = Service(name=x.split(".ini")[0], stype="supervisor",
-            state=conns.Supervisor.getProcessInfo(s.name)["statename"].lower(),
+        for y in c.items(c.sections()[0]):
+            cfg[y[0]] = y[1]
+        name = x.split(".ini")[0]
+        s = Service(name=name, stype="supervisor",
+            state=conns.Supervisor.getProcessInfo(name)["statename"].lower() if not x.endswith("disabled") else "stopped",
             enabled=not x.endswith("disabled"), cfg=cfg)
-        if name == s.name:
+        if id == s.name:
             return s
         svcs.append(s)
-    return sorted(svcs, key=lambda s: s.name) if not name else None
+    return sorted(svcs, key=lambda s: s.name) if not id else None
