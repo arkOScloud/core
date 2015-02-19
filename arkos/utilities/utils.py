@@ -84,12 +84,16 @@ def api(url, post=None, method="", returns="json", headers=[], crit=False):
         if crit:
             raise Exception('%s to %s failed - %s' % (req.get_method(), url, str(e)))
 
-def shell(c, stdin=None, env={"LC_ALL": "C"}):
+def shell(c, stdin=None, env={}):
+    environ = os.environ
+    environ["LC_ALL"] = "C"
+    for x in env:
+        environ[x] = env[x]
     p = subprocess.Popen(shlex.split(c),
             stderr=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stdin=subprocess.PIPE,
-            env=env)
+            env=environ)
     data = p.communicate(stdin)
     data = {"code": p.returncode, "stdout": data[0], 
         "stderr": data[1]}
