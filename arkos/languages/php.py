@@ -7,12 +7,12 @@ from distutils.spawn import find_executable
 from arkos.utilities import shell
 
 
-def install_composer(self):
+def install_composer():
     cwd = os.getcwd()
     os.chdir("/root")
     os.environ['COMPOSER_HOME'] = '/root'
-    self.enable_mod('phar')
-    self.open_basedir('add', '/root')
+    enable_mod('phar')
+    open_basedir('add', '/root')
     installer = urllib2.urlopen("https://getcomposer.org/installer").read()
     s = shell('php', stdin=installer)
     os.chdir(cwd)
@@ -20,16 +20,16 @@ def install_composer(self):
         raise Exception('Composer download/config failed. Error: %s'%str(s["stderr"]))
     os.rename('/root/composer.phar', '/usr/local/bin/composer')
     os.chmod('/usr/local/bin/composer', 755)
-    self.open_basedir('add', '/usr/local/bin')
+    open_basedir('add', '/usr/local/bin')
 
-def verify_composer(self):
+def verify_composer():
     if not find_executable("composer"):
-        self.install_composer()
+        install_composer()
     if not find_executable("composer"):
         raise Exception('Composer was not installed successfully.')
 
-def composer_install(self, path):
-    self.verify_composer()
+def composer_install(path):
+    verify_composer()
     cwd = os.getcwd()
     os.chdir(path)
     s = shell('composer install')
@@ -37,7 +37,7 @@ def composer_install(self, path):
     if s["code"] != 0:
         raise Exception('Composer failed to install this app\'s bundle. Error: %s'%str(s["stderr"]))
 
-def enable_mod(self, *mod):
+def enable_mod(*mod):
     with open('/etc/php/php.ini', 'r') as f:
         lines = f.readlines()
     with open('/etc/php/php.ini', 'w') as f:
@@ -45,7 +45,7 @@ def enable_mod(self, *mod):
             for x in mod:
                 f.write(re.sub(";extension=%s.so" % x, "extension=%s.so" % x, line))
 
-def disable_mod(self, *mod):
+def disable_mod(*mod):
     with open('/etc/php/php.ini', 'r') as f:
         lines = f.readlines()
     with open('/etc/php/php.ini', 'w') as f:
@@ -53,7 +53,7 @@ def disable_mod(self, *mod):
             for x in mod:
                 f.write(re.sub("extension=%s.so" % x, ";extension=%s.so" % x, line))
 
-def open_basedir(self, op, path):
+def open_basedir(op, path):
     oc = []
     with open('/etc/php/php.ini', 'r') as f:
         ic = f.readlines()
@@ -75,7 +75,7 @@ def open_basedir(self, op, path):
     with open('/etc/php/php.ini', 'w') as f:
         f.writelines(oc)
 
-def upload_size(self, size):
+def upload_size(size):
     oc = []
     with open('/etc/php/php.ini', 'r') as f:
         ic = f.readlines()
