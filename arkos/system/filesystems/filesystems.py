@@ -17,12 +17,13 @@ libc = ctypes.CDLL(ctypes.util.find_library("libc"), use_errno=True)
 class DiskPartition:
     def __init__(
             self, id="", path="", mountpoint=None, size=0, fstype="", 
-            crypt=False):
+            enabled=False, crypt=False):
         self.id = id
         self.path = path
         self.mountpoint = mountpoint
         self.size = size
         self.fstype = fstype
+        self.enabled = enabled
         self.crypt = crypt
 
     def mount(self, passwd=None):
@@ -61,6 +62,26 @@ class DiskPartition:
         deregister_point(self.id)
         self.mountpoint = None
     
+    def enable(self):
+        f = FstabEntry()
+        f.src = self.path
+        f.dst = os.path.join('/media', self.id)
+        f.uuid = get_partition_uuid_by_name(self.path)
+        f.fs_type = "ext4"
+        f.options = "defaults"
+        f.dump_p = 0
+        f.fsck_p = 0
+        save_fstab_entry(f)
+        self.enabled = True
+    
+    def disable(self):
+        fstab = get_fstab()
+        for x in fstab:
+            if x == self.path:
+                save_fstab_entry(fstab[x], remove=True)
+                self.disabled = False
+                break
+    
     def as_dict(self):
         return {
             "id": self.id,
@@ -70,6 +91,7 @@ class DiskPartition:
             "size": self.size,
             "fstype": self.fstype,
             "crypt": self.crypt,
+            "enabled": self.enabled,
             "is_ready": True
         }
 
@@ -77,12 +99,13 @@ class DiskPartition:
 class VirtualDisk:
     def __init__(
             self, id="", path="", mountpoint=None, size=0, fstype="ext4",
-            crypt=False):
+            enabled=False, crypt=False):
         self.id = id
         self.path = path
         self.mountpoint = mountpoint
         self.size = size
         self.fstype = fstype
+        self.enabled = enabled
         self.crypt = crypt
     
     def create(self, mount=False):
@@ -153,6 +176,26 @@ class VirtualDisk:
         deregister_point(self.id)
         self.mountpoint = None
     
+    def enable(self):
+        f = FstabEntry()
+        f.src = self.path
+        f.dst = os.path.join('/media', self.id)
+        f.uuid = ""
+        f.fs_type = "ext4"
+        f.options = "loop,rw,auto"
+        f.dump_p = 0
+        f.fsck_p = 0
+        save_fstab_entry(f)
+        self.enabled = True
+    
+    def disable(self):
+        fstab = get_fstab()
+        for x in fstab:
+            if x == self.path:
+                save_fstab_entry(fstab[x], remove=True)
+                self.enabled = False
+                break
+    
     def encrypt(self, passwd, cipher="aes-xts-plain64", keysize=256, mount=False):
         os.rename(self.path, os.path.join(config.get("filesystems", "vdisk_dir"), self.id+'.crypt'))
         self.path = os.path.join(config.get("filesystems", "vdisk_dir"), self.id+'.crypt')
@@ -188,6 +231,7 @@ class VirtualDisk:
             "mountpoint": self.mountpoint,
             "size": self.size,
             "fstype": self.fstype,
+            "enabled": self.enabled,
             "crypt": self.crypt,
             "is_ready": True
         }
@@ -210,17 +254,21 @@ class PointOfInterest:
     def as_dict(self):
         return {
             "id": self.id,
+            "path": self.path,
             "type": self.stype,
             "icon": self.icon
         }
 
 
-def get_disk_partitions(id=None):
+def get(id=None):
     devs, mps = [], {}
+    fstab = get_fstab()
+    
     with open("/etc/mtab", "r") as f:
         for x in f.readlines():
             x = x.split()
             mps[x[0]] = x[1]
+    
     for d in parted.getAllDevices():
         try:
             parts = parted.Disk(d).getPrimaryPartitions()
@@ -231,20 +279,14 @@ def get_disk_partitions(id=None):
                 continue
             dev = DiskPartition(id=p.path.split("/")[-1], path=p.path, 
                 mountpoint=mps.get(p.path) or None, size=int(p.getSize("B")),
-                fstype=parted.probeFileSystem(p.geometry), crypt=crypto.is_luks(p.path)==0)
+                fstype=parted.probeFileSystem(p.geometry), enabled=p.path in fstab,
+                crypt=crypto.is_luks(p.path)==0)
             if dev.mountpoint and not get_points(path=dev.mountpoint):
                 register_point(dev.id, dev.mountpoint, "crypt" if dev.crypt else "disk")
             if id == dev.id:
                 return dev
             devs.append(dev)
-    return devs if not id else None
-
-def get_virtual_disks(id=None):
-    devs, mps = [], {}
-    with open("/etc/mtab", "r") as f:
-        for x in f.readlines():
-            x = x.split()
-            mps[x[0]] = x[1]
+    
     dd = losetup.get_loop_devices()
     for x in dd:
         try:
@@ -259,7 +301,7 @@ def get_virtual_disks(id=None):
         dname = os.path.splitext(os.path.split(x)[1])[0]
         dev = VirtualDisk(id=dname, path=x, size=os.path.getsize(x),
             mountpoint=mps.get(x) or mps.get("/dev/mapper/%s" % dname) or None, 
-            crypt=x.endswith(".crypt"))
+            enabled=x in fstab, crypt=x.endswith(".crypt"))
         if dev.mountpoint and not get_points(path=dev.mountpoint):
             register_point(dev.id, dev.mountpoint, "crypt" if dev.crypt else "disk")
         if id == dev.id:
@@ -293,6 +335,7 @@ def deregister_point(id=None, path=None):
 class FstabEntry:
     def __init__(self):
         self.src = ''
+        self.uuid = ''
         self.dst = ''
         self.options = ''
         self.fs_type = ''
@@ -301,42 +344,46 @@ class FstabEntry:
 
 
 def get_fstab():
-    r = []
+    r = {}
     with open("/etc/fstab", "r") as f:
         ss = f.readlines()
 
     for s in ss:
-        if s != '' and s[0] != '#':
-            try:
-                s = s.split()
-                e = FstabEntry()
-                try:
-                    e.src = s[0]
-                    e.dst = s[1]
-                    e.fs_type = s[2]
-                    e.options = s[3]
-                    e.dump_p = int(s[4])
-                    e.fsck_p = int(s[5])
-                except:
-                    pass
-                r.append(e)
-            except:
-                pass
+        if not s.split() or s[0] == '#':
+            continue
+        s = s.split()
+        e = FstabEntry()
+        if s[0].startswith("UUID="):
+            e.uuid = s[0].split("UUID=")[1]
+            e.src = get_partition_name_by_uuid(e.uuid)
+        else:
+            e.src = s[0]
+            e.uuid = get_partition_uuid_by_name(e.src)
+        try:
+            e.dst = s[1]
+            e.fs_type = s[2]
+            e.options = s[3]
+            e.dump_p = int(s[4])
+            e.fsck_p = int(s[5])
+        except:
+            pass
+        r[e.src] = e
     return r
 
-def save_fstab_entry(e):
+def save_fstab_entry(e, remove=False):
     lines = []
     with open("/etc/fstab", "r") as f:
         for x in f.readlines():
-            if x.startswith(e.src):
+            if x.startswith(e.src) or (e.uuid and x.startswith("UUID=%s" % e.uuid)):
                 continue
             lines.append(x)
-    lines.append('%s\t%s\t%s\t%s\t%i\t%i\n' % (e.src, e.dst, e.fs_type, e.options, e.dump_p, e.fsck_p))
+    if not remove:
+        lines.append('%s\t%s\t%s\t%s\t%i\t%i\n' % (("UUID="+e.uuid) if e.uuid else e.src, e.dst, e.fs_type, e.options, e.dump_p, e.fsck_p))
     with open("/etc/fstab", "w") as f:
-        f.write(d)
+        f.writelines(lines)
 
 def get_partition_uuid_by_name(p):
     return shell('blkid -o value -s UUID ' + p)["stdout"].split('\n')[0]
 
 def get_partition_name_by_uuid(u):
-    return shell('blkid -U ' + u)["stdout"]
+    return shell('blkid -U ' + u)["stdout"].split('\n')[0]
