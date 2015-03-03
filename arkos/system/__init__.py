@@ -1,5 +1,4 @@
 import network
-import packages
 import services
 import stats
 import systemtime
@@ -11,7 +10,6 @@ import filesystems
 
 __all__ = [
     "network",
-    "packages",
     "services",
     "stats",
     "systemtime",

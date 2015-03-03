@@ -18,7 +18,8 @@ setup(
         'psutil',
         'netifaces',
         'GitPython',
-        'python-gnupg'
+        'python-gnupg',
+        'python-pacman'
     ],
     description='arkOS core system management libraries',
     author='CitizenWeb',

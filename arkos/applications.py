@@ -3,13 +3,14 @@ import imp
 import inspect
 import json
 import os
+import pacman
 import shutil
 import tarfile
 
 from distutils.spawn import find_executable
 
 from arkos import config, storage, logger, tracked_services
-from arkos.system import packages, services
+from arkos.system import services
 from arkos.languages import python
 from arkos.utilities import api, DefaultMessage
 
@@ -66,12 +67,13 @@ class App:
                 to_pacman = ""
                 if dep["binary"] and not find_executable(dep["binary"]):
                     to_pacman = dep["package"]
-                elif packages.is_installed(dep["package"]):
+                elif pacman.is_installed(dep["package"]):
                     to_pacman = dep["package"]
                 if to_pacman:
                     try:
                         logger.debug(" *** Installing %s..." % to_pacman)
-                        packages.install([to_pacman], query=True)
+                        pacman.query()
+                        pacman.install([to_pacman])
                     except:
                         error = "Couldn't install %s" % to_pacman
                         verify = False
@@ -123,7 +125,7 @@ class App:
                 if item.has_key("daemon") and item["daemon"]:
                     services.stop(item["daemon"])
                     services.disable(item["daemon"])
-                packages.remove([item["package"]], purge=config.get("apps", "purge", False))
+                pacman.remove([item["package"]], purge=config.get("apps", "purge", False))
         shutil.rmtree(os.path.join(config.get("apps", "app_dir"), self.id))
         storage.apps.remove("installed", self)
         regen_fw = False
