@@ -65,9 +65,8 @@ class App:
         for dep in self.dependencies:
             if dep["type"] == "system":
                 to_pacman = ""
-                if dep["binary"] and not find_executable(dep["binary"]):
-                    to_pacman = dep["package"]
-                elif pacman.is_installed(dep["package"]):
+                if (dep["binary"] and not find_executable(dep["binary"])) \
+                or not pacman.is_installed(dep["package"]):
                     to_pacman = dep["package"]
                 if to_pacman:
                     try:
