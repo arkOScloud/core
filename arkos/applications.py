@@ -19,6 +19,8 @@ class App:
     def __init__(self, **entries):
         self.__dict__.update(entries)
         self.loadable = False
+        self.updatable = False
+        self.installed = False
         self.error = ""
 
     def get_module(self, mtype):
@@ -126,7 +128,7 @@ class App:
                     services.disable(item["daemon"])
                 pacman.remove([item["package"]], purge=config.get("apps", "purge", False))
         shutil.rmtree(os.path.join(config.get("apps", "app_dir"), self.id))
-        storage.apps.remove("installed", self)
+        self.installed = False
         regen_fw = False
         for x in self.services:
             if x["ports"]:
@@ -143,7 +145,7 @@ class App:
 
 
 def get(id=None, type=None, loadable=None, verify=True):
-    data = storage.apps.get("installed")
+    data = storage.apps.get("applications")
     if not data:
         data = scan(verify)
     if id or type or loadable:
@@ -160,9 +162,14 @@ def get(id=None, type=None, loadable=None, verify=True):
 
 def scan(verify=True):
     apps = []
-    applist = [app for app in os.listdir(config.get("apps", "app_dir")) if not app.startswith(".")]
+    idata = [app for app in os.listdir(config.get("apps", "app_dir")) if not app.startswith(".")]
+    # TODO
+    #adata = api('https://%s/api/v1/apps' % config.get("general", "repo_server"), crit=False)
+    adata = []
+    if not adata:
+        adata = []
 
-    for app in applist:
+    for app in idata:
         try:
             with open(os.path.join(config.get("apps", "app_dir"), app, "manifest.json"), "r") as f:
                 data = json.loads(f.read())
@@ -171,56 +178,29 @@ def scan(verify=True):
             continue
         logger.debug(" *** Loading %s" % data["id"])
         a = App(**data)
+        a.installed = True
+        for y in enumerate(adata):
+            if a.id == y[1]["id"] and a.version != y[1]["version"]:
+                a.upgradable = y[1]["version"]
+            if a.id == y[1]["id"]:
+                adata[y[0]]["installed"] = True
         a.load()
         apps.append(a)
-    storage.apps.set("installed", apps)
-    #if verify:
-        #verify_app_dependencies()
-    return storage.apps.get("installed")
+    
+    for x in adata:
+        if not x.get("installed"):
+            app = App(**x)
+            app.installed = False
+            apps.append(app)
 
-def get_available(id=None):
-    data = storage.apps.get("available")
-    if not data:
-        data = scan_available()
-    if id:
-        for x in data:
-            if x["id"] == id:
-                return x
-        return None
-    return data
-
-def scan_available():
-    data = api('https://%s/apps' % config.get("general", "repo_server"), 
-        returns='raw', crit=True)
-    storage.apps.set("available", data)
-    return data
-
-def get_updatable(id=None):
-    data = storage.apps.get("updatable")
-    if not data:
-        data = scan_updatable()
-    if id:
-        for x in data:
-            if x.id == id:
-                return x
-        return None
-    return data
-
-def scan_updatable():
-    upgradeable = []
-    if not storage.apps.get("available"):
-        storage.apps.set("available", get_available())
-    if not storage.apps.get("installed"):
-        storage.apps.set("installed", get())
-    for x in storage.apps.get("available"):
-        for y in storage.apps.get("installed"):
-            if x["id"] == y.id and x["version"] != y.version:
-                upgradeable.append(x)
-                break
-    return upgradeable
+    storage.apps.set("applications", apps)
+    
+    if verify:
+        verify_app_dependencies()
+    return storage.apps.get("applications")
 
 def verify_app_dependencies():
-    apps = storage.apps.get("installed")
+    apps = [x for x in storage.apps.get("applications") if x.installed]
     for x in apps:
         for dep in x.dependencies:
             if dep["type"] == "app":
@@ -232,7 +212,7 @@ def verify_app_dependencies():
                         z = storage.apps.get("installed", z)
                         z.loadable = False
                         z.error = "Depends on %s, which cannot be loaded because %s is not installed" % (x.name,dep["name"])
-                elif not storage.apps.get("installed", dep["package"]).loadable:
+                elif not storage.apps.get("applications", dep["package"]).loadable:
                     x.loadable = False
                     x.error = "Depends on %s, which also failed" % dep["name"]
                     logger.debug("*** Verify failed for %s -- dependent on %s which failed to load" % (x.name,dep["name"]))
@@ -243,18 +223,17 @@ def verify_app_dependencies():
 
 def get_dependent(id, op):
     metoo = []
-    inst = storage.apps.get("installed") or get()
-    avail = storage.apps.get("available") or get_available()
+    apps = storage.apps.get("applications")
     if op == 'remove':
-        for i in inst:
+        for i in apps:
             for dep in i.dependencies:
                 if dep['type'] == 'app' and dep['package'] == id:
                     metoo.append(i)
                     metoo += get_dependent(i.id, 'remove')
     elif op == 'install':
-        i = next(x for x in avail if x["id"] == id)
-        for dep in i["dependencies"]:
-            if dep["type"] == 'app' and dep['package'] not in [x["pid"] for x in inst]:
+        i = next(x for x in apps if x.id == id)
+        for dep in i.dependencies:
+            if dep["type"] == 'app' and dep['package'] not in [x.id for x in apps if x.installed]:
                 metoo.append(dep['package'])
                 metoo += get_dependent(dep['package'], 'install')
     return metoo
@@ -290,7 +269,7 @@ def install(id, install_deps=True, load=True, message=DefaultMessage()):
             tracked_services.register(a.id, x["binary"], x["name"], a.icon, x["ports"])
 
 def _install(id, load=True):
-    data = api('https://%s/apps/%s' % (config.get("general", "repo_server"), id), crit=True)
+    data = api('https://%s/api/v1/apps/%s' % (config.get("general", "repo_server"), id), crit=True)
     if data['status'] == 200:
         with open(os.path.join(config.get("apps", "app_dir"), 'plugin.tar.gz'), 'wb') as f:
             f.write(base64.b64decode(data['info']))

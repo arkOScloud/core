@@ -9,7 +9,7 @@ from arkos.connections import ConnectionsManager
 
 class StorageControl:
     def __init__(self):
-        self.apps = Storage(["installed", "available", "updatable"])
+        self.apps = Storage(["applications"])
         self.sites = Storage(["sites"])
         self.certs = Storage(["certificates", "authorities"])
         self.dbs = Storage(["databases", "users", "managers"])
