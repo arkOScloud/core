@@ -637,6 +637,8 @@ def scan():
         stype = g.get('website', 'type')
         if stype != "ReverseProxy":
             cls = applications.get(stype)
+            if not cls.loadable or not cls.installed:
+                continue
             s = cls._website(id=g.get('website', 'id'))
             s.meta = cls
             s.backup = cls.get_module("backup") or backup.BackupController

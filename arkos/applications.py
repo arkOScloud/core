@@ -19,7 +19,7 @@ class App:
     def __init__(self, **entries):
         self.__dict__.update(entries)
         self.loadable = False
-        self.updatable = False
+        self.upgradable = ""
         self.installed = False
         self.error = ""
 
@@ -141,32 +141,35 @@ class App:
         for x in self.__dict__:
             if not x.startswith("_"):
                 data[x] = self.__dict__[x]
+        data["is_ready"] = True
         return data
 
 
-def get(id=None, type=None, loadable=None, verify=True):
+def get(id=None, type=None, loadable=None, installed=None, verify=True):
     data = storage.apps.get("applications")
     if not data:
         data = scan(verify)
-    if id or type or loadable:
+    if id or type or loadable or installed:
         tlist = []
         for x in data:
             if x.id == id and (x.loadable or not loadable):
                 return x
+            elif str(x.installed).lower() == str(installed).lower() and (x.type or not type):
+                tlist.append(x)
             elif x.type == type and (x.loadable or not loadable):
                 tlist.append(x)
         if tlist:
             return tlist
-        return None
+        return []
     return data
 
 def scan(verify=True):
     apps = []
     idata = [app for app in os.listdir(config.get("apps", "app_dir")) if not app.startswith(".")]
-    # TODO
-    #adata = api('https://%s/api/v1/apps' % config.get("general", "repo_server"), crit=False)
-    adata = []
-    if not adata:
+    adata = api('https://%s/api/v1/apps' % config.get("general", "repo_server"), crit=False)
+    if adata:
+        adata = adata["applications"]
+    else:
         adata = []
 
     for app in idata:
