@@ -195,6 +195,7 @@ def scan(verify=True):
             if a.id == y[1]["id"] and a.version != y[1]["version"]:
                 a.upgradable = y[1]["version"]
             if a.id == y[1]["id"]:
+                a.assets = y[1]["assets"]
                 adata[y[0]]["installed"] = True
         a.load()
         apps.append(a)
