@@ -107,18 +107,26 @@ class App:
         self.error = error
         return verify
     
+    def install(self, install_deps=True, load=True, message=DefaultMessage()):
+        deps = get_dependent(self.id, "install")
+        if install_deps and deps:
+            for x in deps:
+                message.update("info", "Installing dependencies for %s... (%s)" % (self.name, x))
+                _install(x, load=load)
+        message.update("info", "Installing %s..." % self.name)
+        _install(self.id, load=load)
+        for x in self.services:
+            if x["ports"]:
+                regen_fw = True
+                tracked_services.register(self.id, x["binary"], x["name"], self.icon, x["ports"])
+    
     def uninstall(self, force=False, message=DefaultMessage()):
-        if message:
-            message.update("info", "Uninstalling application...")
+        message.update("info", "Uninstalling application...")
         exclude = ['openssl', 'openssh', 'nginx', 'python2', 'git']
-        for app in storage.apps.get("installed"):
+        for app in storage.apps.get("applications"):
             for item in app.dependencies:
                 if item["type"] == "app" and item["package"] == self.id and not force:
-                    if message:
-                        message.complete("error", "Cannot remove, %s depends on this application" % item["package"])
-                        return
-                    else:
-                        raise Exception("Cannot remove, %s depends on this application" % item["package"])
+                    raise Exception("Cannot remove, %s depends on this application" % item["package"])
                 elif item["type"] == "system":
                     exclude.append(item["package"])
         for item in self.dependencies:
@@ -128,6 +136,7 @@ class App:
                     services.disable(item["daemon"])
                 pacman.remove([item["package"]], purge=config.get("apps", "purge", False))
         shutil.rmtree(os.path.join(config.get("apps", "app_dir"), self.id))
+        self.loadable = False
         self.installed = False
         regen_fw = False
         for x in self.services:
@@ -241,49 +250,20 @@ def get_dependent(id, op):
                 metoo += get_dependent(dep['package'], 'install')
     return metoo
 
-def install(id, install_deps=True, load=True, message=DefaultMessage()):
-    deps = get_dependent(id, "install")
-    if install_deps and deps:
-        if message:
-            message.update("info", "Installing dependencies for %s..." % id)
-        for x in deps:
-            try:
-                _install(x, load=load)
-            except Exception, e:
-                if message:
-                    message.complete("error", str(e))
-                    return
-                else:
-                    raise
-    if message:
-        message.update("info", "Installing %s..." % id)
-    try:
-        _install(id, load=load)
-    except Exception, e:
-        if message:
-            message.complete("error", str(e))
-            return
-        else:
-            raise
-    a = get(id)
-    for x in a.services:
-        if x["ports"]:
-            regen_fw = True
-            tracked_services.register(a.id, x["binary"], x["name"], a.icon, x["ports"])
-
 def _install(id, load=True):
-    data = api('https://%s/api/v1/apps/%s' % (config.get("general", "repo_server"), id), crit=True)
-    if data['status'] == 200:
-        with open(os.path.join(config.get("apps", "app_dir"), 'plugin.tar.gz'), 'wb') as f:
-            f.write(base64.b64decode(data['info']))
-    else:
-        raise Exception('Application retrieval failed - %s' % str(data['info']))
+    data = api('https://%s/api/v1/apps/%s' % (config.get("general", "repo_server"), id),
+        returns='raw', crit=True)
+    with open(os.path.join(config.get("apps", "app_dir"), 'plugin.tar.gz'), 'wb') as f:
+        f.write(data)
     with tarfile.open(os.path.join(config.get("apps", "app_dir"), 'plugin.tar.gz'), 'r:gz') as t:
         t.extractall(config.get("apps", "app_dir"))
     os.unlink(os.path.join(config.get("apps", "app_dir"), 'plugin.tar.gz'))
     with open(os.path.join(config.get("apps", "app_dir"), id, "manifest.json")) as f:
         data = json.loads(f.read())
-    app = App(**data)
+    app = get(id)
+    for x in data:
+        setattr(app, x, data[x])
+    app.upgradable = ""
+    app.installed = True
     if load:
         app.load()
-    storage.apps.add("installed", app)
