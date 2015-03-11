@@ -23,7 +23,7 @@ def get_timezone():
     return {"region": zone[0], "zone": zone[1] if len(zone) > 1 else None}
 
 def set_timezone(region, zone=None):
-    if zone:
+    if zone and not zone in ["GMT", "UTC"]:
         zonepath = os.path.join('/usr/share/zoneinfo', region, zone)
     else:
         zonepath = os.path.join('/usr/share/zoneinfo', region)
