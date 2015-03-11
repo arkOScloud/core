@@ -1,5 +1,13 @@
 import os
 
+from arkos.utilities import shell
+
+
+def shutdown():
+    shell('shutdown -P now')
+
+def reboot():
+    shell('reboot')
 
 def get_hostname():
     with open('/etc/hostname', 'r') as f:
