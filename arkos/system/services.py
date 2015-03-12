@@ -32,6 +32,7 @@ class Service:
 
     def start(self):
         if self.stype == 'supervisor':
+            supervisor_ping()
             try:
                 conns.Supervisor.startProcess(self.name)
             except:
@@ -56,6 +57,7 @@ class Service:
     
     def stop(self):
         if self.stype == 'supervisor':
+            supervisor_ping()
             conns.Supervisor.stopProcess(self.name)
             self.state = "stopped"
         else:
@@ -76,6 +78,7 @@ class Service:
     
     def restart(self, real=False):
         if self.stype == 'supervisor':
+            supervisor_ping()
             conns.Supervisor.stopProcess(self.name, wait=True)
             conns.Supervisor.startProcess(self.name)
         else:
@@ -101,6 +104,7 @@ class Service:
     
     def get_log(self):
         if self.stype == 'supervisor':
+            supervisor_ping()
             s = conns.Supervisor.tailProcessStdoutLog(self.name)
         else:
             s = shell("systemctl --no-ask-password status {}.service".format(self.name))["stdout"]
@@ -108,12 +112,10 @@ class Service:
 
     def enable(self):
         if self.stype == 'supervisor':
-            svd = get("supervisord")
+            supervisor_ping()
             if os.path.exists(os.path.join('/etc/supervisor.d', self.name+'.ini.disabled')):
                 os.rename(os.path.join('/etc/supervisor.d', self.name+'.ini.disabled'),
                     os.path.join('/etc/supervisor.d', self.name+'.ini'))
-            if not svd.state == "running":
-                svd.start()
             conns.Supervisor.restart()
         else:
             conns.SystemD.EnableUnitFiles([self.name+".service"], False, True)
@@ -132,6 +134,7 @@ class Service:
 
     def remove(self):
         if self.stype == 'supervisor':
+            supervisor_ping()
             if self.state == "running":
                 self.stop()
             try:
@@ -177,6 +180,7 @@ def get(id=None):
             return files[unit]
         svcs.append(files[unit])
 
+    supervisor_ping()
     if not os.path.exists('/etc/supervisor.d'):
         os.mkdir('/etc/supervisor.d')
     for x in os.listdir('/etc/supervisor.d'):
@@ -193,3 +197,10 @@ def get(id=None):
             return s
         svcs.append(s)
     return sorted(svcs, key=lambda s: s.name) if not id else None
+
+def supervisor_ping():
+    try:
+        conns.Supervisor.getState()
+    except:
+        s = get("supervisord")
+        s.restart()
