@@ -1,4 +1,5 @@
 import ctypes, ctypes.util
+import datetime
 import ntplib
 import time
 
@@ -39,6 +40,9 @@ def convert(intime, infmt, outfmt):
 
 def get_serial_time():
     return time.strftime('%Y%m%d%H%M%S')
+
+def get_iso_time():
+    return datetime.datetime.now().isoformat()
 
 def get_date():
     return time.strftime(config.get("general", "date_format", "%d %b %Y"))

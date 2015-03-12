@@ -196,7 +196,9 @@ class VirtualDisk:
                 self.enabled = False
                 break
     
-    def encrypt(self, passwd, cipher="aes-xts-plain64", keysize=256, mount=False):
+    def encrypt(self, passwd, cipher="", keysize=0, mount=False):
+        cipher = cipher or config.get("filesystems", "cipher") or "aes-xts-plain64"
+        keysize = keysize or config.get("filesystems", "keysize") or 256
         os.rename(self.path, os.path.join(config.get("filesystems", "vdisk_dir"), self.id+'.crypt'))
         self.path = os.path.join(config.get("filesystems", "vdisk_dir"), self.id+'.crypt')
         dev = losetup.find_unused_loop_device()
