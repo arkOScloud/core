@@ -164,7 +164,7 @@ def get(id=None):
     for unit in conns.SystemD.ListUnitFiles():
         if not unit[0].endswith(".service"):
             continue
-        sname = unit[0].split('/usr/lib/systemd/system/')[1].split(".service")[0]
+        sname = os.path.splitext(os.path.split(unit[0])[-1])[0]
         files[sname] = Service(name=sname, stype="system", state="stopped", enabled=unit[1]=="enabled")
 
     for unit in conns.SystemD.ListUnits():
