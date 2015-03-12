@@ -203,7 +203,7 @@ class VirtualDisk:
         self.path = os.path.join(config.get("filesystems", "vdisk_dir"), self.id+'.crypt')
         dev = losetup.find_unused_loop_device()
         dev.mount(str(self.path), offset=1048576)
-        s = crypto.luks_format(dev.device, passwd, cipher, keysize)
+        s = crypto.luks_format(dev.device, passwd, cipher, int(keysize))
         if s != 0:
             dev.unmount()
             os.rename(self.path, os.path.join(config.get("filesystems", "vdisk_dir"), self.id+'.img'))

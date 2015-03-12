@@ -5,8 +5,8 @@
         "task_workers": 1,
         "firewall": true,
         "ntp_server": "ntp.arkos.io",
-        "date_format": "%d %b %Y",
-        "time_format": "%H:%M"
+        "date_format": "DD MMM YYYY",
+        "time_format": "HH:mm:ss"
     },
     "apps": {
         "app_dir": "/var/lib/arkos/applications",
@@ -23,13 +23,16 @@
         "site_dir": "/srv/http/webapps"
     },
     "filesystems": {
-        "vdisk_dir": "/vdisk"
+        "vdisk_dir": "/vdisk",
+        "cipher": "aes-xts-plain64",
+        "keysize": 256
     },
     "updates": {
         "check_updates": true,
         "current_update": 0
     },
     "genesis": {
+        "host": "0.0.0.0",
         "port": 8000,
         "ssl": false,
         "cert_file": "",
