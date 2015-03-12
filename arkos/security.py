@@ -64,6 +64,7 @@ def regen_fw(data, range=[]):
     t = iptc.Target(r, 'RETURN')
     r.target = t
     c.append_rule(r)
+    save_fw()
 
 def add_fw(protocol, port, ranges=[]):
     # Add rule for this port
@@ -150,14 +151,14 @@ def disable_jail_def(jailname):
 def enable_all_def(obj):
     cfg = get_jail_config()
     for jail in obj['f2b']:
-        cfg.set(jail['name'], 'enabled', 'true')
+        cfg.set(jail['id'], 'enabled', 'true')
     with open(jailconf, 'w') as f:
         cfg.write(f)
 
 def disable_all_def(obj):
     cfg = get_jail_config()
     for jail in obj['f2b']:
-        cfg.set(jail['name'], 'enabled', 'false')
+        cfg.set(jail['id'], 'enabled', 'false')
     with open(jailconf, 'w') as f:
         cfg.write(f)
 
@@ -202,26 +203,26 @@ def get_defense_rules():
     remove = []
     cfg = get_jail_config()
     fcfg = ConfigParser.SafeConfigParser()
-    for c in storage.apps.get("installed"):
+    for c in storage.apps.get("applications"):
         if hasattr(c, 'f2b') and hasattr(c, 'f2b_name'):
-            lst.append({'name': c.f2b_name,
+            lst.append({'id': c.f2b_name,
                 'icon': c.f2b_icon,
                 'f2b': c.f2b})
         elif hasattr(c, 'f2b'):
-            lst.append({'name': c.name,
+            lst.append({'id': c.id,
                 'icon': c.icon,
                 'f2b': c.f2b})
     for p in lst:
         for l in p['f2b']:
             if not 'custom' in l:
                 try:
-                    jail_opts = cfg.items(l['name'])
+                    jail_opts = cfg.items(l['id'])
                 except ConfigParser.NoSectionError:
                     remove.append(p)
                     continue
-                filter_name = cfg.get(l['name'], 'filter')
+                filter_name = cfg.get(l['id'], 'filter')
                 if "%(__name__)s" in filter_name:
-                    filter_name = filter_name.replace("%(__name__)s", l['name'])
+                    filter_name = filter_name.replace("%(__name__)s", l['id'])
                 c = fcfg.read([filters+'/common.conf', 
                     filters+'/'+filter_name+'.conf'])
                 filter_opts = fcfg.items('Definition')
@@ -236,15 +237,15 @@ def get_defense_rules():
                         fcfg.set('Definition', o[0], o[1])
                     with open(filters+'/'+l['filter_name']+'.conf', 'w') as f:
                         fcfg.write(f)
-                if not l['name'] in cfg.sections():
-                    cfg.add_section(l['name'])
+                if not l['id'] in cfg.sections():
+                    cfg.add_section(l['id'])
                     for o in l['jail_opts']:
-                        cfg.set(l['name'], o[0], o[1])
+                        cfg.set(l['id'], o[0], o[1])
                     with open(jailconf, 'w') as f:
                         cfg.write(f)
                 else:
-                    jail_opts = cfg.items(l['name'])
-                    filter_name = cfg.get(l['name'], 'filter')
+                    jail_opts = cfg.items(l['id'])
+                    filter_name = cfg.get(l['id'], 'filter')
                     fcfg.read([filters+'/common.conf', 
                         filters+'/'+filter_name+'.conf'])
                     filter_opts = fcfg.items('Definition')

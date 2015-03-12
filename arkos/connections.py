@@ -5,6 +5,7 @@ import os
 import sys
 import xmlrpclib
 
+from utilities import shell
 from dbus import SystemBus, Interface
 
 
@@ -50,5 +51,10 @@ def ldap_connect(uri="", rootdn="", dn="cn=admin", config=None, passwd=""):
     return c
 
 def supervisor_connect():
-    s = xmlrpclib.Server("http://localhost:9001/RPC2")
+    try:
+        s = xmlrpclib.Server("http://localhost:9001/RPC2")
+        s.system.listMethods()
+    except:
+        shell('systemctl restart supervisord')
+        s = xmlrpclib.Server("http://localhost:9001/RPC2")
     return s.supervisor

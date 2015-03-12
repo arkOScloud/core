@@ -21,16 +21,17 @@ class SecurityPolicy:
         with open(policy_path, "r") as f:
             policies = json.loads(f.read())
         if policies.has_key(self.type):
-            policies[self.type][self.id] = policy
+            policies[self.type][self.id] = self.policy
         else:
             policies[self.type] = {}
-            policies[self.type][self.id] = policy
+            policies[self.type][self.id] = self.policy
         with open(policy_path, "w") as f:
             f.write(json.dumps(policies, sort_keys=True, 
                 indent=4, separators=(',', ': ')))
         if config.get("general", "firewall", True) and fw:
             security.regen_fw(get())
-        storage.policies.add("policies", self)
+        if not storage.policies.get("policies", self.id):
+            storage.policies.add("policies", self)
 
     def remove(self, fw=True):
         with open(policy_path, "r") as f:
@@ -53,16 +54,19 @@ class SecurityPolicy:
             "name": self.name,
             "icon": self.icon,
             "ports": self.ports,
-            "policy": self.policy
+            "policy": self.policy,
+            "is_ready": True
         }
 
 
-def get(type=None):
+def get(id=None, type=None):
     data = storage.policies.get("policies")
-    if type:
+    if id or type:
         tlist = []
         for x in data:
-            if x == type:
+            if x.id == id:
+                return x
+            elif x.type == type:
                 tlist.append(data[x])
         if tlist:
             return tlist
@@ -77,7 +81,7 @@ def register(type, id, name, icon, ports, policy=0, fw=True):
             policy = policies[type][id]
         else:
             policy = 2
-    pget = get(type)
+    pget = get(type=type)
     if pget:
         for x in pget:
             if x.id == id:
@@ -86,7 +90,7 @@ def register(type, id, name, icon, ports, policy=0, fw=True):
     svc.save(fw)
 
 def deregister(type, id="", fw=True):
-    for x in get(type):
+    for x in get(type=type):
         if not id:
             x.remove(fw=False)
         elif x.id == id:
