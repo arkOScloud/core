@@ -29,7 +29,7 @@ class Connection:
                 f.write('Security=\'' + self.config["security"] + '\'\n')
             if self.config.get("essid") and self.config.get("connection") == 'wireless':
                 f.write('ESSID=\"' + self.config["essid"] + '\"\n')
-            if self.config.get("ip"):
+            if self.config.get("addressing"):
                 f.write('IP=\'' + self.config["addressing"] + '\'\n')
             if self.config.get("address") and self.config.get("addressing") == 'static':
                 f.write('Address=(\'' + self.config["address"] + '\')\n')
@@ -39,7 +39,12 @@ class Connection:
                 f.write('Key=\"' + self.config["key"] + '\"\n')
 
     def update(self):
+        connected = self.connected
+        if connected:
+            self.disconnect()
         self.add()
+        if connected:
+            self.connect()
     
     def remove(self):
         if os.path.exists(os.path.join("/etc/netctl", self.id)):
@@ -82,23 +87,11 @@ class Connection:
             raise Exception("Network disable failed")
     
     def as_dict(self):
-        if self.connected:
-            try:
-                iface = get_interfaces(self.config["interface"])
-                ips = []
-                for x in iface.ip:
-                    if '127.0.0.1' in x["addr"] or '0.0.0.0' in x["addr"]:
-                        continue
-                    ips.append(x["addr"]+'/'+str(netmask_to_cidr(x["netmask"])))
-                addrs = ", ".join(ips)
-            except:
-                addrs = ""
         return {
             "id": self.id,
             "connected": self.connected,
             "enabled": self.enabled,
             "config": self.config,
-            "address": addrs,
             "is_ready": True
         }
 
@@ -123,6 +116,16 @@ class Interface:
     
     def disable(self):
         shell('systemctl disable netctl-auto@%s.service' % self.id)
+    
+    def as_dict(self):
+        return {
+            "id": self.id,
+            "type": self.itype,
+            "up": self.up,
+            "ip": self.ip,
+            "rx": self.rx,
+            "tx": self.tx
+        }
 
 
 def get_connections(id=None, iface=None):
