@@ -1,6 +1,7 @@
 import ctypes, ctypes.util
 import datetime
 import ntplib
+import os
 import time
 
 from arkos import config
@@ -21,28 +22,9 @@ def verify_time(update=True):
         set_datetime()
     return os
 
-def get_datetime(display=''):
-    return time.strftime(display) if display else time.localtime()
-
-def get_idatetime():
+def get_offset():
     resp = ntp.request(config.get("general", "ntp_server"), version=3)
-    return resp.tx_time
-
-def set_datetime(dt=0):
-    dt = int(dt) if dt else int(get_idatetime())
-    librt = ctypes.CDLL(ctypes.util.find_library("rt"))
-    ts = timespec()
-    ts.tv_sec, ts.tv_nsec = dt, dt * 1000000
-    librt.clock_settime(0, ctypes.byref(ts))
-
-def convert(intime, infmt, outfmt):
-    return time.strftime(outfmt, time.strptime(intime, infmt))
-
-def get_serial_time():
-    return time.strftime('%Y%m%d%H%M%S')
-
-def get_iso_time():
-    return datetime.datetime.now().isoformat()
+    return resp.offset
 
 def get_date():
     return time.strftime(config.get("general", "date_format", "%d %b %Y"))
@@ -50,6 +32,29 @@ def get_date():
 def get_time():
     return time.strftime(config.get("general", "time_format", "%H:%M"))
 
-def get_offset():
+def get_datetime():
+    return get_date() + " " + get_time()
+
+def set_datetime(ut=0):
+    ut = int(ut) if ut else int(get_idatetime())
+    librt = ctypes.CDLL(ctypes.util.find_library("rt"), use_errno=True)
+    ts = timespec()
+    ts.tv_sec, ts.tv_nsec = ut, 0
+    res = librt.clock_settime(0, ctypes.byref(ts))
+    if res == -1:
+        raise Exception("Could not set time: %s" % os.strerror(ctypes.get_errno()))
+
+def get_idatetime():
     resp = ntp.request(config.get("general", "ntp_server"), version=3)
-    return resp.offset
+    return resp.tx_time
+
+def get_serial_time():
+    return time.strftime('%Y%m%d%H%M%S')
+
+def get_iso_time(ts=None, fmt='%Y%m%d%H%M%S'):
+    tz = time.strftime('%z')
+    tz = tz[:3]+":"+tz[3:]
+    if ts:
+        return datetime.datetime.strptime(ts, fmt).isoformat()+tz
+    else:
+        return datetime.datetime.now().isoformat()+tz

@@ -67,7 +67,7 @@ def get(id=None, type=None):
             if x.id == id:
                 return x
             elif x.type == type:
-                tlist.append(data[x])
+                tlist.append(x)
         if tlist:
             return tlist
         return []

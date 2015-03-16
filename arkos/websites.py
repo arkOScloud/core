@@ -93,15 +93,11 @@ class Site:
             if message:
                 message.update("info", "Creating database...")
             try:
-                managers = databases.get_managers()
-                for x in managers:
-                    if x.name == self.meta.selected_dbengine:
-                        manager = x
-                        break
-                else:
+                mgr = databases.get_managers(self.meta.selected_dbengine)
+                if not mgr:
                     raise Exception("No manager found for %s" % self.meta.selected_dbengine)
-                self.db = manager.add_db(self.id)
-                if manager.meta.database_multiuser:
+                self.db = mgr.add_db(self.id)
+                if mgr.meta.database_multiuser:
                     dbpasswd = random_string()[0:16]
                     u = manager.add_user(self.id, dbpasswd)
                     u.chperm("grant", self.db)
@@ -218,7 +214,7 @@ class Site:
         tracked_services.register(self.meta.id if self.meta else "website", 
             self.id, self.id, "gen-earth", [("tcp", self.port)], 2)
         self.backup = self.meta.get_module("backup") or backup.BackupController
-        self.backup = self.backup(self.id, self)
+        self.backup = self.backup(self.id, self.meta.icon, site=self)
         self.installed = True
         storage.sites.add("sites", self)
         if enable:
@@ -355,7 +351,7 @@ class Site:
             self.id, self.id, self.meta.icon if self.meta else "fa fa-globe", 
             [("tcp", self.port)], 2)
         self.backup = self.meta.get_module("backup") or backup.BackupController
-        self.backup = self.backup(self.id, self)
+        self.backup = self.backup(self.id, self.meta.icon, site=self)
         nginx_reload()
 
     def update(self, message=DefaultMessage()):
@@ -642,7 +638,7 @@ def scan():
             s = cls._website(id=g.get('website', 'id'))
             s.meta = cls
             s.backup = cls.get_module("backup") or backup.BackupController
-            s.backup = s.backup(s.id, s)
+            s.backup = s.backup(s.id, cls.icon, site=s)
             if g.has_option("website", "data_path"):
                 s.data_path = g.get("website", "data_path", "")
             else:

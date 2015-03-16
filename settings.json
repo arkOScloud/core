@@ -31,6 +31,10 @@
         "check_updates": true,
         "current_update": 0
     },
+    "backups": {
+        "driver": "filesystem",
+        "location": "/var/lib/arkos/backups"
+    },
     "genesis": {
         "host": "0.0.0.0",
         "port": 8000,
