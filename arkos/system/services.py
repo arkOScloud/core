@@ -190,6 +190,10 @@ def get(id=None):
         for y in c.items(c.sections()[0]):
             cfg[y[0]] = y[1]
         name = x.split(".ini")[0]
+        try:
+            conns.Supervisor.getProcessInfo(name)
+        except:
+            continue
         s = Service(name=name, stype="supervisor",
             state=conns.Supervisor.getProcessInfo(name)["statename"].lower() if not x.endswith("disabled") else "stopped",
             enabled=not x.endswith("disabled"), cfg=cfg)

@@ -210,7 +210,7 @@ def restore(backup, data=True):
                 break
         else:
             app = applications.get(backup["site_type"])
-            controller = app._backup()
+            controller = app._backup(backup["pid"], backup["icon"], True)
     else:
         app = applications.get(backup["pid"])
         controller = app._backup()
