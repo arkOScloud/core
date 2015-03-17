@@ -99,7 +99,7 @@ class Site:
                 self.db = mgr.add_db(self.id)
                 if mgr.meta.database_multiuser:
                     dbpasswd = random_string()[0:16]
-                    u = manager.add_user(self.id, dbpasswd)
+                    u = mgr.add_user(self.id, dbpasswd)
                     u.chperm("grant", self.db)
             except Exception, e:
                 raise Exception('Database could not be created - %s' % str(e))

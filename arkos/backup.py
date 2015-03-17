@@ -68,7 +68,7 @@ class BackupController:
         if not version and self.ctype == "site":
             version = self.site.meta.version
         info = {"pid": self.id, "type": self.ctype, "icon": self.icon, 
-            "version": version, "time": isotime}
+            "version": version, "time": isotime, "site_type": self.site.meta.id}
         with open(os.path.join(backup_dir, '%s-%s.meta' % (self.id,timestamp)), 'w') as f:
             f.write(json.dumps(info))
 
@@ -111,10 +111,10 @@ class BackupController:
                 os.unlink("/%s.sql"%sitename)
                 if dbmgr.meta.database_multiuser:
                     dbpasswd = random_string()[0:16]
-                    if databases.get_users(sitename):
-                        databases.get_users(sitename).remove()
+                    if databases.get_user(sitename):
+                        databases.get_user(sitename).remove()
                     u = dbmgr.add_user(sitename, dbpasswd)
-                    u.chperm("allow", db)
+                    u.chperm("grant", db)
         
         if self.ctype == "site":
             self.post_restore(self.site, dbpasswd)
