@@ -1,6 +1,9 @@
+import bz2
 import base64
 import crypt
 import git
+import glob
+import gzip
 import hashlib
 import json
 import os
@@ -8,7 +11,10 @@ import random
 import shlex
 import string
 import subprocess
+import tarfile
+import tempfile
 import urllib2
+import zipfile
 
 from passlib.hash import sha512_crypt
 
@@ -128,3 +134,72 @@ def str_fsize(sz):
         return '%.1f Mb' % sz
     sz /= 1024.0
     return '%.1f Gb' % sz
+
+def str_fperms(mode):
+    return ('r' if mode & 256 else '-') + \
+       ('w' if mode & 128 else '-') + \
+       ('x' if mode & 64 else '-') + \
+       ('r' if mode & 32 else '-') + \
+       ('w' if mode & 16 else '-') + \
+       ('x' if mode & 8 else '-') + \
+       ('r' if mode & 4 else '-') + \
+       ('w' if mode & 2 else '-') + \
+       ('x' if mode & 1 else '-')
+
+def path_to_b64(path):
+    path = path.replace('//','/')
+    return base64.b64encode(path, altchars='+-').replace('=', '*')
+
+def b64_to_path(b64):
+    return base64.b64decode(str(b64).replace('*', '='), altchars='+-')
+
+def compress(pin, pout='', format='tgz'):
+    if format == 'tgz':
+        pout = tempfile.mkstemp('.tar.gz')[1] if not pout else pout
+        a = tarfile.open(pout, 'w:gz')
+        if os.path.isdir(pin):
+            for r, d, f in os.walk(pin):
+                for x in f:
+                    a.add(os.path.join(r, x), os.path.join(r, x).split(os.path.split(pin)[0]+"/")[1])
+        else:
+            a.add(x)
+        a.close()
+    elif format == 'zip':
+        pout = tempfile.mkstemp('.zip')[1] if not pout else pout
+        a = zipfile.ZipFile(pout, 'w')
+        if os.path.isdir(pin):
+            for r, d, f in os.walk(pin):
+                for x in f:
+                    a.write(os.path.join(r, x), os.path.join(r, x).split(os.path.split(pin)[0]+"/")[1])
+        else:
+            a.write(x)
+        a.close()
+    return pout
+
+def extract(pin, pout, delete=False):
+    name = os.path.basename(pin)
+    if name.endswith(('.tar.gz', '.tgz')):
+        with tarfile.open(pin, 'r:gz') as t:
+            t.extractall(pout)
+    elif name.endswith('.gz'):
+        f = gzip.open(pin, 'rb')
+        i = f.read()
+        f.close()
+        with open(os.path.join(pout, name.split('.gz')[0]), 'wb') as f:
+            f.write(i)
+    elif name.endswith(('.tar.bz2', '.tbz2')):
+        with tarfile.open(pin, 'r:bz2') as t:
+            t.extractall(f[0])
+    elif name.endswith('.bz2'):
+        f = bz2.BZ2File(pin, 'r')
+        i = f.read()
+        f.close()
+        with open(os.path.join(pout, name.split('.bz2')[0]), 'wb') as f:
+            f.write(i)
+    elif name.endswith('.zip'):
+        with zipfile.ZipFile(pin, 'r') as z:
+            z.extractall(pout)
+    else:
+        raise Exception('Not an archive, or unknown archive type')
+    if delete:
+        os.unlink(pin)
