@@ -8,7 +8,7 @@ import shutil
 import crypto
 import losetup
 
-from arkos import config, storage
+from arkos import config
 from arkos.utilities import shell
 
 libc = ctypes.CDLL(ctypes.util.find_library("libc"), use_errno=True)
@@ -49,7 +49,6 @@ class DiskPartition:
             if s == -1:
                 raise Exception('Failed to mount %s: %s'%(self.id, os.strerror(ctypes.get_errno())))
         self.mountpoint = mount_point
-        register_point(self.id, self.mountpoint, "crypt" if self.crypt else "disk")
     
     def umount(self):
         if not self.mountpoint:
@@ -59,7 +58,6 @@ class DiskPartition:
             raise Exception('Failed to unmount %s: %s'%(self.id, os.strerror(ctypes.get_errno())))
         if self.crypt:
             crypto.luks_close(self.id)
-        deregister_point(self.id)
         self.mountpoint = None
     
     def enable(self):
@@ -156,7 +154,6 @@ class VirtualDisk:
                 dev.unmount()
                 raise Exception('Failed to mount %s: %s' % (self.id, os.strerror(ctypes.get_errno())))
         self.mountpoint = mount_point
-        register_point(self.id, self.mountpoint, "crypt" if self.crypt else "vdisk")
     
     def umount(self):
         if not self.mountpoint:
@@ -173,7 +170,6 @@ class VirtualDisk:
             crypto.luks_close(self.id)
         if dev:
             dev.unmount()
-        deregister_point(self.id)
         self.mountpoint = None
     
     def enable(self):
@@ -246,13 +242,6 @@ class PointOfInterest:
         self.stype = stype
         self.icon = icon
     
-    def add(self):
-        deregister_point(path=self.path)
-        storage.points.add("points", self)
-    
-    def remove(self):
-        storage.points.remove("points", self)
-    
     def as_dict(self):
         return {
             "id": self.id,
@@ -283,8 +272,6 @@ def get(id=None):
                 mountpoint=mps.get(p.path) or None, size=int(p.getSize("B")),
                 fstype=parted.probeFileSystem(p.geometry), enabled=p.path in fstab,
                 crypt=crypto.is_luks(p.path)==0)
-            if dev.mountpoint and not get_points(path=dev.mountpoint):
-                register_point(dev.id, dev.mountpoint, "crypt" if dev.crypt else "disk")
             if id == dev.id:
                 return dev
             devs.append(dev)
@@ -304,15 +291,22 @@ def get(id=None):
         dev = VirtualDisk(id=dname, path=x, size=os.path.getsize(x),
             mountpoint=mps.get(x) or mps.get("/dev/mapper/%s" % dname) or None, 
             enabled=x in fstab, crypt=x.endswith(".crypt"))
-        if dev.mountpoint and not get_points(path=dev.mountpoint):
-            register_point(dev.id, dev.mountpoint, "crypt" if dev.crypt else "disk")
         if id == dev.id:
             return dev
         devs.append(dev)
     return devs if not id else None
 
 def get_points(id=None, path=None):
-    points = storage.points.get("points")
+    points = []
+    from arkos import websites
+    for x in get():
+        if x.mountpoint and not x.mountpoint in ["/", "/boot"]:
+            p = PointOfInterest(x.id, x.mountpoint, "crypt" if x.crypt else "disk", "fa-hdd-o")
+            points.append(p)
+    for x in websites.get():
+        if x.meta:
+            p = PointOfInterest(x.id, x.data_path or x.path, "site", x.meta.icon)
+            points.append(p)
     if id:
         for x in points:
             if x.id == id:
@@ -324,14 +318,6 @@ def get_points(id=None, path=None):
                 return x
         return None
     return points
-
-def register_point(id, path, stype, icon="gen-storage"):
-    p = PointOfInterest(id, path, stype, icon)
-    p.add()
-
-def deregister_point(id=None, path=None):
-    p = get_points(id=id, path=path)
-    if (id or path) and p: p.remove()
 
 
 class FstabEntry:

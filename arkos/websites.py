@@ -7,7 +7,7 @@ import shutil
 
 from arkos import config, storage, applications, certificates
 from arkos import databases, tracked_services
-from arkos.system import users, groups, filesystems
+from arkos.system import users, groups
 from arkos.utilities import download, shell, random_string, DefaultMessage
 from arkos.utilities.errors import SoftFail
 
@@ -210,7 +210,6 @@ class Site:
 
         if message:
             message.update("info", "Finishing...")
-        filesystems.register_point(self.id, self.data_path, "site", self.meta.icon)
         tracked_services.register(self.meta.id if self.meta else "website", 
             self.id, self.id, "gen-earth", [("tcp", self.port)], 2)
         self.backup = self.meta.get_module("backup") or backup.BackupController
@@ -643,9 +642,6 @@ def scan():
                 s.data_path = g.get("website", "data_path", "")
             else:
                 s.data_path = ""
-            if s.data_path:
-                filesystems.register_point(g.get('website', 'id'), s.data_path, 
-                    "site", cls.icon if cls else "gen-earth")
         else:
             s = ReverseProxy(id=g.get('website', 'id'))
             s.name = g.get("website", "name")
