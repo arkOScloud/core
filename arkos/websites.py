@@ -457,6 +457,7 @@ class ReverseProxy:
         self.base_path = base_path
         self.block = block
         self.type = type
+        self.cert = None
         self.backup = None
         self.installed = False
 
@@ -465,34 +466,32 @@ class ReverseProxy:
         self.path = self.path or os.path.join(site_dir, self.id)
         self.ssl = None
         if extra_vars:
-			if not extra_vars.get('rp-type') or not vars.get('rp-pass'):
+			if not extra_vars.get('type') or not extra_vars.get('pass'):
 				raise Exception('Must enter ReverseProxy type and location to pass to')
-			elif extra_vars.get('rp-type') in ['fastcgi', 'uwsgi']:
-				self.block = [nginx.Location(vars.get('rp-lregex', '/'), 
-					nginx.Key('%s_pass'%vars.get('rp-type'), 
-						'%s'%vars.get('rp-pass')),
-					nginx.Key('include', '%s_params'%vars.get('rp-type'))
+			elif extra_vars.get('type') in ['fastcgi', 'uwsgi']:
+				self.block = [nginx.Location(extra_vars.get('lregex', '/'), 
+					nginx.Key('%s_pass'%extra_vars.get('type'), 
+						'%s'%extra_vars.get('pass')),
+					nginx.Key('include', '%s_params'%extra_vars.get('type'))
 					)]
 			else:
-				self.block = [nginx.Location(extra_vars.get('rp-lregex', '/'), 
-					nginx.Key('proxy_pass', '%s'%extra_vars.get('rp-pass')),
+				self.block = [nginx.Location(extra_vars.get('lregex', '/'), 
+					nginx.Key('proxy_pass', '%s'%extra_vars.get('pass')),
 					nginx.Key('proxy_redirect', 'off'),
 					nginx.Key('proxy_buffering', 'off'),
 					nginx.Key('proxy_set_header', 'Host $host')
 					)]
-			if vars.getvalue('rp-xrip', '') == '1':
+			if extra_vars.get('xrip'):
 				self.block[0].add(nginx.Key('proxy_set_header', 'X-Real-IP $remote_addr'))
-			if vars.getvalue('rp-xff', '') == '1':
+			if extra_vars.get('xff') == '1':
 				self.block[0].add(nginx.Key('proxy_set_header', 'X-Forwarded-For $proxy_add_x_forwarded_for'))
         c = nginx.Conf()
         s = nginx.Server(
             nginx.Key('listen', self.port),
             nginx.Key('server_name', self.addr),
             nginx.Key('root', self.base_path or self.path),
-            nginx.Key('index', 'index.'+('php' if self.php else 'html'))
         )
-        if add:
-            s.add(*[x for x in add])
+        s.add(*[x for x in self.block])
         c.add(s)
         nginx.dumpf(c, os.path.join('/etc/nginx/sites-available', self.id))
         c = ConfigParser.SafeConfigParser()
@@ -501,13 +500,22 @@ class ReverseProxy:
         c.set('website', 'name', self.name)
         c.set('website', 'type', "ReverseProxy")
         c.set('website', 'extra', self.type)
+        c.set('website', 'version', 'None')
         c.set('website', 'ssl', self.ssl or 'None')
+        try:
+            os.makedirs(self.path)
+        except:
+            pass
         with open(os.path.join(self.path, ".arkos"), 'w') as f:
             c.write(f)
         tracked_services.register("website", self.id, self.name, 
             "gen-earth", [("tcp", self.port)], 2)
         self.installed = True
         storage.sites.add("sites", self)
+        try:
+            self.nginx_enable()
+        except SoftFail:
+            pass
 
     def remove(self, message=None):
         shutil.rmtree(self.path)
@@ -593,10 +601,15 @@ class ReverseProxy:
             "id": self.id,
             "name": self.name,
             "path": self.path,
-            "type": self.type,
             "addr": self.addr,
             "port": self.port,
+            "site_name": "Reverse Proxy",
+            "site_type": self.type,
+            "site_icon": "fa fa-globe",
+            "version": None,
             "certificate": self.cert.id if self.cert else None,
+            "database": None,
+            "php": False,
             "enabled": self.enabled,
             "is_ready": True
         }

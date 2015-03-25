@@ -49,6 +49,13 @@ class App:
                     for y in classes:
                         if issubclass(y[1], mgr) and y[1] != mgr:
                             setattr(self, "_backup", y[1])
+                elif x == "kraken":
+                    try:
+                        from kraken.application import app
+                        setattr(submod, self.id, self._backend)
+                        app.register_blueprint(submod.backend)
+                    except ImportError:
+                        pass
                 else:
                     setattr(self, "_%s"%x, submod)
             if verify:
@@ -73,7 +80,7 @@ class App:
                 if to_pacman:
                     try:
                         logger.debug(" *** Installing %s..." % to_pacman)
-                        pacman.query()
+                        pacman.refresh()
                         pacman.install([to_pacman])
                     except:
                         error = "Couldn't install %s" % to_pacman
@@ -123,8 +130,8 @@ class App:
     def uninstall(self, force=False, message=DefaultMessage()):
         message.update("info", "Uninstalling application...")
         exclude = ['openssl', 'openssh', 'nginx', 'python2', 'git']
-        for app in storage.apps.get("applications"):
-            for item in app.dependencies:
+        for x in storage.apps.get("applications"):
+            for item in x.dependencies:
                 if item["type"] == "app" and item["package"] == self.id and not force:
                     raise Exception("Cannot remove, %s depends on this application" % item["package"])
                 elif item["type"] == "system":
@@ -174,19 +181,19 @@ def get(id=None, type=None, loadable=None, installed=None, verify=True):
 
 def scan(verify=True):
     apps = []
-    idata = [app for app in os.listdir(config.get("apps", "app_dir")) if not app.startswith(".")]
+    idata = [x for x in os.listdir(config.get("apps", "app_dir")) if not x.startswith(".")]
     adata = api('https://%s/api/v1/apps' % config.get("general", "repo_server"), crit=False)
     if adata:
         adata = adata["applications"]
     else:
         adata = []
 
-    for app in idata:
+    for x in idata:
         try:
-            with open(os.path.join(config.get("apps", "app_dir"), app, "manifest.json"), "r") as f:
+            with open(os.path.join(config.get("apps", "app_dir"), x, "manifest.json"), "r") as f:
                 data = json.loads(f.read())
         except ValueError:
-            logger.warn("Failed to load %s due to a JSON parsing error" % app)
+            logger.warn("Failed to load %s due to a JSON parsing error" % x)
             continue
         logger.debug(" *** Loading %s" % data["id"])
         a = App(**data)
@@ -202,9 +209,9 @@ def scan(verify=True):
     
     for x in adata:
         if not x.get("installed"):
-            app = App(**x)
-            app.installed = False
-            apps.append(app)
+            a = App(**x)
+            a.installed = False
+            apps.append(a)
 
     storage.apps.set("applications", apps)
     
@@ -222,7 +229,7 @@ def verify_app_dependencies():
                     x.error = "Depends on %s, which is not installed" % dep["name"]
                     logger.debug("*** Verify failed for %s -- dependent on %s which is not installed" % (x.name,dep["name"]))
                     for z in get_dependent(x.id, "remove"):
-                        z = storage.apps.get("installed", z)
+                        z = storage.apps.get("applications", z)
                         z.loadable = False
                         z.error = "Depends on %s, which cannot be loaded because %s is not installed" % (x.name,dep["name"])
                 elif not storage.apps.get("applications", dep["package"]).loadable:
@@ -230,7 +237,7 @@ def verify_app_dependencies():
                     x.error = "Depends on %s, which also failed" % dep["name"]
                     logger.debug("*** Verify failed for %s -- dependent on %s which failed to load" % (x.name,dep["name"]))
                     for z in get_dependent(x.id, "remove"):
-                        z = storage.apps.get("installed", z)
+                        z = storage.apps.get("applications", z)
                         z.loadable = False
                         z.error = "Depends on %s, which cannot be loaded because %s failed to load" % (x.name,dep["name"])
 
@@ -261,10 +268,10 @@ def _install(id, load=True):
     os.unlink(os.path.join(config.get("apps", "app_dir"), 'plugin.tar.gz'))
     with open(os.path.join(config.get("apps", "app_dir"), id, "manifest.json")) as f:
         data = json.loads(f.read())
-    app = get(id)
+    a = get(id)
     for x in data:
-        setattr(app, x, data[x])
-    app.upgradable = ""
-    app.installed = True
+        setattr(a, x, data[x])
+    a.upgradable = ""
+    a.installed = True
     if load:
-        app.load()
+        a.load()
