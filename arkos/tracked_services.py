@@ -5,7 +5,12 @@ import sys
 
 from arkos import config, storage, security
 
-COMMON_PORTS = [3000, 3306, 5222, 5223, 5232, 8000, 8080, 8765]
+COMMON_PORTS = [3000, 3306, 5222, 5223, 5232, 8000, 8080]
+
+if os.path.exists(os.path.join(sys.path[0], "policies.json")):
+    policy_path = os.path.join(sys.path[0], "policies.json")
+elif os.path.exists("/etc/arkos/policies.json"):
+    policy_path = "/etc/arkos/policies.json"
 
 
 class SecurityPolicy:
@@ -125,19 +130,15 @@ def get_open_port(ignore_common=False):
     r = random.randint(1025, 65534)
     return r if not r in ports else get_open_port()
 
-
-if os.path.exists(os.path.join(sys.path[0], "policies.json")):
-    policy_path = os.path.join(sys.path[0], "policies.json")
-elif os.path.exists("/etc/arkos/policies.json"):
-    policy_path = "/etc/arkos/policies.json"
-with open(policy_path, "r") as f:
-    policies = json.loads(f.read())
-policy = policies["arkos"]["arkos"] if policies.has_key("arkos") \
-    and policies["arkos"].has_key("arkos") else 2
-storage.policies.add("policies", SecurityPolicy("arkos", "arkos", 
-    "System Management (Genesis/APIs)", "gen-arkos-round", 
-    [("tcp", int(config.get("genesis", "port"))), ("tcp", 8765)], policy))
-if policies.has_key("custom"):
-    for x in policies["custom"]:
-        storage.policies.add("policies", SecurityPolicy("custom", x["id"], 
-            x["name"], x["icon"], x["ports"], x["policy"]))
+def initialize():
+    with open(policy_path, "r") as f:
+        policies = json.loads(f.read())
+    policy = policies["arkos"]["arkos"] if policies.has_key("arkos") \
+        and policies["arkos"].has_key("arkos") else 2
+    storage.policies.add("policies", SecurityPolicy("arkos", "arkos", 
+        "System Management (Genesis/APIs)", "gen-arkos-round", 
+        [("tcp", int(config.get("genesis", "port"))), ("tcp", 8765)], policy))
+    if policies.has_key("custom"):
+        for x in policies["custom"]:
+            storage.policies.add("policies", SecurityPolicy("custom", x["id"], 
+                x["name"], x["icon"], x["ports"], x["policy"]))
