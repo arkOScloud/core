@@ -8,7 +8,7 @@ import shutil
 import crypto
 import losetup
 
-from arkos import config
+from arkos import config, signals
 from arkos.utilities import shell
 
 libc = ctypes.CDLL(ctypes.util.find_library("libc"), use_errno=True)
@@ -29,6 +29,7 @@ class DiskPartition:
     def mount(self, passwd=None):
         if self.mountpoint and os.path.ismount(self.mountpoint):
             raise Exception("Disk partition already mounted")
+        signals.emit("filesystems", "pre_mount", self)
         mount_point = self.mountpoint if self.mountpoint else os.path.join('/media', self.id)
         if self.crypt and passwd:
             s = crypto.luks_open(self.path, self.id, passwd)
@@ -48,9 +49,11 @@ class DiskPartition:
                 ctypes.c_char_p(self.fstype), 0, ctypes.c_char_p(""))
             if s == -1:
                 raise Exception('Failed to mount %s: %s'%(self.id, os.strerror(ctypes.get_errno())))
+        signals.emit("filesystems", "post_mount", self)
         self.mountpoint = mount_point
     
     def umount(self):
+        signals.emit("filesystems", "pre_umount", self)
         if not self.mountpoint:
             return
         s = libc.umount2(ctypes.c_char_p(self.mountpoint), 0)
@@ -58,6 +61,7 @@ class DiskPartition:
             raise Exception('Failed to unmount %s: %s'%(self.id, os.strerror(ctypes.get_errno())))
         if self.crypt:
             crypto.luks_close(self.id)
+        signals.emit("filesystems", "post_umount", self)
         self.mountpoint = None
     
     def enable(self):
@@ -110,6 +114,7 @@ class VirtualDisk:
         self.path = str(os.path.join(config.get("filesystems", "vdisk_dir"), self.id+'.img'))
         if os.path.exists(self.path):
             raise Exception("This virtual disk already exists")
+        signals.emit("filesystems", "pre_add", self)
         with open(self.path, 'wb') as f:
             written = 0
             with file('/dev/zero', 'r') as zero:
@@ -122,12 +127,14 @@ class VirtualDisk:
         if s["code"] != 0:
             raise Exception('Failed to format loop device: %s' % s["stderr"])
         l.unmount()
+        signals.emit("filesystems", "pre_add", self)
         if mount:
             self.mount()
     
     def mount(self, passwd=None):
         if self.mountpoint and os.path.ismount(self.mountpoint):
             raise Exception("Virtual disk already mounted")
+        signals.emit("filesystems", "pre_mount", self)
         if not os.path.isdir(os.path.join('/media', self.id)):
             os.makedirs(os.path.join('/media', self.id))
         mount_point = self.mountpoint if self.mountpoint else os.path.join('/media', self.id)
@@ -153,11 +160,13 @@ class VirtualDisk:
             if s == -1:
                 dev.unmount()
                 raise Exception('Failed to mount %s: %s' % (self.id, os.strerror(ctypes.get_errno())))
+        signals.emit("filesystems", "post_mount", self)
         self.mountpoint = mount_point
     
     def umount(self):
         if not self.mountpoint:
             return
+        signals.emit("filesystems", "pre_umount", self)
         l = losetup.get_loop_devices()
         for x in l:
             if l[x].is_used() and l[x].get_filename() == self.path:
@@ -170,6 +179,7 @@ class VirtualDisk:
             crypto.luks_close(self.id)
         if dev:
             dev.unmount()
+        signals.emit("filesystems", "post_umount", self)
         self.mountpoint = None
     
     def enable(self):
@@ -219,7 +229,9 @@ class VirtualDisk:
     
     def remove(self):
         self.umount()
+        signals.emit("filesystems", "pre_remove", self)
         os.unlink(self.path)
+        signals.emit("filesystems", "post_remove", self)
     
     def as_dict(self):
         return {

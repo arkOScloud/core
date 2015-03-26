@@ -4,7 +4,7 @@ import hashlib
 import OpenSSL
 import os
 
-from arkos import config, storage
+from arkos import config, signals, storage, websites, applications
 from system import systemtime, groups
 
 
@@ -28,7 +28,8 @@ class Certificate:
         self.sha1 = sha1
         self.md5 = md5
     
-    def assign(self, atype, name=""):
+    def assign(self, atype, name="", sid=""):
+        signals.emit("certificates", "pre_assign", (self, atype, name, sid))
         nginx_reload = False
         if atype == 'genesis':
             config.set('genesis', 'cert_file', self.cert_path)
@@ -38,16 +39,18 @@ class Certificate:
             self.assign.append({"type": "genesis"})
         elif atype == 'website':
             websites.get(name).ssl_enable(self)
-            self.assign.append({"type": "website", "name": name})
+            self.assign.append({"type": "website", "id": name, "name": name})
             nginx_reload = True
         else:
-            applications.get(name).ssl_enable(self)
-            self.assign.append({"type": "app", "name": name})
+            d = applications.get(name).ssl_enable(self, sid)
+            self.assign.append(d)
         if nginx_reload:
             storage.sites.nginx_reload()
+        signals.emit("certificates", "post_assign", (self, atype, name, sid))
         return self
     
-    def unassign(self, atype, name=""):
+    def unassign(self, atype, name="", sid=""):
+        signals.emit("certificates", "pre_unassign", (self, atype, name, sid))
         nginx_reload = False
         if atype == "website":
             websites.get(name).ssl_disable()
@@ -64,16 +67,19 @@ class Certificate:
             self.assign.remove({"type": atype, "name": name})
         if nginx_reload:
             self.app.sites.nginx_reload()
+        signals.emit("certificates", "post_unassign", (self, atype, name, sid))
         return None
     
     def remove(self):
+        signals.emit("certificates", "pre_remove", self)
         for x in self.assign:
-            self.unassign(x["type"], x.get("name"))
+            self.unassign(x["type"], x.get("id"), x.get("sid"))
         if os.path.exists(self.cert_path):
             os.unlink(self.cert_path)
         if os.path.exists(self.key_path):
             os.unlink(self.key_path)
         storage.certs.remove("certificates", self)
+        signals.emit("certificates", "post_remove", self)
     
     def as_dict(self, ready=True):
         return {
@@ -177,7 +183,7 @@ def upload_certificate(id, cert, key, chain=''):
         ky = OpenSSL.crypto.load_privatekey(OpenSSL.crypto.FILETYPE_PEM, key)
     except Exception, e:
         raise Exception("Could not read private keyfile. Please make sure you've selected the proper file.", e)
-
+    signals.emit("certificates", "pre_add", id)
     sha1, md5 = get_cert_hashes(crt)
     c = Certificate(id=id, cert_path=os.path.join(config.get("certificates", "cert_dir"), id+'.crt'),
         key_path=os.path.join(config.get("certificates", "key_dir"), id+'.key'),
@@ -198,11 +204,13 @@ def upload_certificate(id, cert, key, chain=''):
     os.chown(c.key_path, -1, gid)
     os.chmod(c.key_path, 0660)
     storage.certs.add("certificates", c)
+    signals.emit("certificates", "post_add", c)
     return c
 
 def generate_certificate(
         id, domain, country, state="", locale="", email="", keytype="RSA", 
         keylength=2048):
+    signals.emit("certificates", "pre_add", id)
     # Check to see that we have a CA ready
     basehost = ".".join(domain.split(".")[-2:])
     ca = get_authorities(id=basehost)
@@ -255,6 +263,7 @@ def generate_certificate(
         cert_path=cert_path, key_path=key_path,
         sha1=sha1, md5=md5, expiry=crt.get_notAfter(), assign=[])
     storage.certs.add("certificates", c)
+    signals.emit("certificates", "post_add", c)
     return c
 
 def generate_authority(domain):

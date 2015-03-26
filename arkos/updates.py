@@ -1,7 +1,7 @@
 import json
 import gnupg
 
-from arkos import storage, config, logger
+from arkos import storage, signals, config, logger
 from arkos.utilities import api, DefaultMessage
 
 
@@ -30,6 +30,7 @@ def install_updates(message=DefaultMessage()):
     updates = storage.updates.get("updates")
     if not updates:
         return
+    signals.emit("updates", "pre_install")
     amount = len(updates)
     responses = []
     for z in enumerate(updates):
@@ -60,5 +61,6 @@ def install_updates(message=DefaultMessage()):
         if not getout:
             config.set("updates", "current_update", z[1]["id"])
     else:
+        signals.emit("updates", "post_install")
         if message:
             message.complete("success", "Installation of updates successful. Please restart your system.")

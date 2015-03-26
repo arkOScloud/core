@@ -1,7 +1,7 @@
 import ldap
 import ldap.modlist
 
-from arkos import config, conns
+from arkos import config, conns, signals
 from arkos.system import users
 
 
@@ -21,13 +21,17 @@ class Domain:
         except ldap.NO_SUCH_OBJECT:
             pass
         ldif = {"virtualdomain": self.name, "objectClass": ["mailDomain", "top"]}
+        signals.emit("domains", "pre_add", self)
         conns.LDAP.add_s("virtualdomain=%s,ou=domains,%s" % (self.name,self.rootdn),
             ldap.modlist.addModlist(ldif))
+        signals.emit("domains", "post_add", self)
     
     def remove(self):
         if self.name in [x.domain for x in users.get()]:
             raise Exception("A user is still using this domain")
+        signals.emit("domains", "pre_remove", self)
         conns.LDAP.delete_s("virtualdomain=%s,ou=domains,%s" % (self.name,self.rootdn))
+        signals.emit("domains", "post_remove", self)
 
     def as_dict(self, ready=True):
         return {"id": self.name, "is_ready": ready}

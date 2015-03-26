@@ -3,7 +3,7 @@ import glob
 import os
 import time
 
-from arkos import conns
+from arkos import conns, signals
 from arkos.utilities import shell
 
 
@@ -20,6 +20,7 @@ class Service:
         self.cfg = cfg
     
     def add(self, enable=True):
+        signals.emit("services", "pre_add", self)
         title = 'program:%s' % self.name
         c = ConfigParser.RawConfigParser()
         c.add_section(title)
@@ -29,12 +30,15 @@ class Service:
             c.write(f)
         if enable:
             self.enable()
+        signals.emit("services", "post_add", self)
 
     def start(self):
+        signals.emit("services", "pre_start", self)
         if self.stype == 'supervisor':
             supervisor_ping()
             try:
                 conns.Supervisor.startProcess(self.name)
+                signals.emit("services", "post_start", self)
             except:
                 raise ActionError()
         else:
@@ -49,6 +53,7 @@ class Service:
                     raise ActionError()
                 elif str(data["ActiveState"]) == "active":
                     self.state = "running"
+                    signals.emit("services", "post_start", self)
                     break
                 timeout + 1
                 time.sleep(1)
@@ -56,9 +61,11 @@ class Service:
                 raise ActionError()
     
     def stop(self):
+        signals.emit("services", "pre_stop", self)
         if self.stype == 'supervisor':
             supervisor_ping()
             conns.Supervisor.stopProcess(self.name)
+            signals.emit("services", "post_stop", self)
             self.state = "stopped"
         else:
             path = conns.SystemD.LoadUnit(self.name+".service")
@@ -70,6 +77,7 @@ class Service:
                 data = data.GetAll('org.freedesktop.systemd1.Unit')
                 if str(data["ActiveState"]) in ["inactive", "failed"]:
                     self.state = "stopped"
+                    signals.emit("services", "post_stop", self)
                     break
                 timeout + 1
                 time.sleep(1)
@@ -77,10 +85,12 @@ class Service:
                 raise ActionError()
     
     def restart(self, real=False):
+        signals.emit("services", "pre_restart", self)
         if self.stype == 'supervisor':
             supervisor_ping()
             conns.Supervisor.stopProcess(self.name, wait=True)
             conns.Supervisor.startProcess(self.name)
+            signals.emit("services", "post_restart", self)
         else:
             path = conns.SystemD.LoadUnit(self.name+".service")
             if real:
@@ -96,6 +106,7 @@ class Service:
                     raise ActionError()
                 elif str(data["ActiveState"]) == "active":
                     self.state = "running"
+                    signals.emit("services", "post_restart", self)
                     break
                 timeout + 1
                 time.sleep(1)
@@ -133,6 +144,7 @@ class Service:
         self.enabled = False
 
     def remove(self):
+        signals.emit("services", "pre_remove", self)
         if self.stype == 'supervisor':
             supervisor_ping()
             if self.state == "running":
@@ -145,6 +157,7 @@ class Service:
             self.state = "stopped"
             self.enabled = False
             conns.Supervisor.restart()
+            signals.emit("services", "post_remove", self)
     
     def as_dict(self):
         return {

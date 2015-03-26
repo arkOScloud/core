@@ -1,4 +1,4 @@
-from arkos import storage, applications
+from arkos import storage, signals, applications
 from arkos.utilities import random_string
 
 
@@ -8,15 +8,19 @@ class Database:
         self.manager = manager
     
     def add(self):
+        signals.emit("databases", "pre_add", self)
         self.add_db()
         storage.dbs.add("databases", self)
+        signals.emit("databases", "post_add", self)
     
     def add_db(self):
         pass
     
     def remove(self):
+        signals.emit("databases", "pre_remove", self)
         self.remove_db()
         storage.dbs.remove("databases", self)
+        signals.emit("databases", "post_remove", self)
     
     def remove_db(self):
         pass
@@ -41,15 +45,19 @@ class DatabaseUser:
         self.manager = manager
     
     def add(self, passwd):
+        signals.emit("databases", "pre_user_add", self)
         self.add_user(passwd)
         storage.dbs.add("users", self)
+        signals.emit("databases", "post_user_add", self)
     
     def add_user(self):
         pass
     
     def remove(self):
+        signals.emit("databases", "pre_user_remove", self)
         self.remove_user()
         storage.dbs.remove("users", self)
+        signals.emit("databases", "post_user_remove", self)
     
     def remove_user(self):
         pass

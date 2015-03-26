@@ -9,7 +9,7 @@ import tarfile
 
 from distutils.spawn import find_executable
 
-from arkos import config, storage, logger, tracked_services
+from arkos import config, storage, signals, logger, tracked_services
 from arkos.system import services
 from arkos.languages import python
 from arkos.utilities import api, DefaultMessage
@@ -28,6 +28,7 @@ class App:
     
     def load(self, verify=True):
         try:
+            signals.emit("apps", "pre_load", self)
             module = imp.load_module(self.id, *imp.find_module(self.id, [os.path.join(config.get("apps", "app_dir"))]))
             for x in self.modules:
                 submod = imp.load_module("%s.%s"%(self.id,x), *imp.find_module(x, [os.path.join(config.get("apps", "app_dir"), self.id)]))
@@ -56,6 +57,9 @@ class App:
                         app.register_blueprint(submod.backend)
                     except ImportError:
                         pass
+                elif x == "ssl":
+                    self.ssl = submod
+                    self.cert = self.ssl.get_ssl_assigned()
                 else:
                     setattr(self, "_%s"%x, submod)
             if verify:
@@ -64,6 +68,7 @@ class App:
                 if s["ports"]:
                     tracked_services.register(self.id, s["binary"], s["name"], 
                         self.icon, s["ports"], fw=False)
+            signals.emit("apps", "post_load", self)
         except Exception, e:
             self.loadable = False
             self.error = "Module error: %s" % str(e)
@@ -115,6 +120,7 @@ class App:
         return verify
     
     def install(self, install_deps=True, load=True, message=DefaultMessage()):
+        signals.emit("apps", "pre_install", self)
         deps = get_dependent(self.id, "install")
         if install_deps and deps:
             for x in deps:
@@ -126,8 +132,10 @@ class App:
             if x["ports"]:
                 regen_fw = True
                 tracked_services.register(self.id, x["binary"], x["name"], self.icon, x["ports"])
+        signals.emit("apps", "post_install", self)
     
     def uninstall(self, force=False, message=DefaultMessage()):
+        signals.emit("apps", "pre_remove", self)
         message.update("info", "Uninstalling application...")
         exclude = ['openssl', 'openssh', 'nginx', 'python2', 'git']
         for x in storage.apps.get("applications"):
@@ -151,6 +159,32 @@ class App:
                 regen_fw = True
         if regen_fw:
             tracked_services.deregister(self.id)
+        signals.emit("apps", "post_remove", self)
+    
+    def ssl_enable(self, cert, sid=""):
+        signals.emit("apps", "pre_ssl_enable", self)
+        if sid:
+            self.ssl.ssl_enable(cert, sid)
+            if not hasattr(self, "cert") or type(self.cert) != dict:
+                self.cert = {}
+            self.cert[sid] = cert
+        else:
+            self.ssl.ssl_enable(cert)
+            self.cert = cert
+        signals.emit("apps", "post_ssl_enable", self)
+    
+    def ssl_disable(self, cert, sid=""):
+        signals.emit("apps", "pre_ssl_disable", self)
+        if sid:
+            self.ssl.ssl_disable(sid)
+            del self.cert[sid]
+        else:
+            self.ssl.ssl_disable()
+            self.cert = None
+        signals.emit("apps", "post_ssl_disable", self)
+    
+    def get_ssl_able(self):
+        return self.ssl.get_ssl_able()
     
     def as_dict(self):
         data = {}
@@ -180,6 +214,7 @@ def get(id=None, type=None, loadable=None, installed=None, verify=True):
     return data
 
 def scan(verify=True):
+    signals.emit("apps", "pre_scan")
     apps = []
     idata = [x for x in os.listdir(config.get("apps", "app_dir")) if not x.startswith(".")]
     adata = api('https://%s/api/v1/apps' % config.get("general", "repo_server"), crit=False)
@@ -194,6 +229,9 @@ def scan(verify=True):
                 data = json.loads(f.read())
         except ValueError:
             logger.warn("Failed to load %s due to a JSON parsing error" % x)
+            continue
+        except IOError:
+            logger.warn("Failed to load %s: manifest file inaccessible or not present" % x)
             continue
         logger.debug(" *** Loading %s" % data["id"])
         a = App(**data)
@@ -217,6 +255,7 @@ def scan(verify=True):
     
     if verify:
         verify_app_dependencies()
+    signals.emit("apps", "post_scan")
     return storage.apps.get("applications")
 
 def verify_app_dependencies():

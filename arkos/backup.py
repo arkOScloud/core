@@ -6,7 +6,7 @@ import shutil
 import StringIO
 import tarfile
 
-from arkos import config, applications, websites
+from arkos import config, signals, applications, websites
 from arkos.system import systemtime
 from arkos.utilities import random_string
 
@@ -37,6 +37,7 @@ class BackupController:
         return data
     
     def backup(self, version=None, data=True, backup_location=""):
+        signals.emit("backups", "pre_backup", self)
         if not backup_location:
             backup_location = config.get("backups", "location", "/var/lib/arkos/backups")
         
@@ -76,6 +77,7 @@ class BackupController:
             self.post_backup(self.site)
         else:
             self.post_backup()
+        signals.emit("backups", "post_backup", self)
             
         return {"id": self.id+"/"+timestamp, "pid": self.id, "path": path, 
             "icon": self.icon, "type": self.ctype, "time": isotime, 
@@ -84,6 +86,7 @@ class BackupController:
     
     def restore(self, data):
         from arkos import websites, databases
+        signals.emit("backups", "pre_restore", self)
         self.pre_restore()
         
         sitename = ""
@@ -121,7 +124,7 @@ class BackupController:
             self.site.nginx_enable()
         else:
             self.post_restore()
-        
+        signals.emit("backups", "post_restore", self)
         data["is_ready"] = True
         return data
     

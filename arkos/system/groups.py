@@ -2,7 +2,7 @@ import grp
 import ldap
 import ldap.modlist
 
-from arkos import conns, config
+from arkos import conns, config, signals
 from arkos.utilities import shell
 
 
@@ -27,7 +27,9 @@ class Group:
             "memberUid": self.users
         }
         ldif = ldap.modlist.addModlist(ldif)
+        signals.emit("groups", "pre_add", self)
         conns.LDAP.add_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn), ldif)
+        signals.emit("groups", "post_add", self)
     
     def update(self):
         try:
@@ -38,10 +40,14 @@ class Group:
 
         ldif = ldap.modlist.modifyModlist(ldif[0][1], {"memberUid": self.users}, 
             ignore_oldexistent=1)
+        signals.emit("groups", "pre_update", self)
         conns.LDAP.modify_ext_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn), ldif)
+        signals.emit("groups", "post_update", self)
     
     def delete(self):
+        signals.emit("groups", "pre_remove", self)
         conns.LDAP.delete_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn))
+        signals.emit("groups", "post_remove", self)
     
     def as_dict(self, ready=True):
         return {

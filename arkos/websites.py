@@ -5,7 +5,7 @@ import nginx
 import re
 import shutil
 
-from arkos import config, storage, applications, certificates
+from arkos import config, storage, applications
 from arkos import databases, tracked_services
 from arkos.system import users, groups
 from arkos.utilities import download, shell, random_string, DefaultMessage
@@ -632,7 +632,7 @@ def get(id=None, type=None, verify=True):
     return data
 
 def scan():
-    from arkos import backup
+    from arkos import certificates, backup
     sites = []
     for site in os.listdir('/etc/nginx/sites-available'):
         path = os.path.join('/srv/http/webapps', site)

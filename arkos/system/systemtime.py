@@ -4,7 +4,7 @@ import ntplib
 import os
 import time
 
-from arkos import config
+from arkos import config, signals
 
 ntp = ntplib.NTPClient()
 
@@ -43,6 +43,7 @@ def set_datetime(ut=0):
     res = librt.clock_settime(0, ctypes.byref(ts))
     if res == -1:
         raise Exception("Could not set time: %s" % os.strerror(ctypes.get_errno()))
+    signals.emit("config", "time_changed", ut)
 
 def get_idatetime():
     resp = ntp.request(config.get("general", "ntp_server"), version=3)

@@ -8,7 +8,7 @@ import sys
 
 import groups
 
-from arkos import conns, config
+from arkos import conns, config, signals
 from arkos.utilities import hashpw, shell
 
 
@@ -49,8 +49,10 @@ class User:
             "loginShell": "/usr/bin/bash"
             }
         ldif = ldap.modlist.addModlist(ldif)
+        signals.emit("users", "pre_add", self)
         conns.LDAP.add_s("uid=%s,ou=users,%s" % (self.name,self.rootdn), ldif)
         self.update_adminsudo()
+        signals.emit("users", "post_add", self)
     
     def update(self, newpasswd=""):
         try:
@@ -72,9 +74,11 @@ class User:
         }
         if newpasswd:
             attrs["userPassword"] = hashpw(newpasswd, "crypt")
+        signals.emit("users", "pre_update", self)
         nldif = ldap.modlist.modifyModlist(ldif, attrs, ignore_oldexistent=1)
         conns.LDAP.modify_ext_s("uid=%s,ou=users,%s" % (self.name,self.rootdn), nldif)
         self.update_adminsudo()
+        signals.emit("users", "post_update", self)
 
     def update_adminsudo(self):
         ldif = conns.LDAP.search_s("cn=admins,ou=groups,%s" % self.rootdn,
@@ -124,6 +128,7 @@ class User:
             return False
 
     def delete(self, delete_home=True):
+        signals.emit("users", "pre_remove", self)
         self.admin, self.sudo = False, False
         self.update_adminsudo()
         if delete_home:
@@ -132,6 +137,7 @@ class User:
             if os.path.exists(hdir):
                 shutil.rmtree(hdir)
         conns.LDAP.delete_s("uid=%s,ou=users,%s" % (self.name,self.rootdn))
+        signals.emit("users", "post_remove", self)
     
     def as_dict(self, ready=True):
         return {

@@ -4,9 +4,11 @@ from arkos.utilities import shell
 
 
 def shutdown():
+    signals.emit("config", "shutdown")
     shell('shutdown -P now')
 
 def reboot():
+    signals.emit("config", "shutdown")
     shell('reboot')
 
 def get_hostname():
@@ -16,6 +18,7 @@ def get_hostname():
 def set_hostname(name):
     with open('/etc/hostname', 'w') as f:
         f.write(name)
+    signals.emit("config", "hn_changed", name)
 
 def get_timezone():
     zone = os.path.realpath('/etc/localtime').split('/usr/share/zoneinfo/')[1]
@@ -30,3 +33,4 @@ def set_timezone(region, zone=None):
     if os.path.exists('/etc/localtime'):
         os.remove('/etc/localtime')
     os.symlink(zonepath, '/etc/localtime')
+    signals.emit("config", "tz_changed", (region, zone))

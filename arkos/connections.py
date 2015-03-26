@@ -46,7 +46,7 @@ def ldap_connect(uri="", rootdn="", dn="cn=admin", config=None, passwd=""):
         data = c.search_s("cn=admins,ou=groups,%s" % rootdn,
             ldap.SCOPE_SUBTREE, "(objectClass=*)", ["member"])[0][1]["member"]
         if "%s,%s" % (dn, rootdn) not in data:
-            raise Exception("User is not an administrator")        
+            raise Exception("User is not an administrator") 
     return c
 
 def supervisor_connect():

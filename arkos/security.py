@@ -1,7 +1,7 @@
 import ConfigParser
 import iptc
 
-from arkos import storage
+from arkos import storage, signals
 from arkos.system import network
 from arkos.utilities import shell, cidr_to_netmask
 
@@ -10,6 +10,7 @@ filters = '/etc/fail2ban/filter.d'
 
 
 def initialize_fw():
+    signals.emit("security", "pre_fw_init")
     tb = iptc.Table(iptc.Table.FILTER)
     c = iptc.Chain(tb, 'INPUT')
     c.flush()
@@ -40,10 +41,12 @@ def initialize_fw():
     r.target = t
     c.append_rule(r)
     save_fw()
+    signals.emit("security", "post_fw_init")
 
 def regen_fw(data, range=[]):
     # Regenerate our chain.
     # If local ranges are not provided, get them.
+    signals.emit("security", "pre_fw_regen")
     flush_fw()
     range = range or network.get_active_ranges()
     for x in data:
@@ -65,6 +68,7 @@ def regen_fw(data, range=[]):
     r.target = t
     c.append_rule(r)
     save_fw()
+    signals.emit("security", "post_fw_regen")
 
 def add_fw(protocol, port, ranges=[]):
     # Add rule for this port
@@ -120,6 +124,7 @@ def find_fw(protocol, port, range=""):
 
 def flush_fw():
     # Flush out our chain
+    signals.emit("security", "fw_flush")
     tb = iptc.Table(iptc.Table.FILTER)
     c = iptc.Chain(tb, "arkos-apps")
     if tb.is_chain(c):
