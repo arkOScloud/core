@@ -63,6 +63,7 @@ class App:
                 else:
                     setattr(self, "_%s"%x, submod)
             if verify:
+                pacman.refresh()
                 self.verify_dependencies()
             for s in self.services:
                 if s["ports"]:
@@ -85,7 +86,6 @@ class App:
                 if to_pacman:
                     try:
                         logger.debug(" *** Installing %s..." % to_pacman)
-                        pacman.refresh()
                         pacman.install([to_pacman])
                     except:
                         error = "Couldn't install %s" % to_pacman
