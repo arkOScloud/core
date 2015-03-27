@@ -16,64 +16,66 @@ gid = groups.get_system("ssl-cert").gid
 class Certificate:
     def __init__(
             self, id="", domain="", cert_path="", key_path="", keytype="", keylength=0,
-            assign=[], expiry=None, sha1="", md5=""):
+            assigns=[], expiry=None, sha1="", md5=""):
         self.id = id
         self.domain = domain
         self.cert_path = cert_path
         self.key_path = key_path
         self.keytype = keytype
         self.keylength = keylength
-        self.assign = assign
+        self.assigns = assigns
         self.expiry = expiry
         self.sha1 = sha1
         self.md5 = md5
     
-    def assign(self, atype, name="", sid=""):
-        signals.emit("certificates", "pre_assign", (self, atype, name, sid))
+    def assign(self, assign):
+        signals.emit("certificates", "pre_assign", (self, assign))
         nginx_reload = False
-        if atype == 'genesis':
+        if assign["type"] == 'genesis':
             config.set('genesis', 'cert_file', self.cert_path)
             config.set('genesis', 'cert_key', self.key_path)
             config.set('genesis', 'ssl', True)
             config.save()
-            self.assign.append({"type": "genesis"})
-        elif atype == 'website':
-            websites.get(name).ssl_enable(self)
-            self.assign.append({"type": "website", "id": name, "name": name})
+            self.assigns.append(assign)
+        elif assign["type"] == 'website':
+            w = websites.get(assign["id"])
+            w.cert = self
+            w.ssl_enable()
+            self.assigns.append(assign)
             nginx_reload = True
         else:
-            d = applications.get(name).ssl_enable(self, sid)
-            self.assign.append(d)
+            d = applications.get(assign["aid"]).ssl_enable(self, assign["sid"])
+            self.assigns.append(d)
         if nginx_reload:
-            storage.sites.nginx_reload()
-        signals.emit("certificates", "post_assign", (self, atype, name, sid))
+            websites.nginx_reload()
+        signals.emit("certificates", "post_assign", (self, assign))
         return self
     
-    def unassign(self, atype, name="", sid=""):
-        signals.emit("certificates", "pre_unassign", (self, atype, name, sid))
+    def unassign(self, assign):
+        signals.emit("certificates", "pre_unassign", (self, assign))
         nginx_reload = False
-        if atype == "website":
-            websites.get(name).ssl_disable()
-            self.assign.remove({"type": atype, "name": name})
+        if assign["type"] == "website":
+            websites.get(assign["id"]).ssl_disable()
+            self.assigns.remove(assign)
             nginx_reload = True
-        elif atype == "genesis":
+        elif assign["type"] == "genesis":
             config.set("genesis", "cert_file", "")
             config.set("genesis", "cert_key", "")
             config.set("genesis", "ssl", False)
             config.save()
-            self.assign.remove({"type": "genesis"})
+            self.assigns.remove(assign)
         else:
-            applications.get(name).ssl_disable()
-            self.assign.remove({"type": atype, "name": name})
+            applications.get(assign["aid"]).ssl_disable(assign["sid"])
+            self.assigns.remove(assign)
         if nginx_reload:
-            self.app.sites.nginx_reload()
-        signals.emit("certificates", "post_unassign", (self, atype, name, sid))
+            websites.nginx_reload()
+        signals.emit("certificates", "post_unassign", (self, assign))
         return None
     
     def remove(self):
         signals.emit("certificates", "pre_remove", self)
-        for x in self.assign:
-            self.unassign(x["type"], x.get("id"), x.get("sid"))
+        for x in self.assigns:
+            self.unassign(x)
         if os.path.exists(self.cert_path):
             os.unlink(self.cert_path)
         if os.path.exists(self.key_path):
@@ -87,7 +89,7 @@ class Certificate:
             "domain": self.domain,
             "keytype": self.keytype,
             "keylength": self.keylength,
-            "assign": self.assign,
+            "assigns": self.assigns,
             "expiry": datetime.datetime.strptime(self.expiry, "%Y%m%d%H%M%SZ").isoformat(),
             "sha1": self.sha1,
             "md5": self.md5,
@@ -145,10 +147,11 @@ def scan():
         c = Certificate(id=id, cert_path=x, key_path=os.path.join(config.get("certificates", "key_dir"), id+'.key'),
             keytype="RSA" if key.type() == OpenSSL.crypto.TYPE_RSA else ("DSA" if key.type() == OpenSSL.crypto.TYPE_DSA else "Unknown"),
             keylength=int(key.bits()), domain=crt.get_subject().CN,
-            assign=assigns.get(id) or [], expiry=crt.get_notAfter(),
+            assigns=assigns.get(id) or [], expiry=crt.get_notAfter(),
             sha1=sha1, md5=md5)
         certs.append(c)
     storage.certs.set("certificates", certs)
+    websites.get()
     return certs
 
 def get_authorities(id=None):
@@ -261,7 +264,7 @@ def generate_certificate(
     sha1, md5 = get_cert_hashes(crt)
     c = Certificate(id=id, domain=domain, keytype=keytype, keylength=keylength,
         cert_path=cert_path, key_path=key_path,
-        sha1=sha1, md5=md5, expiry=crt.get_notAfter(), assign=[])
+        sha1=sha1, md5=md5, expiry=crt.get_notAfter(), assigns=[])
     storage.certs.add("certificates", c)
     signals.emit("certificates", "post_add", c)
     return c

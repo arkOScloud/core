@@ -262,7 +262,7 @@ class Site:
             nginx.Key('ssl_session_cache', 'shared:SSL:50m'),
             )
         nginx.dumpf(c, os.path.join('/etc/nginx/sites-available/', self.id))
-        self.enable_ssl()
+        self.enable_ssl(self.cert.cert_path, self.cert.key_path)
     
     def ssl_disable(self):
         c = nginx.loadf(os.path.join('/etc/nginx/sites-available/', self.id))
@@ -351,6 +351,8 @@ class Site:
             [("tcp", self.port)], 2)
         self.backup = self.meta.get_module("backup") or backup.BackupController
         self.backup = self.backup(self.id, self.meta.icon, site=self)
+        if hasattr(self, "site_edited"):
+            self.site_edited()
         nginx_reload()
 
     def update(self, message=DefaultMessage()):
@@ -563,6 +565,7 @@ class ReverseProxy:
             nginx.Key('ssl_session_cache', 'shared:SSL:50m'),
             )
         nginx.dumpf(c, os.path.join('/etc/nginx/sites-available/', self.id))
+        self.enable_ssl(self.cert.cert_path, self.cert.key_path)
     
     def ssl_disable(self):
         c = nginx.loadf(os.path.join('/etc/nginx/sites-available/', self.id))
@@ -580,6 +583,7 @@ class ReverseProxy:
             l.value = l.value.rstrip(' ssl')
         s.remove(*[x for x in s.filter('Key') if x.name.startswith('ssl_')])
         nginx.dumpf(c, os.path.join('/etc/nginx/sites-available/', self.id))
+        self.disable_ssl()
     
     def nginx_enable(self, reload=True):
         origin = os.path.join('/etc/nginx/sites-available', self.id)
@@ -624,7 +628,8 @@ def get(id=None, type=None, verify=True):
         for x in data:
             if x.id == id:
                 return x
-            elif x.meta.id == type:
+            elif (type and (type == "ReverseProxy" and isinstance(x, ReverseProxy))) \
+            or (type and x.meta.id == type):
                 tlist.append(x)
         if tlist:
             return tlist
@@ -675,7 +680,7 @@ def scan():
             s.port, ssl = re.match(rport, n.filter('Key', 'listen')[0].value).group(1, 2)
             if ssl:
                 s.cert = certificates.get(os.path.splitext(os.path.split(n.filter('Key', 'ssl_certificate')[0].value)[1])[0])
-                s.cert.assign.append({"type": "website", "name": s.id})
+                s.cert.assigns.append({"type": "website", "id": s.id, "name": s.id if s.meta else s.name})
             s.port = int(s.port)
             s.addr = n.filter('Key', 'server_name')[0].value
             s.path = n.filter('Key', 'root')[0].value

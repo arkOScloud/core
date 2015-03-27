@@ -63,7 +63,6 @@ class App:
                 else:
                     setattr(self, "_%s"%x, submod)
             if verify:
-                pacman.refresh()
                 self.verify_dependencies()
             for s in self.services:
                 if s["ports"]:
@@ -76,24 +75,15 @@ class App:
             logger.warn("Failed to load %s -- %s" % (self.name, str(e)))
     
     def verify_dependencies(self):
-        verify, error = True, ""
+        verify, error, to_pacman = True, "", []
         for dep in self.dependencies:
             if dep["type"] == "system":
-                to_pacman = ""
                 if (dep["binary"] and not find_executable(dep["binary"])) \
                 or not pacman.is_installed(dep["package"]):
-                    to_pacman = dep["package"]
-                if to_pacman:
-                    try:
-                        logger.debug(" *** Installing %s..." % to_pacman)
-                        pacman.install([to_pacman])
-                    except:
-                        error = "Couldn't install %s" % to_pacman
+                    to_pacman.append(dep["package"])
+                    if dep.has_key("internal") and dep["internal"]:
+                        error = "Restart required"
                         verify = False
-                    finally:
-                        if dep.has_key("internal") and dep["internal"]:
-                            error = "Restart required"
-                            verify = False
             if dep["type"] == "python":
                 to_pip = ""
                 if dep["module"]:
@@ -115,6 +105,15 @@ class App:
                         if dep.has_key("internal") and dep["internal"]:
                             error = "Restart required"
                             verify = False
+        if to_pacman:
+            pacman.refresh()
+        for x in to_pacman:
+            try:
+                logger.debug(" *** Installing %s..." % x)
+                pacman.install(x)
+            except:
+                error = "Couldn't install %s" % x
+                verify = False
         self.loadable = verify
         self.error = error
         return verify
@@ -173,7 +172,7 @@ class App:
             self.cert = cert
         signals.emit("apps", "post_ssl_enable", self)
     
-    def ssl_disable(self, cert, sid=""):
+    def ssl_disable(self, sid=""):
         signals.emit("apps", "pre_ssl_disable", self)
         if sid:
             self.ssl.ssl_disable(sid)
@@ -189,7 +188,7 @@ class App:
     def as_dict(self):
         data = {}
         for x in self.__dict__:
-            if not x.startswith("_"):
+            if not x.startswith("_") and x != "ssl" and x != "cert":
                 data[x] = self.__dict__[x]
         data["is_ready"] = True
         return data
