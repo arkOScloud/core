@@ -207,7 +207,7 @@ class Site:
             shutil.rmtree(self.path, True)
             os.unlink(os.path.join('/etc/nginx/sites-available', self.id))
             raise Exception('Error during website config - '+str(e))
-
+        
         if message:
             message.update("info", "Finishing...")
         tracked_services.register(self.meta.id if self.meta else "website", 

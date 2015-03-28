@@ -37,13 +37,24 @@ def composer_install(path):
     if s["code"] != 0:
         raise Exception('Composer failed to install this app\'s bundle. Error: %s'%str(s["stderr"]))
 
+def change_setting(name, value):
+    with open('/etc/php/php.ini', 'r') as f:
+        lines = f.readlines()
+    with open('/etc/php/php.ini', 'w') as f:
+        for line in lines:
+            if name+" = " in line:
+                line = name+" = "+value+"\n"
+            f.write(line)
+
 def enable_mod(*mod):
     with open('/etc/php/php.ini', 'r') as f:
         lines = f.readlines()
     with open('/etc/php/php.ini', 'w') as f:
         for line in lines:
             for x in mod:
-                f.write(re.sub(";extension=%s.so" % x, "extension=%s.so" % x, line))
+                if ";extension=%s.so"%x in line:
+                    line = "extension=%s.so\n"%x
+            f.write(line)
 
 def disable_mod(*mod):
     with open('/etc/php/php.ini', 'r') as f:
@@ -51,7 +62,9 @@ def disable_mod(*mod):
     with open('/etc/php/php.ini', 'w') as f:
         for line in lines:
             for x in mod:
-                f.write(re.sub("extension=%s.so" % x, ";extension=%s.so" % x, line))
+                if "extension=%s.so"%x in line and not line.startswith(";"):
+                    line = ";extension=%s.so\n"%x
+            f.write(line)
 
 def open_basedir(op, path):
     oc = []
