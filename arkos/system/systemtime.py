@@ -32,6 +32,9 @@ def get_date():
 def get_time():
     return time.strftime(config.get("general", "time_format", "%H:%M"))
 
+def get_unix_time():
+    return int(time.time())
+
 def get_datetime():
     return get_date() + " " + get_time()
 

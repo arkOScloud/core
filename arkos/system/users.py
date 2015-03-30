@@ -179,7 +179,7 @@ class SystemUser:
         }
 
 
-def get(uid=None):
+def get(uid=None, name=None):
     r = []
     for x in conns.LDAP.search_s("ou=users,%s" % config.get("general", "ldap_rootdn", "dc=arkos-servers,dc=org"), 
             ldap.SCOPE_SUBTREE, "(objectClass=inetOrgPerson)", None):
@@ -205,6 +205,8 @@ def get(uid=None):
             u.admin = False
 
         if u.uid == uid:
+            return u
+        elif name and u.name == name:
             return u
         r.append(u)
     return r if not uid else None
