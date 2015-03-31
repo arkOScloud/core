@@ -32,8 +32,11 @@ def get_date():
 def get_time():
     return time.strftime(config.get("general", "time_format", "%H:%M"))
 
-def get_unix_time():
-    return int(time.time())
+def get_unix_time(ts=None, fmt='%Y-%m-%dT%H:%M:%S'):
+    if ts:
+        return int(datetime.datetime.strptime(ts, fmt).strftime("%s"))
+    else:
+        return int(time.time())
 
 def get_datetime():
     return get_date() + " " + get_time()
@@ -58,7 +61,9 @@ def get_serial_time():
 def get_iso_time(ts=None, fmt='%Y%m%d%H%M%S'):
     tz = time.strftime('%z')
     tz = tz[:3]+":"+tz[3:]
-    if ts:
+    if ts and fmt == "unix":
+        return datetime.datetime.fromtimestamp(ts).isoformat()+tz
+    elif ts:
         return datetime.datetime.strptime(ts, fmt).isoformat()+tz
     else:
         return datetime.datetime.now().isoformat()+tz
