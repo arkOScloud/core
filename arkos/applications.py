@@ -123,8 +123,10 @@ class App:
         deps = get_dependent(self.id, "install")
         if install_deps and deps:
             for x in deps:
+                logger.debug("Installing %s (dependency for %s)" % (x, self.name))
                 message.update("info", "Installing dependencies for %s... (%s)" % (self.name, x))
                 _install(x, load=load)
+        logger.debug("Installing %s" % (x, self.name))
         message.update("info", "Installing %s..." % self.name)
         _install(self.id, load=load)
         for x in self.services:
@@ -149,6 +151,7 @@ class App:
                     services.stop(item["daemon"])
                     services.disable(item["daemon"])
                 pacman.remove([item["package"]], purge=config.get("apps", "purge", False))
+        logger.debug("Uninstalling %s" % self.name)
         shutil.rmtree(os.path.join(config.get("apps", "app_dir"), self.id))
         self.loadable = False
         self.installed = False

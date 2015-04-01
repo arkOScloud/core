@@ -7,6 +7,23 @@ from arkos.utilities import new_logger
 from arkos.connections import ConnectionsManager
 
 
+class LoggingControl:
+    def __init__(self, default):
+        self.active_logger = default
+    
+    def info(self, msg):
+        self.active_logger.info(msg)
+    
+    def warn(self, msg):
+        self.active_logger.warn(msg)
+    
+    def error(self, msg):
+        self.active_logger.error(msg)
+    
+    def debug(self, msg):
+        self.active_logger.debug(msg)
+
+
 class StorageControl:
     def __init__(self):
         self.apps = Storage(["applications"])
@@ -26,5 +43,5 @@ if os.path.exists(os.path.join(sys.path[0], "settings.json")):
 elif os.path.exists("/etc/arkos/settings.json"):
     config.load("/etc/arkos/settings.json")
 storage = StorageControl()
-logger = new_logger(20, debug=True)
+logger = LoggingControl(new_logger(20, debug=True))
 conns = ConnectionsManager(config)
