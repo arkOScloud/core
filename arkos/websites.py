@@ -85,6 +85,8 @@ class Site:
         except Exception, e:
             raise Exception('Error during website config - '+str(e))
 
+        if len(self.meta.database_engines) > 1 and extra_vars.get("dbengine", None):
+            self.meta.selected_dbengine = extra_vars.get("dbengine")
         if (not hasattr(self.meta, "selected_dbengine") or not self.meta.selected_dbengine) \
                 and self.meta.database_engines:
             self.meta.selected_dbengine = self.meta.database_engines[0]

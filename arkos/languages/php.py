@@ -32,6 +32,7 @@ def composer_install(path):
     verify_composer()
     cwd = os.getcwd()
     os.chdir(path)
+    shell('composer self-update')
     s = shell('composer install')
     os.chdir(cwd)
     if s["code"] != 0:
