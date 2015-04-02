@@ -50,7 +50,7 @@ class App:
                     for y in classes:
                         if issubclass(y[1], mgr) and y[1] != mgr:
                             setattr(self, "_backup", y[1])
-                elif x == "kraken":
+                elif x == "api":
                     try:
                         from kraken.application import app
                         setattr(submod, self.id, self._backend)
@@ -126,7 +126,7 @@ class App:
                 logger.debug("Installing %s (dependency for %s)" % (x, self.name))
                 message.update("info", "Installing dependencies for %s... (%s)" % (self.name, x))
                 _install(x, load=load)
-        logger.debug("Installing %s" % (x, self.name))
+        logger.debug("Installing %s" % self.name)
         message.update("info", "Installing %s..." % self.name)
         _install(self.id, load=load)
         for x in self.services:
