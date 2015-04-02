@@ -150,20 +150,23 @@ class Site:
         self.php = self.php or self.meta.uses_php or False
         self.version = self.meta.version.rsplit("-", 1)[0] if self.meta.website_updates else None
 
+        uid, gid = users.get_system("http").uid, groups.get_system("http").gid
+        for r, d, f in os.walk(self.path):
+            for x in d:
+                os.chmod(os.path.join(r, x), 0755)
+                os.chown(os.path.join(r, x), uid, gid)
+            for x in f:
+                os.chmod(os.path.join(r, x), 0644)
+                os.chown(os.path.join(r, x), uid, gid)
+                
         # If there is a custom path for the data directory, do the magic
         if hasattr(self.meta, "website_datapaths") and self.meta.website_datapaths \
-                and self.data_path:
-            uid, gid = users.get_system("http").uid, groups.get_system("http").gid
-            if not os.path.exists(datadir):
-                os.makedirs(datadir)
-            for r, d, f in os.walk(datadir):
-                for x in d:
-                    os.chmod(os.path.join(r, x), 0755)
-                    os.chown(os.path.join(r, x), uid, gid)
-                for x in f:
-                    os.chmod(os.path.join(r, x), 0644)
-                    os.chown(os.path.join(r, x), uid, gid)
-            extra_vars["datadir"] = self.data_path
+                and extra_vars.get("datadir"):
+            self.data_path = extra_vars["datadir"]
+            if not os.path.exists(self.data_path):
+                os.makedirs(self.data_path)
+            os.chmod(self.data_path, 0755)
+            os.chown(self.data_path, uid, gid)
         elif hasattr(self, "website_default_data_subdir"):
             self.data_path = os.path.join(self.path, self.website_default_data_subdir)
         else:
@@ -205,6 +208,10 @@ class Site:
             specialmsg = self.post_install(extra_vars, dbpasswd)
         except Exception, e:
             shutil.rmtree(self.path, True)
+            if self.db:
+                self.db.remove()
+                u = databases.get_user(self.id)
+                if u: u.remove()
             os.unlink(os.path.join('/etc/nginx/sites-available', self.id))
             raise Exception('Error during website config - '+str(e))
         
