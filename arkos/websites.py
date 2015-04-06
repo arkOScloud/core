@@ -452,7 +452,7 @@ class Site:
             "database": self.db.id if self.db else None,
             "php": self.php,
             "enabled": self.enabled,
-            "has_actions": self.meta.website_extra_actions if self.meta else None,
+            "has_actions": self.meta.website_extra_actions if hasattr(self.meta, "website_extra_actions") else None,
             "is_ready": True
         }
 
