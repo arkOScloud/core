@@ -36,7 +36,7 @@ class Site:
             self, id="", addr="", port=80, path="", php=False, version="", 
             cert=None, db=None, data_path="", block=[], enabled=False):
         self.id = id
-        self.path = path
+        self.path = path.encode("utf-8")
         self.addr = addr
         self.port = port
         self.php = php
@@ -59,7 +59,7 @@ class Site:
             message.update("info", "Preparing site install...")
         specialmsg = ''
         site_dir = config.get("websites", "site_dir")
-        self.path = self.path or os.path.join(site_dir, self.id)
+        self.path = self.path.encode("utf-8") or os.path.join(site_dir, self.id).encode("utf-8")
         self.ssl = None
 
         if not self.meta.download_url:
@@ -332,11 +332,11 @@ class Site:
         # If the name was changed, rename the folder and files
         if newname and self.id != newname:
             if self.path.endswith('_site'):
-                self.path = os.path.join(config.get("websites", "site_dir"), newname, '_site')
+                self.path = os.path.join(config.get("websites", "site_dir"), newname, '_site').encode("utf-8")
             elif self.path.endswith('htdocs'):
-                self.path = os.path.join(config.get("websites", "site_dir"), newname, 'htdocs')
+                self.path = os.path.join(config.get("websites", "site_dir"), newname, 'htdocs').encode("utf-8")
             else:
-                self.path = os.path.join(config.get("websites", "site_dir"), newname)
+                self.path = os.path.join(config.get("websites", "site_dir"), newname).encode("utf-8")
             if os.path.exists(self.path):
                 shutil.rmtree(self.path)
             self.nginx_disable(reload=False)
@@ -464,7 +464,7 @@ class ReverseProxy:
         self.id = id
         self.name = name
         self.addr = addr
-        self.path = path
+        self.path = path.encode("utf-8")
         self.port = port
         self.base_path = base_path
         self.block = block
@@ -475,7 +475,7 @@ class ReverseProxy:
 
     def install(self, extra_vars={}, enable=True, message=None):
         site_dir = config.get("websites", "site_dir")
-        self.path = self.path or os.path.join(site_dir, self.id)
+        self.path = self.path.encode("utf-8") or os.path.join(site_dir, self.id).encode("utf-8")
         self.ssl = None
         if extra_vars:
 			if not extra_vars.get('type') or not extra_vars.get('pass'):
