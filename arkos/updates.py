@@ -2,7 +2,7 @@ import json
 import gnupg
 
 from arkos import storage, signals, config, logger
-from arkos.utilities import api, DefaultMessage
+from arkos.utilities import api, download, shell, DefaultMessage
 
 
 def check_updates():
@@ -10,19 +10,20 @@ def check_updates():
     gpg = gnupg.GPG()
     server = config.get("general", "repo_server")
     current = config.get("updates", "current_update", 0)
-    data = api("https://%s/updates/%s" % (server, current), crit=True)
-    for x in data:
-        ustr, u = x, json.loads(x)
-        sig = api("https://%s/signatures/%s" % (server, u["id"]), 
+    data = api("https://%s/api/v1/updates/%s" % (server, str(current)), crit=True)
+    for x in data["updates"]:
+        ustr, u = str(x["tasks"]), json.loads(x["tasks"])
+        sig = api("https://%s/api/v1/signatures/%s" % (server, x["id"]), 
             returns="raw", crit=True)
-        with open("/tmp/%s.sig" % u["id"], "w") as f:
+        with open("/tmp/%s.sig" % x["id"], "w") as f:
             f.write(sig)
-        v = gpg.verify("/tmp/%s.sig" % u["id"], ustr)
-        if not v.trust_level or not v.trust_level >= v.TRUST_FULLY:
-            logger.error("Update %s signature verification failed" % u["id"])
+        v = gpg.verify_data("/tmp/%s.sig" % x["id"], ustr)
+        if v.trust_level == None:
+            logger.error("Update %s signature verification failed" % x["id"])
             break
         else:
-            updates.append(u)
+            updates.append({"id": x["id"], "name": x["name"], "date": x["date"], 
+                "info": x["info"], "tasks": u})
     storage.updates.set("updates", updates)
     return updates
 
@@ -32,35 +33,36 @@ def install_updates(message=DefaultMessage()):
         return
     signals.emit("updates", "pre_install")
     amount = len(updates)
-    responses = []
+    responses, ids = [], []
     for z in enumerate(updates):
-        for x in sorted(x[1]["tasks"]):
+        message.update("info", "%s of %s..." % (z[0]+1, amount), head="Installing updates: ")
+        for x in sorted(z[1]["tasks"], key=lambda y: y["step"]):
             getout = False
-            if message:
-                message.update("info", "Installing update %s of %s..." % (z[0]+1, amount))
-            getout = False
-            if x[1]["unit"] == "shell":
-                s = shell(x[1]["order"], stdin=x[1].get("data"))
+            if x["unit"] == "shell":
+                s = shell(x["order"], stdin=x.get("data", None))
                 if s["code"] != 0:
-                    responses.append((x[0], s["stderr"]))
+                    responses.append((x["step"], s["stderr"]))
                     getout = True
                     break
-            elif x[1]["unit"] == "fetch":
+            elif x["unit"] == "fetch":
                 try:
-                    download(x[1]["order"], x[1]["data"], True)
+                    download(x["order"], x["data"], True)
                 except Exception, e:
                     code = 1
                     if hasattr(e, "code"):
                         code = e.code
-                    responses.append((x[0], str(code)))
+                    responses.append((x["step"], str(code)))
                     getout = True
                     break
-        if getout and message:
-            message.complete("error", "Installation of update %s failed. See logs for details." % z[1]["id"])
-            raise
-        if not getout:
+        else:
+            ids.append(z[1]["id"])
             config.set("updates", "current_update", z[1]["id"])
+            config.save()
+            continue
+        message.complete("error", "Installation of update %s failed. See logs for details." % str(z[1]["id"]))
+        print responses
+        break
     else:
         signals.emit("updates", "post_install")
-        if message:
-            message.complete("success", "Installation of updates successful. Please restart your system.")
+        message.complete("success", "Please restart your system for the updates to take effect.", head="Updates installed successfully.")
+        return ids
