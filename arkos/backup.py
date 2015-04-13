@@ -182,7 +182,8 @@ def get_able():
         if x.type != "website" and hasattr(x, "_backup"):
             able.append({"type": "app", "icon": x.icon, "id": x.id})
     for x in websites.get():
-        able.append({"type": "site", "icon": x.meta.icon, "id": x.id})
+        if not isinstance(x, websites.ReverseProxy):
+            able.append({"type": "site", "icon": x.meta.icon, "id": x.id})
     for x in get():
         if not x["pid"] in [y["id"] for y in able]:
             able.append({"type": x["type"], "icon": x["icon"], "id": x["pid"]})

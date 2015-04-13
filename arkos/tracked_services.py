@@ -136,8 +136,8 @@ def initialize():
     policy = policies["arkos"]["arkos"] if policies.has_key("arkos") \
         and policies["arkos"].has_key("arkos") else 2
     storage.policies.add("policies", SecurityPolicy("arkos", "arkos", 
-        "System Management (Genesis/APIs)", "gen-arkos-round", 
-        [("tcp", int(config.get("genesis", "port"))), ("tcp", 8765)], policy))
+        "System Management (Genesis/APIs)", "fa fa-desktop", 
+        [("tcp", int(config.get("genesis", "port")))], policy))
     if policies.has_key("custom"):
         for x in policies["custom"]:
             storage.policies.add("policies", SecurityPolicy("custom", x["id"], 

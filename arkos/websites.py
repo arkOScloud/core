@@ -220,7 +220,7 @@ class Site:
         if message:
             message.update("info", "Finishing...")
         tracked_services.register(self.meta.id if self.meta else "website", 
-            self.id, self.id, "gen-earth", [("tcp", self.port)], 2)
+            self.id, self.id, "fa fa-globe", [("tcp", self.port)], 2)
         self.backup = self.meta.get_module("backup") or backup.BackupController
         self.backup = self.backup(self.id, self.meta.icon, site=self)
         self.installed = True
@@ -521,7 +521,7 @@ class ReverseProxy:
         with open(os.path.join(self.path, ".arkos"), 'w') as f:
             c.write(f)
         tracked_services.register("website", self.id, self.name, 
-            "gen-earth", [("tcp", self.port)], 2)
+            "fa fa-globe", [("tcp", self.port)], 2)
         self.installed = True
         storage.sites.add("sites", self)
         try:
@@ -705,7 +705,7 @@ def scan():
         sites.append(s)
         tracked_services.register(s.meta.id if s.meta else "website", s.id, 
             s.name if hasattr(s, "name") and s.name else s.id, 
-            s.meta.icon if s.meta else "gen-earth", [("tcp", s.port)])
+            s.meta.icon if s.meta else "fa fa-globe", [("tcp", s.port)])
     storage.sites.set("sites", sites)
     return sites
 
