@@ -35,7 +35,7 @@ def install_updates(message=DefaultMessage()):
     amount = len(updates)
     responses, ids = [], []
     for z in enumerate(updates):
-        message.update("info", "%s of %s..." % (z[0]+1, amount), head="Installing updates: ")
+        message.update("info", "%s of %s..." % (z[0]+1, amount), head="Installing updates")
         for x in sorted(z[1]["tasks"], key=lambda y: y["step"]):
             getout = False
             if x["unit"] == "shell":
@@ -64,5 +64,5 @@ def install_updates(message=DefaultMessage()):
         break
     else:
         signals.emit("updates", "post_install")
-        message.complete("success", "Please restart your system for the updates to take effect.", head="Updates installed successfully.")
+        message.complete("success", "Please restart your system for the updates to take effect.", head="Updates installed successfully")
         return ids

@@ -7,7 +7,7 @@ import shutil
 
 from arkos import config, storage, applications
 from arkos import databases, tracked_services
-from arkos.system import users, groups
+from arkos.system import users, groups, services
 from arkos.utilities import download, shell, random_string, DefaultMessage
 from arkos.utilities.errors import SoftFail
 
@@ -55,8 +55,7 @@ class Site:
         from arkos import backup
         dbpasswd = ""
         self.meta = meta
-        if message:
-            message.update("info", "Preparing site install...")
+        message.update("info", "Preparing to install...", head="Installing website")
         specialmsg = ''
         site_dir = config.get("websites", "site_dir")
         self.path = self.path.encode("utf-8") or os.path.join(site_dir, self.id).encode("utf-8")
@@ -77,8 +76,7 @@ class Site:
         else:
             raise Exception('Only GIT repos, gzip, bzip, and zip packages supported for now')
 
-        if message:
-            message.update("info", "Running pre-installation...")
+        message.update("info", "Running pre-installation...", head="Installing website")
         # Run webapp preconfig, if any
         try:
             self.pre_install(extra_vars)
@@ -92,12 +90,14 @@ class Site:
             self.meta.selected_dbengine = self.meta.database_engines[0]
 
         if hasattr(self.meta, "selected_dbengine") and self.meta.selected_dbengine:
-            if message:
-                message.update("info", "Creating database...")
+            message.update("info", "Creating database...", head="Installing website")
             try:
                 mgr = databases.get_managers(self.meta.selected_dbengine)
                 if not mgr:
                     raise Exception("No manager found for %s" % self.meta.selected_dbengine)
+                if not mgr.state:
+                    svc = services.get(mgr.meta.database_service)
+                    svc.restart()
                 self.db = mgr.add_db(self.id)
                 if mgr.meta.database_multiuser:
                     dbpasswd = random_string()[0:16]
@@ -113,8 +113,7 @@ class Site:
             shutil.rmtree(self.path)
         os.makedirs(self.path)
 
-        if message:
-            message.update("info", "Downloading website source...")
+        message.update("info", "Downloading website source...", head="Installing website")
         # Download and extract the source package
         if self.meta.download_url and ending == '.git':
             git.Repo.clone_from(self.meta.download_url, self.path)
@@ -131,16 +130,14 @@ class Site:
             else:
                 extract_cmd = 'unzip -d %s /tmp/%s' % (self.path, self.id+ending)
 
-            if message:
-                message.update("info", "Installing site...")
+            message.update("info", "Installing site...", head="Installing website")
             status = shell(extract_cmd)
             if status["code"] >= 1:
                 raise Exception(status["stderr"])
             os.remove(pkg_path)
         self.php = extra_vars.get("php") or self.php
 
-        if message:
-            message.update("info", "Configuring webserver...")
+        message.update("info", "Configuring webserver...", head="Installing website")
         addtoblock = self.addtoblock or []
         if extra_vars.get("addtoblock"):
             addtoblock += nginx.loads(extra_vars.get("addtoblock"), False)
@@ -204,8 +201,7 @@ class Site:
         except Exception, e:
             raise Exception('nginx serverblock couldn\'t be written - '+str(e))
 
-        if message:
-            message.update("info", "Running post-installation. This may take a few minutes...")
+        message.update("info", "Running post-installation. This may take a few minutes...", head="Installing website")
         try:
             specialmsg = self.post_install(extra_vars, dbpasswd)
         except Exception, e:
@@ -217,8 +213,7 @@ class Site:
             os.unlink(os.path.join('/etc/nginx/sites-available', self.id))
             raise Exception('Error during website config - '+str(e))
         
-        if message:
-            message.update("info", "Finishing...")
+        message.update("info", "Finishing...", head="Installing website")
         tracked_services.register(self.meta.id if self.meta else "website", 
             self.id, self.id, "fa fa-globe", [("tcp", self.port)], 2)
         self.backup = self.meta.get_module("backup") or backup.BackupController
@@ -384,8 +379,7 @@ class Site:
         else:
             raise Exception('Only GIT repos, gzip, bzip, and zip packages supported for now')
 
-        if message:
-            message.update("info", "Downloading website source...")
+        message.update("info", "Downloading website source...", head="Updating website")
         if self.download_url and ending == '.git':
             pkg_path = self.download_url 
         elif self.download_url:
@@ -395,8 +389,7 @@ class Site:
             except Exception, e:
                 raise Exception('Couldn\'t update - %s' % str(e))
         try:
-            if message:
-                message.update("info", "Updating website...")
+            message.update("info", "Updating website...", head="Updating website")
             self.update_site(self.path, pkg_path, self.version)
         except Exception, e:
             raise Exception('Couldn\'t update - %s' % str(e))
@@ -406,11 +399,9 @@ class Site:
             os.unlink(pkg_path)
 
     def remove(self, message=DefaultMessage()):
-        if message:
-            message.update("info", "Running pre-removal...")
+        message.update("info", "Running pre-removal...", head="Removing website")
         self.pre_remove()
-        if message:
-            message.update("info", "Removing website...")
+        message.update("info", "Removing website...", head="Removing website")
         if self.path.endswith('_site'):
             shutil.rmtree(self.path.split('/_site')[0])
         elif self.path.endswith('htdocs'):
@@ -420,8 +411,7 @@ class Site:
         else:
             shutil.rmtree(self.path)
         if self.db:
-            if message:
-                message.update("info", "Removing database...")
+            message.update("info", "Removing database...", head="Removing website")
             if self.db.manager.meta.database_multiuser:
                 u = databases.get_user(self.db.id)
                 if u:
@@ -430,8 +420,7 @@ class Site:
         self.nginx_disable(reload=True)
         tracked_services.deregister(self.meta.id if self.meta else "website", self.id)
         storage.sites.remove("sites", self)
-        if message:
-            message.update("info", "Running post-removal...")
+        message.update("info", "Running post-removal...", head="Removing website")
         self.post_remove()
         try:
             os.unlink(os.path.join('/etc/nginx/sites-available', self.id))
@@ -710,17 +699,15 @@ def scan():
     return sites
 
 def nginx_reload():
-    status = shell('systemctl restart nginx')
-    if status["code"] >= 1:
+    try:
+        s = services.get("nginx")
+        s.restart()
+    except services.ActionError:
         raise SoftFail("NGINX could not be restarted. Please check your configuration.")
 
-def php_enable():
-    shell('sed -i "s/.*include \/etc\/nginx\/php.conf.*/\tinclude \/etc\/nginx\/php.conf;/" /etc/nginx/nginx.conf')
-
-def php_disable():
-    shell('sed -i "s/.*include \/etc\/nginx\/php.conf.*/\t#include \/etc\/nginx\/php.conf;/" /etc/nginx/nginx.conf')
-
 def php_reload():
-    status = shell('systemctl restart php-fpm')
-    if status["code"] >= 1:
-        raise Exception('PHP FastCGI failed to reload.')
+    try:
+        s = services.get("php-fpm")
+        s.restart()
+    except services.ActionError:
+        pass
