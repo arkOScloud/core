@@ -118,7 +118,9 @@ class App:
         self.error = error
         return verify
     
-    def install(self, install_deps=True, load=True, message=DefaultMessage()):
+    def install(self, install_deps=True, load=True, force=False, message=DefaultMessage()):
+        if self.installed and not force:
+            return
         signals.emit("apps", "pre_install", self)
         deps = get_dependent(self.id, "install")
         if install_deps and deps:
@@ -302,11 +304,11 @@ def get_dependent(id, op):
 def _install(id, load=True):
     data = api('https://%s/api/v1/apps/%s' % (config.get("general", "repo_server"), id),
         returns='raw', crit=True)
-    with open(os.path.join(config.get("apps", "app_dir"), 'plugin.tar.gz'), 'wb') as f:
+    with open(os.path.join(config.get("apps", "app_dir"), '%s.tar.gz' % id), 'wb') as f:
         f.write(data)
-    with tarfile.open(os.path.join(config.get("apps", "app_dir"), 'plugin.tar.gz'), 'r:gz') as t:
+    with tarfile.open(os.path.join(config.get("apps", "app_dir"), '%s.tar.gz' % id), 'r:gz') as t:
         t.extractall(config.get("apps", "app_dir"))
-    os.unlink(os.path.join(config.get("apps", "app_dir"), 'plugin.tar.gz'))
+    os.unlink(os.path.join(config.get("apps", "app_dir"), '%s.tar.gz' % id))
     with open(os.path.join(config.get("apps", "app_dir"), id, "manifest.json")) as f:
         data = json.loads(f.read())
     a = get(id)

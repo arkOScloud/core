@@ -25,6 +25,9 @@ class DiskPartition:
         self.fstype = fstype
         self.enabled = enabled
         self.crypt = crypt
+    
+    def is_mounted(self):
+        return self.mountpoint and os.path.ismount(self.mountpoint)
 
     def mount(self, passwd=None):
         if self.mountpoint and os.path.ismount(self.mountpoint):

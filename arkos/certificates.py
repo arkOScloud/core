@@ -137,6 +137,10 @@ def scan():
             assigns[ssl].append({'type': 'genesis'})
         elif ssl:
             assigns[ssl] = [{'type': 'genesis'}]
+    if not os.path.exists(config.get("certificates", "cert_dir")):
+        os.makedirs(config.get("certificates", "cert_dir"))
+    if not os.path.exists(config.get("certificates", "key_dir")):
+        os.makedirs(config.get("certificates", "key_dir"))
     for x in glob.glob(os.path.join(config.get("certificates", "cert_dir"), '*.crt')):
         id = os.path.splitext(os.path.basename(x))[0]
         with open(x, 'r') as f:
@@ -167,6 +171,10 @@ def get_authorities(id=None):
 
 def scan_authorities():
     certs = []
+    if not os.path.exists(config.get("certificates", "ca_cert_dir")):
+        os.makedirs(config.get("certificates", "ca_cert_dir"))
+    if not os.path.exists(config.get("certificates", "ca_key_dir")):
+        os.makedirs(config.get("certificates", "ca_key_dir"))
     for x in glob.glob(os.path.join(config.get("certificates", "ca_cert_dir"), '*.pem')):
         id = os.path.splitext(os.path.split(x)[1])[0]
         with open(x, 'r') as f:

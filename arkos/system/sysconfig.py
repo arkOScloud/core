@@ -1,5 +1,6 @@
 import os
 
+from arkos import signals
 from arkos.utilities import shell
 
 

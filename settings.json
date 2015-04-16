@@ -41,6 +41,7 @@
         "port": 8000,
         "ssl": false,
         "cert_file": "",
-        "key_file": ""
+        "key_file": "",
+        "firstrun": true
     }
 }
