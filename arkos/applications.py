@@ -51,12 +51,9 @@ class App:
                         if issubclass(y[1], mgr) and y[1] != mgr:
                             setattr(self, "_backup", y[1])
                 elif x == "api":
-                    try:
-                        from kraken.application import app
+                    if hasattr(self, "_backend"):
                         setattr(submod, self.id, self._backend)
-                        app.register_blueprint(submod.backend)
-                    except ImportError:
-                        pass
+                    setattr(self, "_api", submod)
                 elif x == "ssl":
                     self.ssl = submod
                     self.cert = self.ssl.get_ssl_assigned()
