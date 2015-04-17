@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 
-from distutils.core import setup
+from setuptools import setup, find_packages
+
 
 setup(
-    name='arkos',
-    version='0.7',
+    name='arkos-core',
+    version='0.7.0beta1',
     install_requires=[
         'ntplib',
         'passlib',
@@ -25,10 +26,10 @@ setup(
     author='CitizenWeb',
     author_email='jacob@citizenweb.io',
     url='http://arkos.io/',
-    packages=["arkos"],
+    packages=find_packages(),
     data_files=[
         ('/etc/arkos', ['defaults/settings.json']),
+        ('/etc/arkos', ['defaults/secrets.json']),
         ('/etc/arkos', ['defaults/policies.json']),
-        ('/etc/arkos', ['defaults/secrets.json'])
     ]
 )

@@ -5,6 +5,7 @@ import os
 import sys
 import xmlrpclib
 
+from arkos.utilities import random_string, hashpw
 from dbus import SystemBus, Interface
 
 
@@ -37,6 +38,8 @@ def ldap_connect(uri="", rootdn="", dn="cn=admin", config=None, passwd=""):
                 passwd = passwd["ldap"]
             else:
                 raise Exception("Admin LDAP credentials not found in secrets file")
+        if passwd == "admin":
+            passwd = change_admin_passwd(uri, rootdn, dn, config, secrets=secrets)
     c = ldap.initialize(uri)
     try:
         c.simple_bind_s("%s,%s" % (dn, rootdn), passwd)
@@ -48,6 +51,24 @@ def ldap_connect(uri="", rootdn="", dn="cn=admin", config=None, passwd=""):
         if "%s,%s" % (dn, rootdn) not in data:
             raise Exception("User is not an administrator") 
     return c
+
+def change_admin_passwd(uri="", rootdn="", dn="cn=admin", config=None, passwd="admin", new_passwd="", secrets=""):
+    new_passwd = new_passwd or random_string()
+    c = ldap_connect(uri, rootdn, dn, config, passwd)
+    ldif = c.search_s("%s,%s" % (dn,rootdn),
+        ldap.SCOPE_SUBTREE, "(objectClass=*)", None)
+    ldif = ldif[0][1]
+    attrs = {
+        "userPassword": hashpw(new_passwd, "crypt")
+    }
+    nldif = ldap.modlist.modifyModlist(ldif, attrs, ignore_oldexistent=1)
+    c.modify_ext_s("%s,%s" % (dn,rootdn), nldif)
+    with open(secrets, "r") as f:
+        data = json.loads(f.read())
+    data["ldap"] = new_passwd
+    with open(secrets, "w") as f:
+        f.write(json.dumps(data))
+    return new_passwd
 
 def supervisor_connect():
     s = xmlrpclib.Server("http://localhost:9001/RPC2")
