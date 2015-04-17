@@ -1,0 +1,46 @@
+{
+    "general": {
+        "repo_server": "grm-test.arkos.io",
+        "policy_path": "/etc/arkos/policies.json",
+        "firewall": true,
+        "ntp_server": "ntp.arkos.io",
+        "date_format": "DD MMM YYYY",
+        "time_format": "HH:mm:ss"
+    },
+    "apps": {
+        "app_dir": "/var/lib/arkos/applications",
+        "purge": true
+    },
+    "certificates": {
+        "cert_dir": "/etc/arkos/ssl/certs",
+        "key_dir": "/etc/arkos/ssl/keys",
+        "ca_cert_dir": "/etc/arkos/ssl/ca_certs",
+        "ca_key_dir": "/etc/arkos/ssl/ca_keys",
+        "ciphers": "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:kEDH+AESGCM:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:ECDHE-RSA-DES-CBC3-SHA:ECDHE-ECDSA-DES-CBC3-SHA:EDH-RSA-DES-CBC3-SHA:EDH-DSS-DES-CBC3-SHA:DES-CBC3-SHA:HIGH:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK"
+    },
+    "websites": {
+        "site_dir": "/srv/http/webapps"
+    },
+    "filesystems": {
+        "vdisk_dir": "/vdisk",
+        "cipher": "aes-xts-plain64",
+        "keysize": 256
+    },
+    "updates": {
+        "check_updates": true,
+        "current_update": 0
+    },
+    "backups": {
+        "driver": "filesystem",
+        "location": "/var/lib/arkos/backups"
+    },
+    "genesis": {
+        "anonymous": true,
+        "host": "0.0.0.0",
+        "port": 8000,
+        "ssl": false,
+        "cert_file": "",
+        "key_file": "",
+        "firstrun": false
+    }
+}

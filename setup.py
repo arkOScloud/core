@@ -25,5 +25,10 @@ setup(
     author='CitizenWeb',
     author_email='jacob@citizenweb.io',
     url='http://arkos.io/',
-    packages=["arkos"]
+    packages=["arkos"],
+    data_files=[
+        ('/etc/arkos', ['defaults/settings.json']),
+        ('/etc/arkos', ['defaults/policies.json']),
+        ('/etc/arkos', ['defaults/secrets.json'])
+    ]
 )
