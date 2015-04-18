@@ -2,10 +2,12 @@ import json
 import ldap
 import ldap.modlist
 import os
+import shutil
 import sys
+import time
 import xmlrpclib
 
-from arkos.utilities import random_string, hashpw
+from arkos.utilities import shell, random_string, hashpw
 from dbus import SystemBus, Interface
 
 
@@ -52,6 +54,7 @@ def ldap_connect(uri="", rootdn="", dn="cn=admin", config=None, passwd=""):
             raise Exception("User is not an administrator") 
     return c
 
+# TODO make this nicer
 def change_admin_passwd(uri="", rootdn="", dn="cn=admin", config=None, passwd="admin", new_passwd="", secrets=""):
     new_passwd = new_passwd or random_string()
     c = ldap_connect(uri, rootdn, dn, config, passwd)
@@ -68,6 +71,22 @@ def change_admin_passwd(uri="", rootdn="", dn="cn=admin", config=None, passwd="a
     data["ldap"] = new_passwd
     with open(secrets, "w") as f:
         f.write(json.dumps(data))
+    with open("/etc/openldap/slapd.conf", "r") as f:
+        data = f.readlines()
+    with open("/etc/openldap/slapd.conf", "w") as f:
+        for x in data:
+            if x.startswith("rootpw"):
+                x = "rootpw\t\t%s\n" % hashpw(new_passwd, "crypt")
+            f.write(x)
+    shell("systemctl stop slapd")
+    shell("rm -rf /etc/openldap/slapd.d/*")
+    shell("slaptest -f /etc/openldap/slapd.conf -F /etc/openldap/slapd.d/")
+    shell("chown -R ldap:ldap /etc/openldap/slapd.d")
+    shell("systemctl restart slapd")
+    try:
+        c.simple_bind_s("%s,%s" % (dn, rootdn), new_passwd)
+    except ldap.SERVER_DOWN:
+        time.sleep(5)
     return new_passwd
 
 def supervisor_connect():
