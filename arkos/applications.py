@@ -29,6 +29,8 @@ class App:
     def load(self, verify=True):
         try:
             signals.emit("apps", "pre_load", self)
+            if verify:
+                self.verify_dependencies()
             module = imp.load_module(self.id, *imp.find_module(self.id, [os.path.join(config.get("apps", "app_dir"))]))
             for x in self.modules:
                 submod = imp.load_module("%s.%s"%(self.id,x), *imp.find_module(x, [os.path.join(config.get("apps", "app_dir"), self.id)]))
@@ -59,8 +61,6 @@ class App:
                     self.cert = self.ssl.get_ssl_assigned()
                 else:
                     setattr(self, "_%s"%x, submod)
-            if verify:
-                self.verify_dependencies()
             for s in self.services:
                 if s["ports"]:
                     tracked_services.register(self.id, s["binary"], s["name"], 
@@ -94,7 +94,7 @@ class App:
                 if to_pip:
                     try:
                         logger.debug(" *** Installing %s (via pip)..." % to_pip)
-                        python.install([to_pip])
+                        python.install(to_pip)
                     except:
                         error = "Couldn't install %s" % to_pip
                         verify = False
@@ -139,6 +139,8 @@ class App:
         message.update("info", "Uninstalling application...")
         exclude = ['openssl', 'openssh', 'nginx', 'python2', 'git']
         for x in storage.apps.get("applications"):
+            if not x.installed:
+                continue
             for item in x.dependencies:
                 if item["type"] == "app" and item["package"] == self.id and not force:
                     raise Exception("Cannot remove, %s depends on this application" % item["package"])

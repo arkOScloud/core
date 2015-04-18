@@ -172,6 +172,7 @@ def get_managers(id=None):
 def scan_managers():
     mgrs = []
     for x in applications.get(type="database"):
-        mgrs.append(x._database_mgr(id=x.id, name=x.name, meta=x))
+        if x.installed:
+            mgrs.append(x._database_mgr(id=x.id, name=x.name, meta=x))
     storage.dbs.set("managers", mgrs)
     return mgrs
