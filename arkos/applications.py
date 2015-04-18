@@ -217,6 +217,8 @@ def get(id=None, type=None, loadable=None, installed=None, verify=True):
 def scan(verify=True):
     signals.emit("apps", "pre_scan")
     apps = []
+    if not os.path.exists(config.get("apps", "app_dir")):
+        os.makedirs(config.get("apps", "app_dir"))
     idata = [x for x in os.listdir(config.get("apps", "app_dir")) if not x.startswith(".")]
     adata = api('https://%s/api/v1/apps' % config.get("general", "repo_server"), crit=False)
     if adata:

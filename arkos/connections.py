@@ -54,8 +54,8 @@ def ldap_connect(uri="", rootdn="", dn="cn=admin", config=None, passwd=""):
             raise Exception("User is not an administrator") 
     return c
 
-# TODO make this nicer
 def change_admin_passwd(uri="", rootdn="", dn="cn=admin", config=None, passwd="admin", new_passwd="", secrets=""):
+    from arkos.system import users, groups, services
     new_passwd = new_passwd or random_string()
     c = ldap_connect(uri, rootdn, dn, config, passwd)
     ldif = c.search_s("%s,%s" % (dn,rootdn),
@@ -78,11 +78,18 @@ def change_admin_passwd(uri="", rootdn="", dn="cn=admin", config=None, passwd="a
             if x.startswith("rootpw"):
                 x = "rootpw\t\t%s\n" % hashpw(new_passwd, "crypt")
             f.write(x)
-    shell("systemctl stop slapd")
-    shell("rm -rf /etc/openldap/slapd.d/*")
+    services.get("slapd").stop()
+    for x in os.listdir("/etc/openldap/slapd.d"):
+        shutil.rmtree(os.path.join("/etc/openldap/slapd.d", x))
     shell("slaptest -f /etc/openldap/slapd.conf -F /etc/openldap/slapd.d/")
-    shell("chown -R ldap:ldap /etc/openldap/slapd.d")
-    shell("systemctl restart slapd")
+    uid, gid = users.get_system("ldap").uid, groups.get_system("ldap").gid
+    os.chown("/etc/openldap/slapd.d", uid, gid)
+    for r, d, f in os.walk("/etc/openldap/slapd.d"):
+        for x in d:
+            os.chown(os.path.join(r, x), uid, gid)
+        for x in f:
+            os.chown(os.path.join(r, x), uid, gid)
+    services.get("slapd").restart()
     try:
         c.simple_bind_s("%s,%s" % (dn, rootdn), new_passwd)
     except ldap.SERVER_DOWN:
