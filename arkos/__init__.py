@@ -45,3 +45,4 @@ elif os.path.exists("/etc/arkos/settings.json"):
 storage = StorageControl()
 logger = LoggingControl(new_logger(20, debug=True))
 conns = ConnectionsManager(config)
+conns.connect()

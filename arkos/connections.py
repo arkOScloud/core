@@ -13,10 +13,13 @@ from dbus import SystemBus, Interface
 
 class ConnectionsManager:
     def __init__(self, config):
-        self.LDAP = ldap_connect(config=config)
+        self.config = config
+    
+    def connect(self):
         self.DBus = SystemBus()
         self.SystemD = self.SystemDConnect("/org/freedesktop/systemd1", 
             "org.freedesktop.systemd1.Manager")
+        self.LDAP = ldap_connect(config=self.config)
         self.Supervisor = supervisor_connect()
     
     def SystemDConnect(self, path, interface):
