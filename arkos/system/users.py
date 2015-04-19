@@ -213,7 +213,7 @@ def get(uid=None, name=None):
 
 def get_system(uid=None):
     r = []
-    grps = groups.get()
+    grps = groups.get_system()
     for x in pwd.getpwall():
         if x.pw_name == "root":
             continue
