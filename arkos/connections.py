@@ -83,7 +83,10 @@ def change_admin_passwd(uri="", rootdn="", dn="cn=admin", config=None, passwd="a
             f.write(x)
     services.get("slapd").stop()
     for x in os.listdir("/etc/openldap/slapd.d"):
-        shutil.rmtree(os.path.join("/etc/openldap/slapd.d", x))
+        if os.path.isdir(os.path.join("/etc/openldap/slapd.d", x)):
+            shutil.rmtree(os.path.join("/etc/openldap/slapd.d", x))
+        else:
+            os.unlink(os.path.join("/etc/openldap/slapd.d", x))
     shell("slaptest -f /etc/openldap/slapd.conf -F /etc/openldap/slapd.d/")
     uid, gid = users.get_system("ldap").uid, groups.get_system("ldap").gid
     os.chown("/etc/openldap/slapd.d", uid, gid)
