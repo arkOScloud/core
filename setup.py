@@ -29,7 +29,6 @@ setup(
     packages=find_packages(),
     data_files=[
         ('/etc/arkos', ['defaults/settings.json']),
-        ('/etc/arkos', ['defaults/secrets.json']),
         ('/etc/arkos', ['defaults/policies.json']),
     ]
 )
