@@ -710,7 +710,7 @@ def scan():
         if site_type != "ReverseProxy":
             # If it's a regular website, initialize its class, metadata, etc
             app = applications.get(site_type)
-            if not app.loadable or not cls.installed:
+            if not app.loadable or not app.installed:
                 continue
             site = app._website(id=meta.get("website", "id"))
             site.meta = app
