@@ -689,7 +689,7 @@ def get(id=None, type=None, verify=True):
         if type_list:
             return type_list
         return None
-    return data
+    return sites
 
 def scan():
     from arkos import certificates
