@@ -10,9 +10,11 @@ def check_updates():
     gpg = gnupg.GPG()
     server = config.get("general", "repo_server")
     current = config.get("updates", "current_update", 0)
+    # Fetch updates from registry server
     data = api("https://%s/api/v1/updates/%s" % (server, str(current)), crit=True)
     for x in data["updates"]:
         ustr, u = str(x["tasks"]), json.loads(x["tasks"])
+        # Get the update signature and test it
         sig = api("https://%s/api/v1/signatures/%s" % (server, x["id"]), 
             returns="raw", crit=True)
         with open("/tmp/%s.sig" % x["id"], "w") as f:

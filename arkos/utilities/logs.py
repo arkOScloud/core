@@ -43,24 +43,24 @@ class ConsoleHandler(logging.StreamHandler):
         if not self.stream.isatty():
             return logging.StreamHandler.handle(self, record)
 
-        s = ''
+        s = ""
         if self.tstamp:
             d = datetime.datetime.fromtimestamp(record.created)
             s += d.strftime("\033[37m%d.%m.%Y %H:%M \033[0m")
         if self.debug:
-            s += ('%s:%s'%(record.filename,record.lineno)).ljust(30)
-        l = ''
-        if record.levelname == 'DEBUG':
-            l = '\033[37mDEBUG\033[0m '
-        if record.levelname == 'INFO':
-            l = '\033[32mINFO\033[0m  '
-        if record.levelname == 'WARNING':
-            l = '\033[33mWARN\033[0m  '
-        if record.levelname == 'ERROR':
-            l = '\033[31mERROR\033[0m '
+            s += ("%s:%s"%(record.filename,record.lineno)).ljust(30)
+        l = ""
+        if record.levelname == "DEBUG":
+            l = "\033[37mDEBUG\033[0m "
+        if record.levelname == "INFO":
+            l = "\033[32mINFO\033[0m  "
+        if record.levelname == "WARNING":
+            l = "\033[33mWARN\033[0m  "
+        if record.levelname == "ERROR":
+            l = "\033[31mERROR\033[0m "
         s += l.ljust(9)
         s += record.msg
-        s += '\n'
+        s += "\n"
         self.stream.write(s)
 
 
@@ -68,7 +68,7 @@ def new_logger(log_level=logging.INFO, debug=False):
     logger = logging.getLogger("arkos")
     stdout = ConsoleHandler(sys.stdout, debug, False)
     stdout.setLevel(logging.DEBUG if debug else log_level)
-    dformatter = logging.Formatter('%(asctime)s [%(levelname)s] %(module)s: %(message)s')
+    dformatter = logging.Formatter("%(asctime)s [%(levelname)s] %(module)s: %(message)s")
     stdout.setFormatter(dformatter)
     logger.addHandler(stdout)
     return logger

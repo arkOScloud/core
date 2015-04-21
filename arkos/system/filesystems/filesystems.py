@@ -33,17 +33,18 @@ class DiskPartition:
         if self.mountpoint and os.path.ismount(self.mountpoint):
             raise Exception("Disk partition already mounted")
         signals.emit("filesystems", "pre_mount", self)
-        mount_point = self.mountpoint if self.mountpoint else os.path.join('/media', self.id)
+        mount_point = self.mountpoint if self.mountpoint else os.path.join("/media", self.id)
         if self.crypt and passwd:
+            # Decrypt the disk first if it's an encrypted disk
             s = crypto.luks_open(self.path, self.id, passwd)
             if s != 0:
-                raise Exception('Failed to decrypt %s with errno %s' % (self.id, str(s)))
+                raise Exception("Failed to decrypt %s with errno %s" % (self.id, str(s)))
             s = libc.mount(ctypes.c_char_p(os.path.join("/dev/mapper", self.id)), 
                 ctypes.c_char_p(mount_point), 
                 ctypes.c_char_p(self.fstype), 0, ctypes.c_char_p(""))
             if s == -1:
                 crypto.luks_close(self.id)
-                raise Exception('Failed to mount %s: %s' % (self.id, os.strerror(ctypes.get_errno())))
+                raise Exception("Failed to mount %s: %s" % (self.id, os.strerror(ctypes.get_errno())))
         elif self.crypt and not passwd:
             raise Exception("Must provide password to decrypt encrypted disk")
         else:
@@ -51,7 +52,7 @@ class DiskPartition:
                 ctypes.c_char_p(mount_point), 
                 ctypes.c_char_p(self.fstype), 0, ctypes.c_char_p(""))
             if s == -1:
-                raise Exception('Failed to mount %s: %s'%(self.id, os.strerror(ctypes.get_errno())))
+                raise Exception("Failed to mount %s: %s"%(self.id, os.strerror(ctypes.get_errno())))
         signals.emit("filesystems", "post_mount", self)
         self.mountpoint = mount_point
     
@@ -61,7 +62,7 @@ class DiskPartition:
             return
         s = libc.umount2(ctypes.c_char_p(self.mountpoint), 0)
         if s == -1:
-            raise Exception('Failed to unmount %s: %s'%(self.id, os.strerror(ctypes.get_errno())))
+            raise Exception("Failed to unmount %s: %s"%(self.id, os.strerror(ctypes.get_errno())))
         if self.crypt:
             crypto.luks_close(self.id)
         signals.emit("filesystems", "post_umount", self)
@@ -70,7 +71,7 @@ class DiskPartition:
     def enable(self):
         f = FstabEntry()
         f.src = self.path
-        f.dst = os.path.join('/media', self.id)
+        f.dst = os.path.join("/media", self.id)
         f.uuid = get_partition_uuid_by_name(self.path)
         f.fs_type = "ext4"
         f.options = "defaults"
@@ -114,22 +115,26 @@ class VirtualDisk:
         self.crypt = crypt
     
     def create(self, mount=False):
-        self.path = str(os.path.join(config.get("filesystems", "vdisk_dir"), self.id+'.img'))
+        vdisk_dir = config.get("filesystems", "vdisk_dir")
+        self.path = str(os.path.join(vdisk_dir, self.id+".img"))
         if os.path.exists(self.path):
             raise Exception("This virtual disk already exists")
         signals.emit("filesystems", "pre_add", self)
-        with open(self.path, 'wb') as f:
+        # Create an empty file matching disk size
+        with open(self.path, "wb") as f:
             written = 0
-            with file('/dev/zero', 'r') as zero:
+            with file("/dev/zero", "r") as zero:
                 while self.size > written:
                     written += 1024
                     f.write(zero.read(1024))
-        l = losetup.find_unused_loop_device()
-        l.mount(str(self.path), offset=1048576)
-        s = shell('mkfs.ext4 %s' % l.device)
+        # Get a free loopback device and mount
+        loop = losetup.find_unused_loop_device()
+        loop.mount(str(self.path), offset=1048576)
+        # Make a filesystem
+        s = shell("mkfs.ext4 %s" % loop.device)
         if s["code"] != 0:
-            raise Exception('Failed to format loop device: %s' % s["stderr"])
-        l.unmount()
+            raise Exception("Failed to format loop device: %s" % s["stderr"])
+        loop.unmount()
         signals.emit("filesystems", "pre_add", self)
         if mount:
             self.mount()
@@ -138,31 +143,33 @@ class VirtualDisk:
         if self.mountpoint and os.path.ismount(self.mountpoint):
             raise Exception("Virtual disk already mounted")
         signals.emit("filesystems", "pre_mount", self)
-        if not os.path.isdir(os.path.join('/media', self.id)):
-            os.makedirs(os.path.join('/media', self.id))
-        mount_point = self.mountpoint if self.mountpoint else os.path.join('/media', self.id)
-        dev = losetup.find_unused_loop_device()
-        dev.mount(str(self.path), offset=1048576)
+        if not os.path.isdir(os.path.join("/media", self.id)):
+            os.makedirs(os.path.join("/media", self.id))
+        mount_point = self.mountpoint if self.mountpoint else os.path.join("/media", self.id)
+        # Find a free loopback device and mount
+        loop = losetup.find_unused_loop_device()
+        loop.mount(str(self.path), offset=1048576)
         if self.crypt and passwd:
-            s = crypto.luks_open(dev.device, self.id, passwd)
+            # If it's an encrypted virtual disk, decrypt first then mount
+            s = crypto.luks_open(loop.device, self.id, passwd)
             if s != 0:
-                dev.unmount()
-                raise Exception('Failed to decrypt %s with errno %s' % (self.id, str(s)))
+                loop.unmount()
+                raise Exception("Failed to decrypt %s with errno %s" % (self.id, str(s)))
             s = libc.mount(ctypes.c_char_p(os.path.join("/dev/mapper", self.id)), 
                 ctypes.c_char_p(mount_point), 
                 ctypes.c_char_p(self.fstype), 0, ctypes.c_char_p(""))
             if s == -1:
                 crypto.luks_close(self.id)
-                dev.unmount()
-                raise Exception('Failed to mount %s: %s' % (self.id, os.strerror(ctypes.get_errno())))
+                loop.unmount()
+                raise Exception("Failed to mount %s: %s" % (self.id, os.strerror(ctypes.get_errno())))
         elif self.crypt and not passwd:
             raise Exception("Must provide password to decrypt encrypted container")
         else:
-            s = libc.mount(ctypes.c_char_p(dev.device), ctypes.c_char_p(mount_point), 
+            s = libc.mount(ctypes.c_char_p(loop.device), ctypes.c_char_p(mount_point), 
                 ctypes.c_char_p(self.fstype), 0, ctypes.c_char_p(""))
             if s == -1:
-                dev.unmount()
-                raise Exception('Failed to mount %s: %s' % (self.id, os.strerror(ctypes.get_errno())))
+                loop.unmount()
+                raise Exception("Failed to mount %s: %s" % (self.id, os.strerror(ctypes.get_errno())))
         signals.emit("filesystems", "post_mount", self)
         self.mountpoint = mount_point
     
@@ -170,14 +177,14 @@ class VirtualDisk:
         if not self.mountpoint:
             return
         signals.emit("filesystems", "pre_umount", self)
-        l = losetup.get_loop_devices()
-        for x in l:
-            if l[x].is_used() and l[x].get_filename() == self.path:
-                dev = l[x]
+        loops = losetup.get_loop_devices()
+        for loop in loops:
+            if loops[loop].is_used() and loops[loop].get_filename() == self.path:
+                dev = loops[loop]
                 break
         s = libc.umount2(ctypes.c_char_p(self.mountpoint), 0)
         if s == -1:
-            raise Exception('Failed to unmount %s: %s'%(self.id, os.strerror(ctypes.get_errno())))
+            raise Exception("Failed to unmount %s: %s" % (self.id, os.strerror(ctypes.get_errno())))
         if self.crypt:
             crypto.luks_close(self.id)
         if dev:
@@ -188,7 +195,7 @@ class VirtualDisk:
     def enable(self):
         f = FstabEntry()
         f.src = self.path
-        f.dst = os.path.join('/media', self.id)
+        f.dst = os.path.join("/media", self.id)
         f.uuid = ""
         f.fs_type = "ext4"
         f.options = "loop,rw,auto"
@@ -208,24 +215,27 @@ class VirtualDisk:
     def encrypt(self, passwd, cipher="", keysize=0, mount=False):
         cipher = cipher or config.get("filesystems", "cipher") or "aes-xts-plain64"
         keysize = keysize or config.get("filesystems", "keysize") or 256
-        os.rename(self.path, os.path.join(config.get("filesystems", "vdisk_dir"), self.id+'.crypt'))
-        self.path = os.path.join(config.get("filesystems", "vdisk_dir"), self.id+'.crypt')
-        dev = losetup.find_unused_loop_device()
-        dev.mount(str(self.path), offset=1048576)
-        s = crypto.luks_format(dev.device, passwd, cipher, int(keysize))
+        os.rename(self.path, os.path.join(config.get("filesystems", "vdisk_dir"), self.id+".crypt"))
+        self.path = os.path.join(config.get("filesystems", "vdisk_dir"), self.id+".crypt")
+        # Find an open loopback device and mount
+        loop = losetup.find_unused_loop_device()
+        loop.mount(str(self.path), offset=1048576)
+        # Encrypt the file inside the loopback and mount
+        s = crypto.luks_format(loop.device, passwd, cipher, int(keysize))
         if s != 0:
-            dev.unmount()
-            os.rename(self.path, os.path.join(config.get("filesystems", "vdisk_dir"), self.id+'.img'))
-            raise Exception('Failed to encrypt %s with errno %s'%(self.id, str(s)))
-        s = crypto.luks_open(dev.device, self.id, passwd)
+            loop.unmount()
+            os.rename(self.path, os.path.join(config.get("filesystems", "vdisk_dir"), self.id+".img"))
+            raise Exception("Failed to encrypt %s with errno %s"%(self.id, str(s)))
+        s = crypto.luks_open(loop.device, self.id, passwd)
         if s != 0:
-            dev.unmount()
-            raise Exception('Failed to decrypt %s with errno %s'%(self.id, str(s)))
-        s = shell('mkfs.ext4 /dev/mapper/%s' % self.id)
+            loop.unmount()
+            raise Exception("Failed to decrypt %s with errno %s"%(self.id, str(s)))
+        # Create a filesystem inside the encrypted device
+        s = shell("mkfs.ext4 /dev/mapper/%s" % self.id)
         crypto.luks_close(self.id)
-        dev.unmount()
+        loop.unmount()
         if s["code"] != 0:
-            raise Exception('Failed to format loop device: %s' % s["stderr"])
+            raise Exception("Failed to format loop device: %s" % s["stderr"])
         self.crypt = True
         if mount:
             self.mount(passwd)
@@ -270,11 +280,13 @@ def get(id=None):
     devs, mps = [], {}
     fstab = get_fstab()
     
+    # Get mount data for all devices
     with open("/etc/mtab", "r") as f:
         for x in f.readlines():
             x = x.split()
             mps[x[0]] = x[1]
     
+    # Get physical disks available
     for d in parted.getAllDevices():
         try:
             parts = parted.Disk(d).getPrimaryPartitions()
@@ -291,6 +303,7 @@ def get(id=None):
                 return dev
             devs.append(dev)
     
+    # Replace mount data for virtual disks with loopback id
     dd = losetup.get_loop_devices()
     for x in dd:
         try:
@@ -299,7 +312,9 @@ def get(id=None):
             continue
         if "/dev/loop%s" % s.lo_number in mps:
             mps[s.lo_filename] = mps["/dev/loop%s" % s.lo_number]
-    for x in glob.glob(os.path.join(config.get("filesystems", "vdisk_dir"), '*')):
+    
+    # Get virtual disks available
+    for x in glob.glob(os.path.join(config.get("filesystems", "vdisk_dir"), "*")):
         if not x.endswith((".img", ".crypt")):
             continue
         dname = os.path.splitext(os.path.split(x)[1])[0]
@@ -337,11 +352,11 @@ def get_points(id=None, path=None):
 
 class FstabEntry:
     def __init__(self):
-        self.src = ''
-        self.uuid = ''
-        self.dst = ''
-        self.options = ''
-        self.fs_type = ''
+        self.src = ""
+        self.uuid = ""
+        self.dst = ""
+        self.options = ""
+        self.fs_type = ""
         self.dump_p = 0
         self.fsck_p = 0
 
@@ -352,7 +367,7 @@ def get_fstab():
         ss = f.readlines()
 
     for s in ss:
-        if not s.split() or s[0] == '#':
+        if not s.split() or s[0] == "#":
             continue
         s = s.split()
         e = FstabEntry()
@@ -381,12 +396,12 @@ def save_fstab_entry(e, remove=False):
                 continue
             lines.append(x)
     if not remove:
-        lines.append('%s\t%s\t%s\t%s\t%i\t%i\n' % (("UUID="+e.uuid) if e.uuid else e.src, e.dst, e.fs_type, e.options, e.dump_p, e.fsck_p))
+        lines.append("%s\t%s\t%s\t%s\t%i\t%i\n" % (("UUID="+e.uuid) if e.uuid else e.src, e.dst, e.fs_type, e.options, e.dump_p, e.fsck_p))
     with open("/etc/fstab", "w") as f:
         f.writelines(lines)
 
 def get_partition_uuid_by_name(p):
-    return shell('blkid -o value -s UUID ' + p)["stdout"].split('\n')[0]
+    return shell("blkid -o value -s UUID " + p)["stdout"].split("\n")[0]
 
 def get_partition_name_by_uuid(u):
-    return shell('blkid -U ' + u)["stdout"].split('\n')[0]
+    return shell("blkid -U " + u)["stdout"].split("\n")[0]

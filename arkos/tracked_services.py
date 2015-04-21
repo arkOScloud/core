@@ -3,7 +3,7 @@ import os
 import random
 import sys
 
-from arkos import config, storage, security
+from arkos import config, signals, storage, security
 
 COMMON_PORTS = [3000, 3306, 5222, 5223, 5232, 8000, 8080]
 
@@ -32,7 +32,7 @@ class SecurityPolicy:
             policies[self.type][self.id] = self.policy
         with open(policy_path, "w") as f:
             f.write(json.dumps(policies, sort_keys=True, 
-                indent=4, separators=(',', ': ')))
+                indent=4, separators=(",", ": ")))
         if config.get("general", "firewall", True) and fw:
             security.regen_fw(get())
         if not storage.policies.get("policies", self.id):
@@ -47,7 +47,7 @@ class SecurityPolicy:
             del policies[self.type][self.id]
         with open(policy_path, "w") as f:
             f.write(json.dumps(policies, sort_keys=True, 
-                indent=4, separators=(',', ': ')))
+                indent=4, separators=(",", ": ")))
         if config.get("general", "firewall", True) and fw:
             security.regen_fw(get())
         storage.policies.remove("policies", self)
@@ -121,7 +121,7 @@ def refresh_policies():
                         newpolicies[x][s] = policies[x][s]
     with open(policy_path, "w") as f:
         f.write(json.dumps(newpolicies, sort_keys=True, 
-            indent=4, separators=(',', ': ')))
+            indent=4, separators=(",", ": ")))
 
 def get_open_port(ignore_common=False):
     data = get()
@@ -142,3 +142,16 @@ def initialize():
         for x in policies["custom"]:
             storage.policies.add("policies", SecurityPolicy("custom", x["id"], 
                 x["name"], x["icon"], x["ports"], x["policy"]))
+
+def register_website(site):
+    register(site.meta.id if site.meta else "website", site.id, 
+        site.name if hasattr(site, "name") and site.name else site.id, 
+        site.meta.icon if site.meta else "fa fa-globe", [("tcp", site.port)])
+
+def deregister_website(site):
+    deregister(site.meta.id if site.meta else "website", site.id)
+
+signals.add("tracked_services", "websites", "site_loaded", register_website)
+signals.add("tracked_services", "websites", "site_installed", register_website)
+signals.add("tracked_services", "websites", "site_removed", deregister_website)
+    

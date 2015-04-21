@@ -31,8 +31,8 @@ def ldap_connect(uri="", rootdn="", dn="cn=admin", config=None, passwd=""):
     uri = uri or config.get("general", "ldap_uri", "ldap://localhost")
     rootdn = rootdn or config.get("general", "ldap_rootdn", "dc=arkos-servers,dc=org")
     if not passwd:
-        if os.path.isfile(os.path.join(sys.path[0], 'secrets.json')):
-            secrets = os.path.join(sys.path[0], 'secrets.json')
+        if os.path.isfile(os.path.join(sys.path[0], "secrets.json")):
+            secrets = os.path.join(sys.path[0], "secrets.json")
         else:
             secrets = "/etc/arkos/secrets.json"
         with open(secrets, "r") as f:

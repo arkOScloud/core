@@ -37,27 +37,31 @@ class BackupController:
         return data
     
     def backup(self, version=None, data=True, backup_location=""):
-        signals.emit("backups", "pre_backup", self)
         if not backup_location:
             backup_location = config.get("backups", "location", "/var/lib/arkos/backups")
+        signals.emit("backups", "pre_backup", self)
         
+        # Trigger the pre-backup hook for the app/site
         if self.ctype == "site":
             self.pre_backup(self.site)
         else:
             self.pre_backup()
         
+        # Create backup directory in storage
         backup_dir = os.path.join(backup_location, self.id)
         try:
             os.makedirs(backup_dir)
         except:
             pass
         
+        # Gather config and data file paths to archive
         myconfig = self._get_config()
         data = self._get_data() if data else []
         timestamp = systemtime.get_serial_time()
         isotime = systemtime.get_iso_time(timestamp)
-        path = os.path.join(backup_dir, '%s-%s.tar.gz' % (self.id,timestamp))
-        with tarfile.open(path, 'w:gz') as t:
+        path = os.path.join(backup_dir, "%s-%s.tar.gz" % (self.id,timestamp))
+        # Zip up the gathered file paths
+        with tarfile.open(path, "w:gz") as t:
             for f in myconfig+data:
                 for x in glob.glob(f):
                     t.add(x)
@@ -66,13 +70,15 @@ class BackupController:
                 dinfo = tarfile.TarInfo(name="/%s.sql"%self.site.id)
                 dinfo.size = len(dbsql.buf)
                 t.addfile(tarinfo=dinfo, fileobj=dbsql)
+        # Create a metadata file to track information
         if not version and self.ctype == "site":
             version = self.site.meta.version
         info = {"pid": self.id, "type": self.ctype, "icon": self.icon, 
             "version": version, "time": isotime, "site_type": self.site.meta.id}
-        with open(os.path.join(backup_dir, '%s-%s.meta' % (self.id,timestamp)), 'w') as f:
+        with open(os.path.join(backup_dir, "%s-%s.meta" % (self.id,timestamp)), "w") as f:
             f.write(json.dumps(info))
-
+        
+        # Trigger post-backup hook for the app/site
         if self.ctype == "site":
             self.post_backup(self.site)
         else:
@@ -85,27 +91,29 @@ class BackupController:
             "site_type": self.site.meta.id, "is_ready": True}
     
     def restore(self, data):
-        from arkos import websites, databases
         signals.emit("backups", "pre_restore", self)
+        # Trigger pre-restore hook for the app/site
         self.pre_restore()
         
+        # Extract all files in archive
         sitename = ""
-        with tarfile.open(data["path"], 'r:gz') as t:
+        with tarfile.open(data["path"], "r:gz") as t:
             for x in t.getnames():
                 if x.startswith("etc/nginx/sites-available"):
                     sitename = os.path.basename(x)
             t.extractall("/")
         
+        # If it's a website that had a database, restore DB via SQL file too
         dbpasswd = ""
         if self.ctype == "site" and sitename:
             self.site = websites.get(sitename)
             if not self.site:
                 websites.scan()
                 self.site = websites.get(sitename)
-            g = ConfigParser.SafeConfigParser()
-            g.read(os.path.join(self.site.path, ".arkos"))
-            if g.get('website', 'dbengine', None) and os.path.exists("/%s.sql"%sitename):
-                dbmgr = databases.get_managers(g.get("website", "dbengine"))
+            meta = ConfigParser.SafeConfigParser()
+            meta.read(os.path.join(self.site.path, ".arkos"))
+            if meta.get("website", "dbengine", None) and os.path.exists("/%s.sql"%sitename):
+                dbmgr = databases.get_managers(meta.get("website", "dbengine"))
                 if databases.get(sitename):
                     databases.get(sitename).remove()
                 db = dbmgr.add_db(sitename)
@@ -116,9 +124,10 @@ class BackupController:
                     dbpasswd = random_string()[0:16]
                     if databases.get_user(sitename):
                         databases.get_user(sitename).remove()
-                    u = dbmgr.add_user(sitename, dbpasswd)
-                    u.chperm("grant", db)
+                    db_user = dbmgr.add_user(sitename, dbpasswd)
+                    db_user.chperm("grant", db)
         
+        # Trigger post-restore hook for the app/site
         if self.ctype == "site":
             self.post_restore(self.site, dbpasswd)
             self.site.nginx_enable()
@@ -154,8 +163,10 @@ def get(backup_location=""):
     if not os.path.exists(backup_location):
         os.makedirs(backup_location)
     for x in os.listdir(backup_location):
+        # Get backups, sort by date
         archives = os.listdir(os.path.join(backup_location, x))
-        archives = sorted(archives, key=lambda y: int(os.path.splitext(os.path.splitext(y)[0])[0].split("-")[1]))
+        archives = sorted(archives, 
+            key=lambda y: int(os.path.splitext(os.path.splitext(y)[0])[0].split("-")[1]))
         for y in archives:
             if not y.endswith(".tar.gz"):
                 continue
@@ -230,3 +241,13 @@ def remove(id, time, backup_location=""):
     for x in backups:
         if x["id"] == id+"/"+time:
             os.unlink(x["path"])
+
+def site_load(site):
+    if site.__name__ != "ReverseProxy":
+        controller = site.meta.get_module("backup") or BackupController
+        site.backup = controller(site.id, site.meta.icon, site=site)
+    else:
+        site.backup = None
+
+signals.add("backup", "websites", "site_loaded", site_load)
+signals.add("backup", "websites", "site_installed", site_load)

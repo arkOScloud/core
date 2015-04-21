@@ -22,12 +22,14 @@ def get_load():
 
 def get_temp():
     # TODO: replace this with libsensors.so / PySensors
-    if config.get("enviro", "board") == 'Raspberry Pi':
-        return '%3.1f°C'%(float(shell('cat /sys/class/thermal/thermal_zone0/temp').split('\n')[0])/1000)
+    if config.get("enviro", "board") == "Raspberry Pi":
+        temp = shell("cat /sys/class/thermal/thermal_zone0/temp")
+        return "%3.1f°C"%(float(temp.split("\n")[0])/1000)
     else:
-        if os.path.exists('/sys/class/hwmon/hwmon1/temp1_input'):
-            return '%3.1f°C'%(float(shell('cat /sys/class/hwmon/hwmon1/temp1_input'))/1000)
-    return ''
+        if os.path.exists("/sys/class/hwmon/hwmon1/temp1_input"):
+            shell("cat /sys/class/hwmon/hwmon1/temp1_input")
+            return "%3.1f°C"%(float(temp)/1000)
+    return ""
 
 def get_ram():
     s = psutil.virtual_memory()

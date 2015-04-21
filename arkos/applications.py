@@ -23,44 +23,50 @@ class App:
         self.installed = False
         self.error = ""
 
-    def get_module(self, mtype):
-        return getattr(self, "_%s"%mtype) if hasattr(self, "_%s"%mtype) else None
+    def get_module(self, mod_type):
+        return getattr(self, "_%s" % mod_type) if hasattr(self, "_%s" % mod_type) else None
     
     def load(self, verify=True):
         try:
             signals.emit("apps", "pre_load", self)
             if verify:
                 self.verify_dependencies()
-            module = imp.load_module(self.id, *imp.find_module(self.id, [os.path.join(config.get("apps", "app_dir"))]))
-            for x in self.modules:
-                submod = imp.load_module("%s.%s"%(self.id,x), *imp.find_module(x, [os.path.join(config.get("apps", "app_dir"), self.id)]))
+            
+            # Load the application module into Python
+            imp.load_module(self.id, *imp.find_module(self.id, 
+                [os.path.join(config.get("apps", "app_dir"))]))
+            # Get module and its important classes and track them on this object
+            for module in self.modules:
+                submod = imp.load_module("%s.%s" % (self.id, module), 
+                    *imp.find_module(module, [os.path.join(config.get("apps", "app_dir"), self.id)]))
                 classes = inspect.getmembers(submod, inspect.isclass)
                 mgr = None
                 for y in classes:
                     if y[0] in ["DatabaseManager", "Site", "BackupController"]:
                         mgr = y[1]
                         break
-                if x == "database":
+                if module == "database":
                     for y in classes:
                         if issubclass(y[1], mgr) and y[1] != mgr:
                             setattr(self, "_database_mgr", y[1])
-                elif x == "website":
+                elif module == "website":
                     for y in classes:
                         if issubclass(y[1], mgr) and y[1] != mgr:
                             setattr(self, "_website", y[1])
-                elif x == "backup":
+                elif module == "backup":
                     for y in classes:
                         if issubclass(y[1], mgr) and y[1] != mgr:
                             setattr(self, "_backup", y[1])
-                elif x == "api":
+                elif module == "api":
                     if hasattr(self, "_backend"):
                         setattr(submod, self.id, self._backend)
                     setattr(self, "_api", submod)
-                elif x == "ssl":
+                elif module == "ssl":
                     self.ssl = submod
                     self.cert = self.ssl.get_ssl_assigned()
                 else:
-                    setattr(self, "_%s"%x, submod)
+                    setattr(self, "_%s" % module, submod)
+            # Set up tracking of ports associated with this app
             for s in self.services:
                 if s["ports"]:
                     tracked_services.register(self.id, s["binary"], s["name"], 
@@ -73,6 +79,8 @@ class App:
     
     def verify_dependencies(self):
         verify, error, to_pacman = True, "", []
+        # If dependency isn't installed, add it to "to install" list
+        # If it can't be installed, mark the app as not loadable and say why
         for dep in self.dependencies:
             if dep["type"] == "system":
                 if (dep["binary"] and not find_executable(dep["binary"])) \
@@ -102,6 +110,7 @@ class App:
                         if dep.has_key("internal") and dep["internal"]:
                             error = "Restart required"
                             verify = False
+        # Execute the "to install" list actions
         if to_pacman:
             pacman.refresh()
         for x in to_pacman:
@@ -119,25 +128,26 @@ class App:
         if self.installed and not force:
             return
         signals.emit("apps", "pre_install", self)
+        # Get all apps that this app depends on and install them first
         deps = get_dependent(self.id, "install")
         if install_deps and deps:
             for x in deps:
                 logger.debug("Installing %s (dependency for %s)" % (x, self.name))
                 message.update("info", "Installing dependencies for %s... (%s)" % (self.name, x))
                 _install(x, load=load)
+        # Install this app
         logger.debug("Installing %s" % self.name)
         message.update("info", "Installing %s..." % self.name)
         _install(self.id, load=load)
-        for x in self.services:
-            if x["ports"]:
-                regen_fw = True
-                tracked_services.register(self.id, x["binary"], x["name"], self.icon, x["ports"])
         signals.emit("apps", "post_install", self)
     
     def uninstall(self, force=False, message=DefaultMessage()):
         signals.emit("apps", "pre_remove", self)
         message.update("info", "Uninstalling application...")
-        exclude = ['openssl', 'openssh', 'nginx', 'python2', 'git']
+        exclude = ["openssl", "openssh", "nginx", "python2", "git"]
+        
+        # Make sure this app can be successfully removed, and if so also remove
+        # any system-level packages that *only* this app requires
         for x in storage.apps.get("applications"):
             if not x.installed:
                 continue
@@ -146,6 +156,8 @@ class App:
                     raise Exception("Cannot remove, %s depends on this application" % item["package"])
                 elif item["type"] == "system":
                     exclude.append(item["package"])
+                    
+        # Stop any running services associated with this app
         for item in self.dependencies:
             if item["type"] == "system" and not item["package"] in exclude:
                 if item.has_key("daemon") and item["daemon"]:
@@ -153,9 +165,13 @@ class App:
                     services.disable(item["daemon"])
                 pacman.remove([item["package"]], purge=config.get("apps", "purge", False))
         logger.debug("Uninstalling %s" % self.name)
+        
+        # Remove the app's directory and cleanup the app object
         shutil.rmtree(os.path.join(config.get("apps", "app_dir"), self.id))
         self.loadable = False
         self.installed = False
+        
+        # Regenerate the firewall and re-block the abandoned ports
         regen_fw = False
         for x in self.services:
             if x["ports"]:
@@ -203,34 +219,39 @@ def get(id=None, type=None, loadable=None, installed=None, verify=True):
     if not data:
         data = scan(verify)
     if id or type or loadable or installed:
-        tlist = []
+        type_list = []
         for x in data:
             if x.id == id and (x.loadable or not loadable):
                 return x
             elif str(x.installed).lower() == str(installed).lower() and (x.type or not type):
-                tlist.append(x)
+                type_list.append(x)
             elif x.type == type and (x.loadable or not loadable):
-                tlist.append(x)
-        if tlist:
-            return tlist
+                type_list.append(x)
+        if type_list:
+            return type_list
         return []
     return data
 
 def scan(verify=True):
     signals.emit("apps", "pre_scan")
+    app_dir = config.get("apps", "app_dir")
     apps = []
-    if not os.path.exists(config.get("apps", "app_dir")):
-        os.makedirs(config.get("apps", "app_dir"))
-    idata = [x for x in os.listdir(config.get("apps", "app_dir")) if not x.startswith(".")]
-    adata = api('https://%s/api/v1/apps' % config.get("general", "repo_server"), crit=False)
-    if adata:
-        adata = adata["applications"]
+    if not os.path.exists(app_dir):
+        os.makedirs(app_dir)
+    
+    # Get paths for installed apps, metadata for available ones
+    installed_apps = [x for x in os.listdir(app_dir) if not x.startswith(".")]
+    available_apps = api("https://%s/api/v1/apps" % config.get("general", "repo_server"),
+        crit=False)
+    if available_apps:
+        available_apps = available_apps["applications"]
     else:
-        adata = []
+        available_apps = []
 
-    for x in idata:
+    # Create objects for installed apps with appropriate metadata
+    for x in installed_apps:
         try:
-            with open(os.path.join(config.get("apps", "app_dir"), x, "manifest.json"), "r") as f:
+            with open(os.path.join(app_dir, x, "manifest.json"), "r") as f:
                 data = json.loads(f.read())
         except ValueError:
             logger.warn("Failed to load %s due to a JSON parsing error" % x)
@@ -239,22 +260,23 @@ def scan(verify=True):
             logger.warn("Failed to load %s: manifest file inaccessible or not present" % x)
             continue
         logger.debug(" *** Loading %s" % data["id"])
-        a = App(**data)
-        a.installed = True
+        app = App(**data)
+        app.installed = True
         for y in enumerate(adata):
-            if a.id == y[1]["id"] and a.version != y[1]["version"]:
-                a.upgradable = y[1]["version"]
-            if a.id == y[1]["id"]:
-                a.assets = y[1]["assets"]
+            if app.id == y[1]["id"] and app.version != y[1]["version"]:
+                app.upgradable = y[1]["version"]
+            if app.id == y[1]["id"]:
+                app.assets = y[1]["assets"]
                 adata[y[0]]["installed"] = True
-        a.load()
-        apps.append(a)
+        app.load()
+        apps.append(app)
     
-    for x in adata:
+    # Convert available apps payload to objects
+    for x in available_apps:
         if not x.get("installed"):
-            a = App(**x)
-            a.installed = False
-            apps.append(a)
+            app = App(**x)
+            app.installed = False
+            apps.append(app)
 
     storage.apps.set("applications", apps)
     
@@ -267,19 +289,24 @@ def verify_app_dependencies():
     apps = [x for x in storage.apps.get("applications") if x.installed]
     for x in apps:
         for dep in x.dependencies:
+            # For each app-type dependency in all installed apps...
             if dep["type"] == "app":
+                # If the needed app isn't yet installed, put a fail message
                 if not dep["package"] in [y.id for y in apps]:
                     x.loadable = False
                     x.error = "Depends on %s, which is not installed" % dep["name"]
                     logger.debug("*** Verify failed for %s -- dependent on %s which is not installed" % (x.name,dep["name"]))
+                    # Cascade this fail message to all apps in the dependency chain
                     for z in get_dependent(x.id, "remove"):
                         z = storage.apps.get("applications", z)
                         z.loadable = False
                         z.error = "Depends on %s, which cannot be loaded because %s is not installed" % (x.name,dep["name"])
+                # Also put a fail message if the app we depended on failed to load
                 elif not storage.apps.get("applications", dep["package"]).loadable:
                     x.loadable = False
                     x.error = "Depends on %s, which also failed" % dep["name"]
                     logger.debug("*** Verify failed for %s -- dependent on %s which failed to load" % (x.name,dep["name"]))
+                    # Cascade this fail message to all apps in the dependency chain
                     for z in get_dependent(x.id, "remove"):
                         z = storage.apps.get("applications", z)
                         z.loadable = False
@@ -288,34 +315,40 @@ def verify_app_dependencies():
 def get_dependent(id, op):
     metoo = []
     apps = storage.apps.get("applications")
-    if op == 'remove':
-        for i in apps:
-            for dep in i.dependencies:
-                if dep['type'] == 'app' and dep['package'] == id:
-                    metoo.append(i)
-                    metoo += get_dependent(i.id, 'remove')
-    elif op == 'install':
-        i = next(x for x in apps if x.id == id)
-        for dep in i.dependencies:
-            if dep["type"] == 'app' and dep['package'] not in [x.id for x in apps if x.installed]:
-                metoo.append(dep['package'])
-                metoo += get_dependent(dep['package'], 'install')
+    installed = [x.id for x in apps if x.installed]
+    # If any apps depend on me, flag them to be removed also
+    if op == "remove":
+        for app in apps:
+            for dep in app.dependencies:
+                if dep["type"] == "app" and dep["package"] == id:
+                    metoo.append(app)
+                    metoo += get_dependent(app.id, "remove")
+    # If I need any other apps to install, flag them to be installed also
+    elif op == "install":
+        app = next(x for x in apps if x.id == id)
+        for dep in app.dependencies:
+            if dep["type"] == "app" and dep["package"] not in installed:
+                metoo.append(dep["package"])
+                metoo += get_dependent(dep["package"], "install")
     return metoo
 
 def _install(id, load=True):
-    data = api('https://%s/api/v1/apps/%s' % (config.get("general", "repo_server"), id),
-        returns='raw', crit=True)
-    with open(os.path.join(config.get("apps", "app_dir"), '%s.tar.gz' % id), 'wb') as f:
+    app_dir = config.get("apps", "app_dir")
+    # Download and extract the app source package
+    data = api("https://%s/api/v1/apps/%s" % (config.get("general", "repo_server"), id),
+        returns="raw", crit=True)
+    with open(os.path.join(app_dir, "%s.tar.gz" % id), "wb") as f:
         f.write(data)
-    with tarfile.open(os.path.join(config.get("apps", "app_dir"), '%s.tar.gz' % id), 'r:gz') as t:
-        t.extractall(config.get("apps", "app_dir"))
-    os.unlink(os.path.join(config.get("apps", "app_dir"), '%s.tar.gz' % id))
-    with open(os.path.join(config.get("apps", "app_dir"), id, "manifest.json")) as f:
+    with tarfile.open(os.path.join(app_dir, "%s.tar.gz" % id), "r:gz") as t:
+        t.extractall(app_dir)
+    os.unlink(os.path.join(app_dir, "%s.tar.gz" % id))
+    # Read the app's metadata and create an object
+    with open(os.path.join(app_dir, id, "manifest.json")) as f:
         data = json.loads(f.read())
-    a = get(id)
+    app = get(id)
     for x in data:
-        setattr(a, x, data[x])
-    a.upgradable = ""
-    a.installed = True
+        setattr(app, x, data[x])
+    app.upgradable = ""
+    app.installed = True
     if load:
-        a.load()
+        app.load()
