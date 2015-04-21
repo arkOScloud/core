@@ -262,12 +262,12 @@ def scan(verify=True):
         logger.debug(" *** Loading %s" % data["id"])
         app = App(**data)
         app.installed = True
-        for y in enumerate(adata):
+        for y in enumerate(available_apps):
             if app.id == y[1]["id"] and app.version != y[1]["version"]:
                 app.upgradable = y[1]["version"]
             if app.id == y[1]["id"]:
                 app.assets = y[1]["assets"]
-                adata[y[0]]["installed"] = True
+                available_apps[y[0]]["installed"] = True
         app.load()
         apps.append(app)
     
