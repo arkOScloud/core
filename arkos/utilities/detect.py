@@ -19,6 +19,8 @@ def detect_architecture():
         # Is this a... Raspberry Pi?
         if cpuinfo.has_key("Hardware") and cpuinfo["Hardware"] in ("BCM2708", "BCM2835"):
             btype = "Raspberry Pi"
+        elif cpuinfo.has_key("Hardware") and cpuinfo["Hardware"] == "BCM2709":
+            btype = "Raspberry Pi 2"
         # Is this a... BeagleBone Black?
         elif cpuinfo.has_key("Hardware") and "Generic AM33XX" in cpuinfo["Hardware"] and cpuinfo["CPU part"] == "0xc08":
             btype = "BeagleBone Black"

@@ -13,6 +13,9 @@ class Config:
             self.config = json.loads(f.read())
 
     def save(self):
+        config = self.config.copy()
+        if config.has_key("enviro"):
+            del config["enviro"]
         with open(self.filename, 'w') as f:
             f.write(json.dumps(self.config, sort_keys=True, 
                 indent=4, separators=(',', ': ')))
