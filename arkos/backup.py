@@ -243,7 +243,7 @@ def remove(id, time, backup_location=""):
             os.unlink(x["path"])
 
 def site_load(site):
-    if site.__name__ != "ReverseProxy":
+    if site.__class__.__name__ != "ReverseProxy":
         controller = site.meta.get_module("backup") or BackupController
         site.backup = controller(site.id, site.meta.icon, site=site)
     else:
