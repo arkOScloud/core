@@ -6,6 +6,8 @@ from arkos.storage import Storage
 from arkos.utilities import new_logger
 from arkos.connections import ConnectionsManager
 
+VERSION = "0.7.0beta1"
+
 
 class LoggingControl:
     def __init__(self, default):
