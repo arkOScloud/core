@@ -181,10 +181,15 @@ def get_interfaces(id=None):
         data = psutil.net_io_counters(pernic=True)
         data = data[x] if type(data) == dict else data
         i.rx, i.tx = data[0], data[1]
-        # Determine the interface's IP address
-        i.ip = netifaces.ifaddresses(i.id)[netifaces.AF_INET]
+        addrs = netifaces.ifaddresses(x)
+        i.ip = addrs.get(netifaces.AF_INET, None)
+        i.ip6 = addrs.get(netifaces.AF_INET6, None)
+        if not i.ip and not i.ip6:
+            i.up = False
+            continue
         # Determine if the interface is up or not
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s = socket.socket(socket.AF_INET if i.ip else socket.AF_INET6, 
+            socket.SOCK_DGRAM)
         r = fcntl.ioctl(s.fileno(), 0x8913, i.id + ("\0"*256))
         flags, = struct.unpack("H", r[16:18])
         up = flags & 1
