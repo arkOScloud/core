@@ -139,6 +139,7 @@ class App:
         logger.debug("Installing %s" % self.name)
         message.update("info", "Installing %s..." % self.name)
         _install(self.id, load=load)
+        verify_app_dependencies()
         signals.emit("apps", "post_install", self)
     
     def uninstall(self, force=False, message=DefaultMessage()):
