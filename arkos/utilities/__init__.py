@@ -3,7 +3,6 @@ from arkos.utilities.utils import *
 from arkos.utilities.logs import *
 
 __all__ = [
-    "version",
     "path_to_b64",
     "b64_to_path",
     "extract",

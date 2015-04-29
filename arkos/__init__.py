@@ -6,22 +6,23 @@ from arkos.storage import Storage
 from arkos.utilities import new_logger
 from arkos.connections import ConnectionsManager
 
+
 VERSION = "0.7.0beta2"
 
 
 class LoggingControl:
     def __init__(self, default):
         self.active_logger = default
-    
+
     def info(self, msg):
         self.active_logger.info(msg)
-    
+
     def warn(self, msg):
         self.active_logger.warn(msg)
-    
+
     def error(self, msg):
         self.active_logger.error(msg)
-    
+
     def debug(self, msg):
         self.active_logger.debug(msg)
 
@@ -39,6 +40,7 @@ class StorageControl:
         self.signals = Storage(["listeners"])
 
 
+version = VERSION
 config = Config()
 if os.path.exists(os.path.join(sys.path[0], "settings.json")):
     config.load(os.path.join(sys.path[0], "settings.json"))
