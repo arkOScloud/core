@@ -13,12 +13,15 @@ class timespec(ctypes.Structure):
         _fields_ = [("tv_sec", ctypes.c_long), ("tv_nsec", ctypes.c_long)]
 
 
-def verify_time(update=True):
+def verify_time(update=True, crit=True):
     # Verifies system time with NTP, sets it if it is more than an hour off
     try:
         os = get_offset()
     except Exception, e:
-        raise Exception("System time could not be retrieved. Error: %s" % str(e))
+        if crit:
+            raise Exception("System time could not be retrieved. Error: %s" % str(e))
+        else:
+            return "UNKNOWN"
     if (os < -3600 or os > 3600) and update:
         set_datetime()
     return os

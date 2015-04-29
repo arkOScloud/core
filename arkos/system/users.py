@@ -44,7 +44,7 @@ class User:
             "mail": self.name+"@"+self.domain,
             "maildrop": self.name,
             "userPassword": hashpw(passwd, "crypt"),
-            "gidNumber": str(self.uid),
+            "gidNumber": "100",
             "uidNumber": str(self.uid),
             "homeDirectory": "/home/%s" % self.name,
             "loginShell": "/usr/bin/bash"
