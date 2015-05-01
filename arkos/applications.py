@@ -1,4 +1,3 @@
-import base64
 import imp
 import inspect
 import json
@@ -25,19 +24,19 @@ class App:
 
     def get_module(self, mod_type):
         return getattr(self, "_%s" % mod_type) if hasattr(self, "_%s" % mod_type) else None
-    
+
     def load(self, verify=True):
         try:
             signals.emit("apps", "pre_load", self)
             if verify:
                 self.verify_dependencies()
-            
+
             # Load the application module into Python
-            imp.load_module(self.id, *imp.find_module(self.id, 
+            imp.load_module(self.id, *imp.find_module(self.id,
                 [os.path.join(config.get("apps", "app_dir"))]))
             # Get module and its important classes and track them on this object
             for module in self.modules:
-                submod = imp.load_module("%s.%s" % (self.id, module), 
+                submod = imp.load_module("%s.%s" % (self.id, module),
                     *imp.find_module(module, [os.path.join(config.get("apps", "app_dir"), self.id)]))
                 classes = inspect.getmembers(submod, inspect.isclass)
                 mgr = None
@@ -45,6 +44,7 @@ class App:
                     if y[0] in ["DatabaseManager", "Site", "BackupController"]:
                         mgr = y[1]
                         break
+                logger.debug(" *** Registering %s module on %s" % (module, self.id))
                 if module == "database":
                     for y in classes:
                         if issubclass(y[1], mgr) and y[1] != mgr:
@@ -63,20 +63,19 @@ class App:
                     setattr(self, "_api", submod)
                 elif module == "ssl":
                     self.ssl = submod
-                    self.cert = self.ssl.get_ssl_assigned()
                 else:
                     setattr(self, "_%s" % module, submod)
             # Set up tracking of ports associated with this app
             for s in self.services:
                 if s["ports"]:
-                    tracked_services.register(self.id, s["binary"], s["name"], 
+                    tracked_services.register(self.id, s["binary"], s["name"],
                         self.icon, s["ports"], fw=False)
             signals.emit("apps", "post_load", self)
         except Exception, e:
             self.loadable = False
             self.error = "Module error: %s" % str(e)
             logger.warn("Failed to load %s -- %s" % (self.name, str(e)))
-    
+
     def verify_dependencies(self):
         verify, error, to_pacman = True, "", []
         # If dependency isn't installed, add it to "to install" list
@@ -123,7 +122,7 @@ class App:
         self.loadable = verify
         self.error = error
         return verify
-    
+
     def install(self, install_deps=True, load=True, force=False, message=DefaultMessage()):
         if self.installed and not force:
             return
@@ -141,12 +140,12 @@ class App:
         _install(self.id, load=load)
         verify_app_dependencies()
         signals.emit("apps", "post_install", self)
-    
+
     def uninstall(self, force=False, message=DefaultMessage()):
         signals.emit("apps", "pre_remove", self)
         message.update("info", "Uninstalling application...")
         exclude = ["openssl", "openssh", "nginx", "python2", "git"]
-        
+
         # Make sure this app can be successfully removed, and if so also remove
         # any system-level packages that *only* this app requires
         for x in storage.apps.get("applications"):
@@ -157,7 +156,7 @@ class App:
                     raise Exception("Cannot remove, %s depends on this application" % item["package"])
                 elif item["type"] == "system":
                     exclude.append(item["package"])
-                    
+
         # Stop any running services associated with this app
         for item in self.dependencies:
             if item["type"] == "system" and not item["package"] in exclude:
@@ -166,12 +165,12 @@ class App:
                     services.disable(item["daemon"])
                 pacman.remove([item["package"]], purge=config.get("apps", "purge", False))
         logger.debug("Uninstalling %s" % self.name)
-        
+
         # Remove the app's directory and cleanup the app object
         shutil.rmtree(os.path.join(config.get("apps", "app_dir"), self.id))
         self.loadable = False
         self.installed = False
-        
+
         # Regenerate the firewall and re-block the abandoned ports
         regen_fw = False
         for x in self.services:
@@ -180,36 +179,31 @@ class App:
         if regen_fw:
             tracked_services.deregister(self.id)
         signals.emit("apps", "post_remove", self)
-    
+
     def ssl_enable(self, cert, sid=""):
         signals.emit("apps", "pre_ssl_enable", self)
         if sid:
-            self.ssl.ssl_enable(cert, sid)
-            if not hasattr(self, "cert") or type(self.cert) != dict:
-                self.cert = {}
-            self.cert[sid] = cert
+            d = self.ssl.ssl_enable(cert, sid)
         else:
             self.ssl.ssl_enable(cert)
-            self.cert = cert
         signals.emit("apps", "post_ssl_enable", self)
-    
+        return d
+
     def ssl_disable(self, sid=""):
         signals.emit("apps", "pre_ssl_disable", self)
         if sid:
             self.ssl.ssl_disable(sid)
-            del self.cert[sid]
         else:
             self.ssl.ssl_disable()
-            self.cert = None
         signals.emit("apps", "post_ssl_disable", self)
-    
+
     def get_ssl_able(self):
         return self.ssl.get_ssl_able()
-    
+
     def as_dict(self):
         data = {}
         for x in self.__dict__:
-            if not x.startswith("_") and x != "ssl" and x != "cert":
+            if not x.startswith("_") and x != "ssl":
                 data[x] = self.__dict__[x]
         data["is_ready"] = True
         return data
@@ -239,7 +233,7 @@ def scan(verify=True):
     apps = []
     if not os.path.exists(app_dir):
         os.makedirs(app_dir)
-    
+
     # Get paths for installed apps, metadata for available ones
     installed_apps = [x for x in os.listdir(app_dir) if not x.startswith(".")]
     available_apps = api("https://%s/api/v1/apps" % config.get("general", "repo_server"),
@@ -271,7 +265,7 @@ def scan(verify=True):
                 available_apps[y[0]]["installed"] = True
         app.load()
         apps.append(app)
-    
+
     # Convert available apps payload to objects
     for x in available_apps:
         if not x.get("installed"):
@@ -280,7 +274,7 @@ def scan(verify=True):
             apps.append(app)
 
     storage.apps.set("applications", apps)
-    
+
     if verify:
         verify_app_dependencies()
     signals.emit("apps", "post_scan")

@@ -27,7 +27,7 @@ class Certificate:
         self.expiry = expiry
         self.sha1 = sha1
         self.md5 = md5
-    
+
     def assign(self, assign):
         signals.emit("certificates", "pre_assign", (self, assign))
         nginx_reload = False
@@ -50,7 +50,7 @@ class Certificate:
             websites.nginx_reload()
         signals.emit("certificates", "post_assign", (self, assign))
         return self
-    
+
     def unassign(self, assign):
         signals.emit("certificates", "pre_unassign", (self, assign))
         nginx_reload = False
@@ -71,7 +71,7 @@ class Certificate:
             websites.nginx_reload()
         signals.emit("certificates", "post_unassign", (self, assign))
         return None
-    
+
     def remove(self):
         signals.emit("certificates", "pre_remove", self)
         for x in self.assigns:
@@ -82,7 +82,7 @@ class Certificate:
             os.unlink(self.key_path)
         storage.certs.remove("certificates", self)
         signals.emit("certificates", "post_remove", self)
-    
+
     def as_dict(self, ready=True):
         return {
             "id": self.id,
@@ -103,14 +103,14 @@ class CertificateAuthority:
         self.cert_path = cert_path
         self.key_path = key_path
         self.expiry = expiry
-    
+
     def remove(self):
         if os.path.exists(self.cert_path):
             os.unlink(self.cert_path)
         if os.path.exists(self.key_path):
             os.unlink(self.key_path)
         storage.certs.remove("authorities", self)
-    
+
     def as_dict(self):
         return {
             "id": self.id,
@@ -137,6 +137,14 @@ def scan():
             assigns[ssl].append({"type": "genesis"})
         elif ssl:
             assigns[ssl] = [{"type": "genesis"}]
+    for x in applications.get(installed=True):
+        if hasattr(x, "ssl"):
+            for ssl, data in x.ssl.get_ssl_assigned():
+                if assigns.has_key(ssl):
+                    assigns[ssl] += data
+                else:
+                    assigns[ssl] = []
+                    assigns[ssl].append(data)
     if not os.path.exists(config.get("certificates", "cert_dir")):
         os.makedirs(config.get("certificates", "cert_dir"))
     if not os.path.exists(config.get("certificates", "key_dir")):
@@ -221,10 +229,10 @@ def upload_certificate(id, cert, key, chain=""):
     return c
 
 def generate_certificate(
-        id, domain, country, state="", locale="", email="", keytype="RSA", 
+        id, domain, country, state="", locale="", email="", keytype="RSA",
         keylength=2048):
     signals.emit("certificates", "pre_add", id)
-    
+
     # Check to see that we have a CA ready; if not, generate one
     basehost = ".".join(domain.split(".")[-2:])
     ca = get_authorities(id=basehost)
@@ -259,7 +267,7 @@ def generate_certificate(
         crt.sign(ca_key, "sha256")
     except Exception, e:
         raise Exception("Error generating self-signed certificate: "+str(e))
-    
+
     # Save to files
     cert_path = os.path.join(config.get("certificates", "cert_dir"), id+".crt")
     key_path = os.path.join(config.get("certificates", "key_dir"), id+".key")
@@ -271,7 +279,7 @@ def generate_certificate(
         f.write(OpenSSL.crypto.dump_privatekey(OpenSSL.crypto.FILETYPE_PEM, key))
     os.chown(key_path, -1, gid)
     os.chmod(key_path, 0660)
-    
+
     # Create actual certificate object
     sha1, md5 = get_cert_hashes(crt)
     c = Certificate(id=id, domain=domain, keytype=keytype, keylength=keylength,
@@ -282,10 +290,10 @@ def generate_certificate(
     return c
 
 def generate_authority(domain):
-    ca = CertificateAuthority(id=domain, 
+    ca = CertificateAuthority(id=domain,
         cert_path=os.path.join(config.get("certificates", "ca_cert_dir"), domain+".pem"),
         key_path=os.path.join(config.get("certificates", "ca_key_dir"), domain+".key"))
-    
+
     # Generate private key and create X509 certificate, then set options
     key = OpenSSL.crypto.PKey()
     key.generate_key(OpenSSL.crypto.TYPE_RSA, 2048)
@@ -319,5 +327,5 @@ def get_cert_hashes(cert):
     h.update(OpenSSL.crypto.dump_certificate(OpenSSL.crypto.FILETYPE_ASN1, cert))
     m.update(OpenSSL.crypto.dump_certificate(OpenSSL.crypto.FILETYPE_ASN1, cert))
     h, m = h.hexdigest(), m.hexdigest()
-    return (":".join([h[i:i+2].upper() for i in range(0,len(h), 2)]), 
+    return (":".join([h[i:i+2].upper() for i in range(0,len(h), 2)]),
         ":".join([m[i:i+2].upper() for i in range(0,len(m), 2)]))
