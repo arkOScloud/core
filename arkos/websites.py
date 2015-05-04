@@ -372,7 +372,7 @@ class Site:
         server.filter("Key", "server_name")[0].value = self.addr
         server.filter("Key", "root")[0].value = self.path
         server.filter("Key", "index")[0].value = "index.php" if self.php else "index.html"
-        nginx.dumpf(c, os.path.join("/etc/nginx/sites-available", self.id))
+        nginx.dumpf(block, os.path.join("/etc/nginx/sites-available", self.id))
 
         # Call the site's edited hook, if it has one, then reload nginx
         signals.emit("websites", "site_loaded", self)

@@ -148,12 +148,10 @@ class App:
 
         # Make sure this app can be successfully removed, and if so also remove
         # any system-level packages that *only* this app requires
-        for x in storage.apps.get("applications"):
-            if not x.installed:
-                continue
+        for x in get(installed=True):
             for item in x.dependencies:
                 if item["type"] == "app" and item["package"] == self.id and not force:
-                    raise Exception("Cannot remove, %s depends on this application" % item["package"])
+                    raise Exception("Cannot remove, %s depends on this application" % x.name)
                 elif item["type"] == "system":
                     exclude.append(item["package"])
 
