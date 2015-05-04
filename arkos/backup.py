@@ -6,18 +6,20 @@ import shutil
 import StringIO
 import tarfile
 
+from arkos import version as arkos_version
 from arkos import config, signals, applications, websites
 from arkos.system import systemtime
-from arkos.utilities import random_string
+from arkos.utilities import random_string, shell
 
 
 class BackupController:
-    def __init__(self, id, icon, site=None):
+    def __init__(self, id, icon, site=None, version=None):
         self.id = id
         self.icon = icon
         self.ctype = "site" if site else "app"
         self.site = site
-    
+        self.version = version
+
     def _get_config(self):
         configs = []
         if self.ctype == "site":
@@ -25,7 +27,7 @@ class BackupController:
         else:
             configs += self.get_config()
         return configs
-    
+
     def _get_data(self):
         data = []
         if self.ctype == "site":
@@ -35,25 +37,27 @@ class BackupController:
         else:
             data += self.get_data()
         return data
-    
-    def backup(self, version=None, data=True, backup_location=""):
+
+    def backup(self, data=True, backup_location=""):
         if not backup_location:
             backup_location = config.get("backups", "location", "/var/lib/arkos/backups")
+        if self.ctype == "site":
+            self.version = self.site.meta.version
         signals.emit("backups", "pre_backup", self)
-        
+
         # Trigger the pre-backup hook for the app/site
         if self.ctype == "site":
             self.pre_backup(self.site)
         else:
             self.pre_backup()
-        
+
         # Create backup directory in storage
         backup_dir = os.path.join(backup_location, self.id)
         try:
             os.makedirs(backup_dir)
         except:
             pass
-        
+
         # Gather config and data file paths to archive
         myconfig = self._get_config()
         data = self._get_data() if data else []
@@ -71,30 +75,30 @@ class BackupController:
                 dinfo.size = len(dbsql.buf)
                 t.addfile(tarinfo=dinfo, fileobj=dbsql)
         # Create a metadata file to track information
-        if not version and self.ctype == "site":
-            version = self.site.meta.version
-        info = {"pid": self.id, "type": self.ctype, "icon": self.icon, 
-            "version": version, "time": isotime, "site_type": self.site.meta.id}
+        info = {"pid": self.id, "type": self.ctype, "icon": self.icon,
+            "version": self.version, "time": isotime}
+        if self.site:
+            info["site_type"] = self.site.meta.id
         with open(os.path.join(backup_dir, "%s-%s.meta" % (self.id,timestamp)), "w") as f:
             f.write(json.dumps(info))
-        
+
         # Trigger post-backup hook for the app/site
         if self.ctype == "site":
             self.post_backup(self.site)
         else:
             self.post_backup()
         signals.emit("backups", "post_backup", self)
-            
-        return {"id": self.id+"/"+timestamp, "pid": self.id, "path": path, 
-            "icon": self.icon, "type": self.ctype, "time": isotime, 
-            "version": version, "size": os.path.getsize(path), 
-            "site_type": self.site.meta.id, "is_ready": True}
-    
+
+        return {"id": self.id+"/"+timestamp, "pid": self.id, "path": path,
+            "icon": self.icon, "type": self.ctype, "time": isotime,
+            "version": self.version, "size": os.path.getsize(path),
+            "site_type": self.site.meta.id if self.site else None, "is_ready": True}
+
     def restore(self, data):
         signals.emit("backups", "pre_restore", self)
         # Trigger pre-restore hook for the app/site
         self.pre_restore()
-        
+
         # Extract all files in archive
         sitename = ""
         with tarfile.open(data["path"], "r:gz") as t:
@@ -102,7 +106,7 @@ class BackupController:
                 if x.startswith("etc/nginx/sites-available"):
                     sitename = os.path.basename(x)
             t.extractall("/")
-        
+
         # If it's a website that had a database, restore DB via SQL file too
         dbpasswd = ""
         if self.ctype == "site" and sitename:
@@ -126,7 +130,7 @@ class BackupController:
                         databases.get_user(sitename).remove()
                     db_user = dbmgr.add_user(sitename, dbpasswd)
                     db_user.chperm("grant", db)
-        
+
         # Trigger post-restore hook for the app/site
         if self.ctype == "site":
             self.post_restore(self.site, dbpasswd)
@@ -136,24 +140,57 @@ class BackupController:
         signals.emit("backups", "post_restore", self)
         data["is_ready"] = True
         return data
-    
+
     def get_config(self):
         return []
-    
+
     def get_data(self):
         return []
-    
+
     def pre_backup(self):
         pass
-    
+
     def post_backup(self):
         pass
-    
+
     def pre_restore(self):
         pass
-    
+
     def post_restore(self):
         pass
+
+
+class arkOSBackupCfg(BackupController):
+    def get_config(self):
+        return ["/etc/arkos", "/tmp/ldap.ldif"]
+
+    def get_data(self):
+        return []
+
+    def pre_backup(self):
+        s = shell("slapcat -n 1")
+        if s["code"] != 0:
+            raise Exception("Could not backup LDAP database. Please check logs for errors.")
+        with open("/tmp/ldap.ldif", "w") as f:
+            f.write(s["stdout"])
+
+    def post_backup(self):
+        if os.path.exists("/tmp/ldap.ldif"):
+            os.unlink("/tmp/ldap.ldif")
+
+    def post_restore(self):
+        if not os.path.exists("/tmp/ldap.ldif"):
+            raise Exception("Could not restore LDAP database. Please check logs for errors.")
+        with open("/tmp/ldap.ldif", "r") as f:
+            ldif = f.read()
+        with open("/etc/arkos/secrets.json", "r") as f:
+            pwd = json.loads(f.read())
+            pwd = pwd["ldap"]
+        s = shell('ldapadd -D "cn=admin,dc=arkos-servers,dc=org" -w %s' % pwd, stdin=ldif)
+        if os.path.exists("/tmp/ldap.ldif"):
+            os.unlink("/tmp/ldap.ldif")
+        if s["code"] != 0:
+            raise Exception("Could not restore LDAP database. Please check logs for errors.")
 
 
 def get(backup_location=""):
@@ -165,7 +202,7 @@ def get(backup_location=""):
     for x in os.listdir(backup_location):
         # Get backups, sort by date
         archives = os.listdir(os.path.join(backup_location, x))
-        archives = sorted(archives, 
+        archives = sorted(archives,
             key=lambda y: int(os.path.splitext(os.path.splitext(y)[0])[0].split("-")[1]))
         for y in archives:
             if not y.endswith(".tar.gz"):
@@ -181,15 +218,15 @@ def get(backup_location=""):
                 continue
             with open(meta, "r") as f:
                 data = json.loads(f.read())
-                backups.append({"id": x+"/"+stime, "pid": x, "path": path, 
-                    "icon": data["icon"], "type": data["type"], "time": data["time"], 
-                    "version": data["version"], "size": os.path.getsize(path), 
-                    "site_type": data["site_type"], "is_ready": True})
+                backups.append({"id": x+"/"+stime, "pid": x, "path": path,
+                    "icon": data["icon"], "type": data["type"], "time": data["time"],
+                    "version": data["version"], "size": os.path.getsize(path),
+                    "site_type": data.get("site_type", None), "is_ready": True})
     return backups
 
 def get_able():
     able = []
-    for x in applications.get():
+    for x in applications.get(installed=True):
         if x.type != "website" and hasattr(x, "_backup"):
             able.append({"type": "app", "icon": x.icon, "id": x.id})
     for x in websites.get():
@@ -198,13 +235,17 @@ def get_able():
     for x in get():
         if not x["pid"] in [y["id"] for y in able]:
             able.append({"type": x["type"], "icon": x["icon"], "id": x["pid"]})
+    able.append({"type": "internal", "icon": "fa fa-cog", "id": "arkOS"})
     return able
 
 def create(id, data=True):
     controller = None
+    if id == "arkOS":
+        controller = arkOSBackupCfg(id="arkOS", icon="fa fa-cog", version=arkos_version)
+        return controller.backup()
     app = applications.get(id)
     if app and app.type != "website" and hasattr(app, "_backup"):
-        controller = app._backup()
+        controller = app._backup(app.id, app.icon, version=app.version)
     else:
         sites = websites.get()
         for x in sites:
@@ -245,7 +286,7 @@ def remove(id, time, backup_location=""):
 def site_load(site):
     if site.__class__.__name__ != "ReverseProxy":
         controller = site.meta.get_module("backup") or BackupController
-        site.backup = controller(site.id, site.meta.icon, site=site)
+        site.backup = controller(site.id, site.meta.icon, site, site.meta.version)
     else:
         site.backup = None
 
