@@ -7,7 +7,7 @@ import StringIO
 import tarfile
 
 from arkos import version as arkos_version
-from arkos import config, signals, applications, websites
+from arkos import secrets, config, signals, applications, websites
 from arkos.system import systemtime
 from arkos.utilities import random_string, shell
 
@@ -183,10 +183,8 @@ class arkOSBackupCfg(BackupController):
             raise Exception("Could not restore LDAP database. Please check logs for errors.")
         with open("/tmp/ldap.ldif", "r") as f:
             ldif = f.read()
-        with open("/etc/arkos/secrets.json", "r") as f:
-            pwd = json.loads(f.read())
-            pwd = pwd["ldap"]
-        s = shell('ldapadd -D "cn=admin,dc=arkos-servers,dc=org" -w %s' % pwd, stdin=ldif)
+        s = shell('ldapadd -D "cn=admin,dc=arkos-servers,dc=org" -w %s' % secrets.ldap,
+            stdin=ldif)
         if os.path.exists("/tmp/ldap.ldif"):
             os.unlink("/tmp/ldap.ldif")
         if s["code"] != 0:

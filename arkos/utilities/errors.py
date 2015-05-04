@@ -1,3 +1,10 @@
+class ConfigurationError(Exception):
+    def __init__(self, text):
+        self.text = id
+
+    def __str__(self):
+        return self.text
+
 class ConnectionError(Exception):
     def __init__(self, id):
         self.id = id
@@ -7,17 +14,17 @@ class ConnectionError(Exception):
 
 
 class SoftFail(Exception):
-    def __init__(self, msg): 
+    def __init__(self, msg):
         self.msg = msg
-    
+
     def __str__(self):
         return self.msg
-    
+
 
 class RequestError(Exception):
-    def __init__(self, msg): 
+    def __init__(self, msg):
         self.msg = msg
-    
+
     def __str__(self):
         return self.msg
 
@@ -25,6 +32,6 @@ class RequestError(Exception):
 class DefaultException(Exception):
     def __init__(self, msg):
         self.msg = msg
-    
+
     def __str__(self):
         return self.msg

@@ -15,7 +15,7 @@ class DefaultMessage:
             print "\033[33m%s\033[0m" % msg
         elif self.PRINT and msg:
             print "\033[32m%s\033[0m" % msg
-    
+
     def update(self, cls, msg):
         if cls == "error":
             raise DefaultException(str(msg))
@@ -23,7 +23,7 @@ class DefaultMessage:
             print "\033[33m%s\033[0m" % msg
         elif self.PRINT:
             print "\033[32m%s\033[0m" % msg
-    
+
     def complete(self, cls, msg):
         if cls == "error":
             raise DefaultException(str(msg))
@@ -31,6 +31,23 @@ class DefaultMessage:
             print "\033[33m%s\033[0m" % msg
         elif self.PRINT:
             print "\033[32m%s\033[0m" % msg
+
+
+class LoggingControl:
+    def __init__(self, logger=None):
+        self.logger = logger
+
+    def info(self, msg):
+        self.logger.info(msg)
+
+    def warn(self, msg):
+        self.logger.warn(msg)
+
+    def danger(self, msg):
+        self.logger.danger(msg)
+
+    def debug(self, msg):
+        self.logger.debug(msg)
 
 
 class ConsoleHandler(logging.StreamHandler):

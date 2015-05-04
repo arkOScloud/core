@@ -10,16 +10,15 @@ from dbus import SystemBus, Interface
 
 
 class ConnectionsManager:
-    def __init__(self, config):
+    def connect(self, config, secrets):
         self.config = config
-    
-    def connect(self):
+        self.secrets = secrets
         self.DBus = SystemBus()
-        self.SystemD = self.SystemDConnect("/org/freedesktop/systemd1", 
+        self.SystemD = self.SystemDConnect("/org/freedesktop/systemd1",
             "org.freedesktop.systemd1.Manager")
-        self.LDAP = ldap_connect(config=self.config)
+        self.LDAP = ldap_connect(config=config, passwd=secrets.ldap)
         self.Supervisor = supervisor_connect()
-    
+
     def SystemDConnect(self, path, interface):
         systemd = self.DBus.get_object("org.freedesktop.systemd1", path)
         return Interface(systemd, dbus_interface=interface)
@@ -30,17 +29,6 @@ def ldap_connect(uri="", rootdn="", dn="cn=admin", config=None, passwd=""):
         raise Exception("No configuration values passed")
     uri = uri or config.get("general", "ldap_uri", "ldap://localhost")
     rootdn = rootdn or config.get("general", "ldap_rootdn", "dc=arkos-servers,dc=org")
-    if not passwd:
-        if os.path.isfile(os.path.join(sys.path[0], "secrets.json")):
-            secrets = os.path.join(sys.path[0], "secrets.json")
-        else:
-            secrets = "/etc/arkos/secrets.json"
-        with open(secrets, "r") as f:
-            passwd = json.loads(f.read())
-            if passwd.has_key("ldap"):
-                passwd = passwd["ldap"]
-            else:
-                raise Exception("Admin LDAP credentials not found in secrets file")
     c = ldap.ldapobject.ReconnectLDAPObject(uri, retry_max=3, retry_delay=5.0)
     try:
         c.simple_bind_s("%s,%s" % (dn, rootdn), passwd)
@@ -50,7 +38,7 @@ def ldap_connect(uri="", rootdn="", dn="cn=admin", config=None, passwd=""):
         data = c.search_s("cn=admins,ou=groups,%s" % rootdn,
             ldap.SCOPE_SUBTREE, "(objectClass=*)", ["member"])[0][1]["member"]
         if "%s,%s" % (dn, rootdn) not in data:
-            raise Exception("User is not an administrator") 
+            raise Exception("User is not an administrator")
     return c
 
 def supervisor_connect():

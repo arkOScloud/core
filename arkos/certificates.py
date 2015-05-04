@@ -163,7 +163,6 @@ def scan():
             sha1=sha1, md5=md5)
         certs.append(c)
     storage.certs.set("certificates", certs)
-    websites.get()
     return certs
 
 def get_authorities(id=None):
