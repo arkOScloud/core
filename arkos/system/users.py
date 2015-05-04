@@ -14,7 +14,7 @@ from arkos.utilities import hashpw, shell
 
 class User:
     def __init__(
-            self, name="", first_name="", last_name="", uid=0, domain="", 
+            self, name="", first_name="", last_name="", uid=0, domain="",
             rootdn="dc=arkos-servers,dc=org", admin=False, sudo=False):
         self.name = str(name)
         self.first_name = str(first_name)
@@ -24,7 +24,7 @@ class User:
         self.rootdn = str(rootdn)
         self.admin = admin
         self.sudo = sudo
-    
+
     def add(self, passwd):
         try:
             ldif = conns.LDAP.search_s("uid=%s,ou=users,%s" % (self.name,self.rootdn),
@@ -37,7 +37,7 @@ class User:
         ldif = {
             "objectClass": ["mailAccount", "inetOrgPerson", "posixAccount"],
             "givenName": self.first_name,
-            "sn": self.last_name,
+            "sn": self.last_name or "NONE",
             "displayName": self.first_name+" "+self.last_name,
             "cn": self.first_name+" "+self.last_name,
             "uid": self.name,
@@ -54,7 +54,7 @@ class User:
         conns.LDAP.add_s("uid=%s,ou=users,%s" % (self.name,self.rootdn), ldif)
         self.update_adminsudo()
         signals.emit("users", "post_add", self)
-    
+
     def update(self, newpasswd=""):
         try:
             ldif = conns.LDAP.search_s("uid=%s,ou=users,%s" % (self.name,self.rootdn),
@@ -86,7 +86,7 @@ class User:
         ldif = conns.LDAP.search_s("cn=admins,ou=groups,%s" % self.rootdn,
             ldap.SCOPE_SUBTREE, "(objectClass=*)", None)[0][1]
         memlist = ldif["member"]
-        
+
         if self.admin and "uid=%s,ou=users,%s"%(self.name,self.rootdn) not in memlist:
             memlist += ["uid=%s,ou=users,%s" % (self.name,self.rootdn)]
             conns.LDAP.modify_ext_s("cn=admins,ou=groups,%s" % self.rootdn,
@@ -116,7 +116,7 @@ class User:
             conns.LDAP.add_s("cn=%s,ou=sudo,%s" % (self.name, self.rootdn), nldif)
         elif not self.sudo and is_sudo:
             conns.LDAP.delete_s("cn=%s,ou=sudo,%s" % (self.name, self.rootdn))
-    
+
     def verify_passwd(self, passwd):
         # Validate the provided password against the hash stored in LDAP
         try:
@@ -141,13 +141,13 @@ class User:
                 shutil.rmtree(hdir)
         conns.LDAP.delete_s("uid=%s,ou=users,%s" % (self.name,self.rootdn))
         signals.emit("users", "post_remove", self)
-    
+
     def as_dict(self, ready=True):
         return {
             "id": self.uid,
             "name": self.name,
             "first_name": self.first_name,
-            "last_name": self.last_name,
+            "last_name": self.last_name if self.last_name != "NONE" else "",
             "domain": self.domain,
             "admin": self.admin,
             "sudo": self.sudo,
@@ -160,20 +160,20 @@ class SystemUser:
         self.name = name
         self.uid = uid or get_next_uid()
         self.groups = groups
-    
+
     def add(self):
         shell("useradd -rm %s" % self.name)
-    
+
     def update(self):
         for x in self.groups:
             shell("usermod -a -G %s %s" % (x, self.name))
-    
+
     def update_password(self, passwd):
         shell("passwd %s" % u, stdin="%s\n%s\n" % (self.name,passwd,passwd))
-    
+
     def delete(self):
         shell("userdel %s" % self.name)
-    
+
     def as_dict(self):
         return {
             "id": self.uid,
@@ -185,13 +185,13 @@ class SystemUser:
 def get(uid=None, name=None):
     r = []
     rootdn = config.get("general", "ldap_rootdn", "dc=arkos-servers,dc=org")
-    ldap_users = conns.LDAP.search_s("ou=users,%s" % rootdn, ldap.SCOPE_SUBTREE, 
+    ldap_users = conns.LDAP.search_s("ou=users,%s" % rootdn, ldap.SCOPE_SUBTREE,
         "(objectClass=inetOrgPerson)", None)
     for x in ldap_users:
         for y in x[1]:
             if type(x[1][y]) == list and len(x[1][y]) == 1:
                 x[1][y] = x[1][y][0]
-        u = User(name=x[1]["uid"], uid=int(x[1]["uidNumber"]), 
+        u = User(name=x[1]["uid"], uid=int(x[1]["uidNumber"]),
             first_name=x[1]["givenName"], last_name=x[1]["sn"],
             domain=x[1]["mail"].split("@")[1], rootdn=x[0].split("ou=users,")[1])
 

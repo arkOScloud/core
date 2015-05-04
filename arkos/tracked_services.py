@@ -31,7 +31,7 @@ class SecurityPolicy:
             policies[self.type] = {}
             policies[self.type][self.id] = self.policy
         with open(policy_path, "w") as f:
-            f.write(json.dumps(policies, sort_keys=True, 
+            f.write(json.dumps(policies, sort_keys=True,
                 indent=4, separators=(",", ": ")))
         if config.get("general", "firewall", True) and fw:
             security.regen_fw(get())
@@ -46,12 +46,12 @@ class SecurityPolicy:
         elif policies.has_key(self.type) and policies[self.type].has_key(self.id):
             del policies[self.type][self.id]
         with open(policy_path, "w") as f:
-            f.write(json.dumps(policies, sort_keys=True, 
+            f.write(json.dumps(policies, sort_keys=True,
                 indent=4, separators=(",", ": ")))
         if config.get("general", "firewall", True) and fw:
             security.regen_fw(get())
         storage.policies.remove("policies", self)
-    
+
     def as_dict(self):
         return {
             "type": self.type,
@@ -120,14 +120,26 @@ def refresh_policies():
                     if s == y.id:
                         newpolicies[x][s] = policies[x][s]
     with open(policy_path, "w") as f:
-        f.write(json.dumps(newpolicies, sort_keys=True, 
+        f.write(json.dumps(newpolicies, sort_keys=True,
             indent=4, separators=(",", ": ")))
+
+def is_open_port(port, ignore_common=False):
+    data = get()
+    ports = []
+    for x in data:
+        for y in x.ports:
+            ports.append(int(y[1]))
+    if not ignore_common: ports = ports + COMMON_PORTS
+    return port not in ports
 
 def get_open_port(ignore_common=False):
     data = get()
-    ports = [[y[1] for y in x.ports] for x in data]
+    ports = []
+    for x in data:
+        for y in x.ports:
+            ports.append(int(y[1]))
     if not ignore_common: ports = ports + COMMON_PORTS
-    r = random.randint(1025, 65534)
+    r = random.randint(8001, 65534)
     return r if not r in ports else get_open_port()
 
 def initialize():
@@ -135,17 +147,17 @@ def initialize():
         policies = json.loads(f.read())
     policy = policies["arkos"]["arkos"] if policies.has_key("arkos") \
         and policies["arkos"].has_key("arkos") else 2
-    storage.policies.add("policies", SecurityPolicy("arkos", "arkos", 
-        "System Management (Genesis/APIs)", "fa fa-desktop", 
+    storage.policies.add("policies", SecurityPolicy("arkos", "arkos",
+        "System Management (Genesis/APIs)", "fa fa-desktop",
         [("tcp", int(config.get("genesis", "port")))], policy))
     if policies.has_key("custom"):
         for x in policies["custom"]:
-            storage.policies.add("policies", SecurityPolicy("custom", x["id"], 
+            storage.policies.add("policies", SecurityPolicy("custom", x["id"],
                 x["name"], x["icon"], x["ports"], x["policy"]))
 
 def register_website(site):
-    register(site.meta.id if site.meta else "website", site.id, 
-        site.name if hasattr(site, "name") and site.name else site.id, 
+    register(site.meta.id if site.meta else "website", site.id,
+        site.name if hasattr(site, "name") and site.name else site.id,
         site.meta.icon if site.meta else "fa fa-globe", [("tcp", site.port)])
 
 def deregister_website(site):
@@ -154,4 +166,3 @@ def deregister_website(site):
 signals.add("tracked_services", "websites", "site_loaded", register_website)
 signals.add("tracked_services", "websites", "site_installed", register_website)
 signals.add("tracked_services", "websites", "site_removed", deregister_website)
-    

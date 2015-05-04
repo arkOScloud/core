@@ -5,7 +5,7 @@ import nginx
 import re
 import shutil
 
-from arkos import applications, config, databases, signals, storage
+from arkos import applications, config, databases, signals, storage, tracked_services
 from arkos.system import users, groups, services
 from arkos.utilities import download, shell, random_string, DefaultMessage
 from arkos.utilities.errors import SoftFail
@@ -52,6 +52,10 @@ class Site:
 
     def install(self, meta, extra_vars={}, enable=True, message=DefaultMessage()):
         message.update("info", "Preparing to install...", head="Installing website")
+
+        # Make sure the chosen port is indeed open
+        if not tracked_services.is_open_port(self.port):
+            raise Exception("This port is taken by another site or service, please choose another")
 
         # Set some metadata values
         specialmsg, dbpasswd = "", ""
@@ -130,7 +134,7 @@ class Site:
                 raise Exception("Couldn't download - %s" % str(e))
 
             # Format extraction command according to type
-            message.update("info", "Installing site...", head="Installing website")
+            message.update("info", "Extracting source...", head="Installing website")
             if ending in [".tar.gz", ".tgz", ".tar.bz2"]:
                 extract_cmd = "tar "
                 extract_cmd += "xzf" if ending in [".tar.gz", ".tgz"] else "xjf"
