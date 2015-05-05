@@ -1,16 +1,10 @@
-import json
 import os
 import random
 import sys
 
-from arkos import config, signals, storage, security
+from arkos import config, policies, signals, storage, security
 
 COMMON_PORTS = [3000, 3306, 5222, 5223, 5232, 8000, 8080]
-
-if os.path.exists(os.path.join(sys.path[0], "policies.json")):
-    policy_path = os.path.join(sys.path[0], "policies.json")
-elif os.path.exists("/etc/arkos/policies.json"):
-    policy_path = "/etc/arkos/policies.json"
 
 
 class SecurityPolicy:
@@ -23,31 +17,16 @@ class SecurityPolicy:
         self.policy = policy
 
     def save(self, fw=True):
-        with open(policy_path, "r") as f:
-            policies = json.loads(f.read())
-        if policies.has_key(self.type):
-            policies[self.type][self.id] = self.policy
-        else:
-            policies[self.type] = {}
-            policies[self.type][self.id] = self.policy
-        with open(policy_path, "w") as f:
-            f.write(json.dumps(policies, sort_keys=True,
-                indent=4, separators=(",", ": ")))
+        policies.set(self.type, self.id, self.policy)
+        policies.save()
         if config.get("general", "firewall", True) and fw:
             security.regen_fw(get())
         if not storage.policies.get("policies", self.id):
             storage.policies.add("policies", self)
 
     def remove(self, fw=True):
-        with open(policy_path, "r") as f:
-            policies = json.loads(f.read())
-        if policies.has_key(self.type) and len(policies[self.type]) <= 1:
-            del policies[self.type]
-        elif policies.has_key(self.type) and policies[self.type].has_key(self.id):
-            del policies[self.type][self.id]
-        with open(policy_path, "w") as f:
-            f.write(json.dumps(policies, sort_keys=True,
-                indent=4, separators=(",", ": ")))
+        policies.remove(self.type, self.id)
+        policies.save()
         if config.get("general", "firewall", True) and fw:
             security.regen_fw(get())
         storage.policies.remove("policies", self)
@@ -79,13 +58,8 @@ def get(id=None, type=None):
     return data
 
 def register(type, id, name, icon, ports, policy=0, fw=True):
-    with open(policy_path, "r") as f:
-        policies = json.loads(f.read())
     if not policy:
-        if policies.has_key(type) and policies[type].has_key(id):
-            policy = policies[type][id]
-        else:
-            policy = 2
+        policy = policies.get(type, id, 2)
     pget = get(type=type)
     if pget:
         for x in pget:
@@ -105,23 +79,20 @@ def deregister(type, id="", fw=True):
         security.regen_fw(get())
 
 def refresh_policies():
-    with open(policy_path, "r") as f:
-        policies = json.loads(f.read())
     svcs = get()
     newpolicies = {}
-    for x in policies:
+    for x in policies.get_all():
         if x == "custom":
-            newpolicies["custom"] = policies["custom"]
+            newpolicies["custom"] = policies.get_all("custom")
         for y in svcs:
             if x == y.type:
                 if not x in newpolicies:
                     newpolicies[x] = {}
-                for s in policies[x]:
+                for s in policies.get_all(x):
                     if s == y.id:
-                        newpolicies[x][s] = policies[x][s]
-    with open(policy_path, "w") as f:
-        f.write(json.dumps(newpolicies, sort_keys=True,
-            indent=4, separators=(",", ": ")))
+                        newpolicies[x][s] = policies.get(x, s)
+    policies.config = newpolicies
+    policies.save()
 
 def is_open_port(port, ignore_common=False):
     data = get()
@@ -143,17 +114,13 @@ def get_open_port(ignore_common=False):
     return r if not r in ports else get_open_port()
 
 def initialize():
-    with open(policy_path, "r") as f:
-        policies = json.loads(f.read())
-    policy = policies["arkos"]["arkos"] if policies.has_key("arkos") \
-        and policies["arkos"].has_key("arkos") else 2
+    policy = policies.get("arkos", "arkos", 2)
     storage.policies.add("policies", SecurityPolicy("arkos", "arkos",
         "System Management (Genesis/APIs)", "fa fa-desktop",
         [("tcp", int(config.get("genesis", "port")))], policy))
-    if policies.has_key("custom"):
-        for x in policies["custom"]:
-            storage.policies.add("policies", SecurityPolicy("custom", x["id"],
-                x["name"], x["icon"], x["ports"], x["policy"]))
+    for x in policies.get_all("custom"):
+        storage.policies.add("policies", SecurityPolicy("custom", x["id"],
+            x["name"], x["icon"], x["ports"], x["policy"]))
 
 def register_website(site):
     register(site.meta.id if site.meta else "website", site.id,

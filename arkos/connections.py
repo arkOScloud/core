@@ -16,7 +16,7 @@ class ConnectionsManager:
         self.DBus = SystemBus()
         self.SystemD = self.SystemDConnect("/org/freedesktop/systemd1",
             "org.freedesktop.systemd1.Manager")
-        self.LDAP = ldap_connect(config=config, passwd=secrets.ldap)
+        self.LDAP = ldap_connect(config=config, passwd=secrets.get("ldap"))
         self.Supervisor = supervisor_connect()
 
     def SystemDConnect(self, path, interface):

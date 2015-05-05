@@ -183,7 +183,7 @@ class arkOSBackupCfg(BackupController):
             raise Exception("Could not restore LDAP database. Please check logs for errors.")
         with open("/tmp/ldap.ldif", "r") as f:
             ldif = f.read()
-        s = shell('ldapadd -D "cn=admin,dc=arkos-servers,dc=org" -w %s' % secrets.ldap,
+        s = shell('ldapadd -D "cn=admin,dc=arkos-servers,dc=org" -w %s' % secrets.get("ldap"),
             stdin=ldif)
         if os.path.exists("/tmp/ldap.ldif"):
             os.unlink("/tmp/ldap.ldif")

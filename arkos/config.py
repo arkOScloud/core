@@ -8,17 +8,18 @@ from arkos.utilities.errors import ConfigurationError
 
 
 class Config:
-    def __init__(self):
+    def __init__(self, filename):
         self.config = {}
+        self.filename = filename
 
     def load(self, path):
         if not os.path.exists(path):
             dir = os.path.dirname(os.path.abspath(os.path.dirname(arkos.__file__)))
-            if os.path.exists(os.path.join(dir, 'settings.json')):
-                path = os.path.join(dir, 'settings.json')
+            if os.path.exists(os.path.join(dir, self.filename)):
+                path = os.path.join(dir, self.filename)
             else:
-                raise ConfigurationError("Settings file not found")
-        self.filename = path
+                raise ConfigurationError("%s not found" % self.filename)
+        self.path = path
         with open(path) as f:
             self.config = json.loads(f.read())
 
@@ -26,49 +27,41 @@ class Config:
         config = self.config.copy()
         if config.has_key("enviro"):
             del config["enviro"]
-        with open(self.filename, 'w') as f:
+        with open(self.path, 'w') as f:
             f.write(json.dumps(self.config, sort_keys=True,
                 indent=4, separators=(',', ': ')))
 
-    def get(self, section, key, default=None):
-        if self.config.has_key(section):
+    def get(self, section, key=None, default=None):
+        if self.config.has_key(section) and type(self.config.get(section)) not in [dict, list]:
+            return self.config.get(section)
+        elif self.config.has_key(section):
             value = self.config.get(section).get(key) or default
         else:
             value = None or default
         return value
 
-    def set(self, section, key, value):
-        if self.config.has_key(section):
+    def get_all(self, section=None):
+        if section:
+            return self.config.get(section, {})
+        return self.config
+
+    def set(self, section, key, value=None):
+        if not value:
+            self.config[section] = key
+        elif self.config.has_key(section):
             self.config[section][key] = value
         else:
             self.config[section] = {}
             self.config[section][key] = value
+
+    def remove(self, section, key):
+        if self.config.has_key(section) and len(self.config[section]) <= 1:
+            del self.config[section]
+        elif self.config.has_key(section) and self.config[section].has_key(key):
+            del self.config[section][key]
 
     def has_option(self, section, key):
         if self.config.has_key(section):
             return self.config[section].has_key(key)
         else:
             return False
-
-
-class Secrets:
-    def __init__(self):
-        self._data = {}
-
-    def load(self, path):
-        if not os.path.exists(path):
-            dir = os.path.dirname(os.path.abspath(os.path.dirname(arkos.__file__)))
-            if os.path.exists(os.path.join(dir, 'secrets.json')):
-                path = os.path.join(dir, 'secrets.json')
-            else:
-                raise ConfigurationError("Secrets file not found")
-        self.filename = path
-        with open(self.filename, "r") as f:
-            self._data = json.loads(f.read())
-        for x in self._data:
-            setattr(self, x, self._data[x])
-
-    def save(self):
-        with open(self.filename, "w") as f:
-            f.write(json.dumps(self._data, sort_keys=True,
-                indent=4, separators=(",", ": ")))
