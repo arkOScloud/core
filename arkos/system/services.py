@@ -18,7 +18,7 @@ class Service:
         self.state = state
         self.enabled = enabled
         self.cfg = cfg
-    
+
     def add(self, enable=True):
         signals.emit("services", "pre_add", self)
         title = "program:%s" % self.name
@@ -61,7 +61,7 @@ class Service:
                 time.sleep(1)
             else:
                 raise ActionError()
-    
+
     def stop(self):
         signals.emit("services", "pre_stop", self)
         if self.stype == "supervisor":
@@ -87,7 +87,7 @@ class Service:
                 time.sleep(1)
             else:
                 raise ActionError()
-    
+
     def restart(self, real=False):
         signals.emit("services", "pre_restart", self)
         if self.stype == "supervisor":
@@ -118,7 +118,7 @@ class Service:
                 time.sleep(1)
             else:
                 raise ActionError()
-    
+
     def get_log(self):
         if self.stype == "supervisor":
             supervisor_ping()
@@ -164,7 +164,7 @@ class Service:
             self.enabled = False
             conns.Supervisor.restart()
             signals.emit("services", "post_remove", self)
-    
+
     def as_dict(self):
         return {
             "id": self.name,
@@ -179,23 +179,31 @@ class Service:
 
 def get(id=None):
     svcs, files = [], {}
-    
+
     # Get all unit files, loaded or not
     for unit in conns.SystemD.ListUnitFiles():
         if not unit[0].endswith(".service"):
             continue
         sname = os.path.splitext(os.path.split(unit[0])[-1])[0]
         files[sname] = Service(name=sname, stype="system", state="stopped", enabled=unit[1]=="enabled")
-    
+
     # Get all loaded services
     for unit in conns.SystemD.ListUnits():
         if not unit[0].endswith(".service"):
             continue
         sname = unit[0].split(".service")[0]
         if not sname in files:
-            continue
+            files[sname] = Service(name=sname, stype="system", state="", enabled=unit[1]=="enabled")
+        if "@" in sname and files.get(id.split("@")[0] + "@", None):
+            files[sname].enabled = files.get(id.split("@")[0] + "@", None).enabled
         files[sname].state = "running" if unit[3]=="active" else "stopped"
-    
+
+    # If user requests a service with identifier and it's not running or enabled...
+    if id and "@" in id and not id in files and (id.split("@")[0] + "@") in files:
+        files[id] = Service(name=sname, stype="system", state="stopped",
+            enabled=False)
+        return files[id]
+
     # Match up loaded services with their unit files and show state
     for unit in files:
         if id == unit:
