@@ -254,7 +254,7 @@ class Site:
                 nginx.Key("server_name", self.addr),
                 nginx.Key("return", "301 https://%s$request_uri" % self.addr)
             ))
-            for x in c.servers:
+            for x in block.servers:
                 if x.filter("Key", "listen")[0].value == "443 ssl":
                     server = x
                     break
