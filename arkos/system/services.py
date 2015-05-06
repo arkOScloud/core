@@ -194,8 +194,8 @@ def get(id=None):
         sname = unit[0].split(".service")[0]
         if not sname in files:
             files[sname] = Service(name=sname, stype="system", state="", enabled=unit[1]=="enabled")
-        if "@" in sname and files.get(id.split("@")[0] + "@", None):
-            files[sname].enabled = files.get(id.split("@")[0] + "@", None).enabled
+        if "@" in sname and files.get(sname.split("@")[0] + "@", None):
+            files[sname].enabled = files.get(sname.split("@")[0] + "@", None).enabled
         files[sname].state = "running" if unit[3]=="active" else "stopped"
 
     # If user requests a service with identifier and it's not running or enabled...
