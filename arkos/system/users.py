@@ -15,13 +15,14 @@ from arkos.utilities import hashpw, shell
 class User:
     def __init__(
             self, name="", first_name="", last_name="", uid=0, domain="",
-            rootdn="dc=arkos-servers,dc=org", admin=False, sudo=False):
+            rootdn="dc=arkos-servers,dc=org", mail=[], admin=False, sudo=False):
         self.name = str(name)
         self.first_name = str(first_name)
         self.last_name = str(last_name)
         self.uid = uid or get_next_uid()
         self.domain = str(domain)
         self.rootdn = str(rootdn)
+        self.mail = [str(x) for x in mail]
         self.admin = admin
         self.sudo = sudo
 
@@ -41,7 +42,7 @@ class User:
             "displayName": self.first_name+" "+self.last_name,
             "cn": self.first_name+" "+self.last_name,
             "uid": self.name,
-            "mail": self.name+"@"+self.domain,
+            "mail": [self.name+"@"+self.domain],
             "maildrop": self.name,
             "userPassword": hashpw(passwd, "crypt"),
             "gidNumber": "100",
@@ -71,7 +72,7 @@ class User:
             "sn": self.last_name,
             "displayName": "%s %s" % (self.first_name, self.last_name),
             "cn": "%s %s" % (self.first_name, self.last_name),
-            "mail": self.name+"@"+self.domain
+            "mail": self.mail
         }
         if newpasswd:
             attrs["userPassword"] = hashpw(newpasswd, "crypt")
@@ -151,6 +152,7 @@ class User:
             "domain": self.domain,
             "admin": self.admin,
             "sudo": self.sudo,
+            "mail_addresses": self.mail,
             "is_ready": ready
         }
 
@@ -189,11 +191,14 @@ def get(uid=None, name=None):
         "(objectClass=inetOrgPerson)", None)
     for x in ldap_users:
         for y in x[1]:
+            if y == "mail":
+                continue
             if type(x[1][y]) == list and len(x[1][y]) == 1:
                 x[1][y] = x[1][y][0]
         u = User(name=x[1]["uid"], uid=int(x[1]["uidNumber"]),
             first_name=x[1]["givenName"], last_name=x[1]["sn"],
-            domain=x[1]["mail"].split("@")[1], rootdn=x[0].split("ou=users,")[1])
+            mail=x[1]["mail"], domain=x[1]["mail"][0].split("@")[1],
+            rootdn=x[0].split("ou=users,")[1])
 
         # Check if the user is a member of the admin or sudo groups
         try:
