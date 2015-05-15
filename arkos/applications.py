@@ -144,7 +144,7 @@ class App:
     def uninstall(self, force=False, message=DefaultMessage()):
         signals.emit("apps", "pre_remove", self)
         message.update("info", "Uninstalling application...")
-        exclude = ["openssl", "openssh", "nginx", "python2", "git"]
+        exclude = ["openssl", "openssh", "nginx", "python2", "git", "nodejs", "npm"]
 
         # Make sure this app can be successfully removed, and if so also remove
         # any system-level packages that *only* this app requires

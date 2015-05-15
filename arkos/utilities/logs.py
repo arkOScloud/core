@@ -43,8 +43,8 @@ class LoggingControl:
     def warn(self, msg):
         self.logger.warn(msg)
 
-    def danger(self, msg):
-        self.logger.danger(msg)
+    def error(self, msg):
+        self.logger.error(msg)
 
     def debug(self, msg):
         self.logger.debug(msg)
