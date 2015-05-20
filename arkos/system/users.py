@@ -14,11 +14,11 @@ from arkos.utilities import hashpw, shell
 
 class User:
     def __init__(
-            self, name="", first_name="", last_name="", uid=0, domain="",
+            self, name="", first_name="", last_name=None, uid=0, domain="",
             rootdn="dc=arkos-servers,dc=org", mail=[], admin=False, sudo=False):
         self.name = str(name)
         self.first_name = str(first_name)
-        self.last_name = str(last_name)
+        self.last_name = None if self.last_name == None else str(last_name)
         self.uid = uid or get_next_uid()
         self.domain = str(domain)
         self.rootdn = str(rootdn)
@@ -148,7 +148,7 @@ class User:
             "id": self.uid,
             "name": self.name,
             "first_name": self.first_name,
-            "last_name": self.last_name if self.last_name != "NONE" else "",
+            "last_name": self.last_name,
             "domain": self.domain,
             "admin": self.admin,
             "sudo": self.sudo,
@@ -196,7 +196,7 @@ def get(uid=None, name=None):
             if type(x[1][y]) == list and len(x[1][y]) == 1:
                 x[1][y] = x[1][y][0]
         u = User(name=x[1]["uid"], uid=int(x[1]["uidNumber"]),
-            first_name=x[1]["givenName"], last_name=x[1]["sn"],
+            first_name=x[1]["givenName"], last_name=x[1]["sn"] if x[1]["sn"] != "NONE" else None,
             mail=x[1]["mail"], domain=x[1]["mail"][0].split("@")[1],
             rootdn=x[0].split("ou=users,")[1])
 

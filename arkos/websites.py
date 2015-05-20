@@ -60,7 +60,6 @@ class Site:
         # Set some metadata values
         specialmsg, dbpasswd = "", ""
         site_dir = config.get("websites", "site_dir")
-        self.ssl = None
         self.meta = meta
         self.path = self.path.encode("utf-8") or os.path.join(site_dir, self.id).encode("utf-8")
         self.php = extra_vars.get("php") or self.php or self.meta.uses_php or False
@@ -193,7 +192,7 @@ class Site:
         meta.add_section("website")
         meta.set("website", "id", self.id)
         meta.set("website", "type", self.meta.id)
-        meta.set("website", "ssl", self.ssl or "None")
+        meta.set("website", "ssl", self.cert.id if hasattr(self, "cert") and self.cert else "None")
         meta.set("website", "version", self.version or "None")
         if hasattr(self.meta, "website_datapaths") and self.meta.website_datapaths \
                 and self.data_path:
@@ -278,6 +277,13 @@ class Site:
             )
         nginx.dumpf(block, os.path.join("/etc/nginx/sites-available/", self.id))
 
+        # Set the certificate name in the metadata file
+        meta = ConfigParser.SafeConfigParser()
+        meta.read(os.path.join(self.path, ".arkos"))
+        meta.set("website", "ssl", self.cert.id)
+        with open(os.path.join(self.path, ".arkos"), "w") as f:
+            meta.write(f)
+
         # Call the website type's SSL enable hook
         self.enable_ssl(self.cert.cert_path, self.cert.key_path)
 
@@ -301,6 +307,11 @@ class Site:
             listen.value = listen.value.rstrip(" ssl")
         server.remove(*[x for x in s.filter("Key") if x.name.startswith("ssl_")])
         nginx.dumpf(block, os.path.join("/etc/nginx/sites-available/", self.id))
+        meta = ConfigParser.SafeConfigParser()
+        meta.read(os.path.join(self.path, ".arkos"))
+        meta.set("website", "ssl", "None")
+        with open(os.path.join(self.path, ".arkos"), "w") as f:
+            meta.write(f)
 
         # Call the website type's SSL disable hook
         self.disable_ssl()
@@ -485,7 +496,7 @@ class Site:
         }
 
 
-class ReverseProxy:
+class ReverseProxy(Site):
     def __init__(
             self, id="", name="", path="", addr="", port=80,
             base_path="", block=[], type="internal"):
@@ -504,7 +515,6 @@ class ReverseProxy:
         # Set metadata values
         site_dir = config.get("websites", "site_dir")
         self.path = self.path.encode("utf-8") or os.path.join(site_dir, self.id).encode("utf-8")
-        self.ssl = None
 
         try:
             os.makedirs(self.path)
@@ -550,7 +560,7 @@ class ReverseProxy:
         meta.set("website", "type", "ReverseProxy")
         meta.set("website", "extra", self.type)
         meta.set("website", "version", "None")
-        meta.set("website", "ssl", self.ssl or "None")
+        meta.set("website", "ssl", self.cert.id if hasattr(self, "cert") and self.cert else "None")
         with open(os.path.join(self.path, ".arkos"), "w") as f:
             meta.write(f)
 
@@ -572,92 +582,6 @@ class ReverseProxy:
             pass
         storage.sites.remove("sites", self)
         signals.emit("websites", "site_removed", self)
-
-    def ssl_enable(self):
-        # Get server-preferred ciphers
-        if config.get("certificates", "ciphers"):
-            ciphers = config.get("certificates", "ciphers")
-        else:
-            config.set("certificates", "ciphers", ciphers)
-            config.save()
-
-        block = nginx.loadf(os.path.join("/etc/nginx/sites-available/", self.id))
-        server = block.servers[0]
-
-        # If the site is on port 80, setup an HTTP redirect to new port 443
-        listen = server.filter("Key", "listen")[0]
-        if listen.value == "80":
-            listen.value = "443 ssl"
-            block.add(nginx.Server(
-                nginx.Key("listen", "80"),
-                nginx.Key("server_name", self.addr),
-                nginx.Key("return", "301 https://%s$request_uri" % self.addr)
-            ))
-            for key in block.servers:
-                if key.filter("Key", "listen")[0].value == "443 ssl":
-                    server = key
-                    break
-        else:
-            listen.value = listen.value.split(" ssl")[0] + " ssl"
-
-        # Clean up any pre-existing SSL directives that no longer apply
-        for x in server.all():
-            if type(x) == nginx.Key and x.name.startswith("ssl_"):
-                server.remove(x)
-
-        # Add the necessary SSL directives to the serverblock and save
-        server.add(
-            nginx.Key("ssl_certificate", self.cert.cert_path),
-            nginx.Key("ssl_certificate_key", self.cert.key_path),
-            nginx.Key("ssl_protocols", "TLSv1 TLSv1.1 TLSv1.2"),
-            nginx.Key("ssl_ciphers", ciphers),
-            nginx.Key("ssl_session_timeout", "5m"),
-            nginx.Key("ssl_prefer_server_ciphers", "on"),
-            nginx.Key("ssl_session_cache", "shared:SSL:50m"),
-            )
-        nginx.dumpf(block, os.path.join("/etc/nginx/sites-available/", self.id))
-
-        # Call the app's SSL enable hook
-        self.enable_ssl(self.cert.cert_path, self.cert.key_path)
-
-    def ssl_disable(self):
-        block = nginx.loadf(os.path.join("/etc/nginx/sites-available/", self.id))
-
-        # If there's an 80-to-443 redirect block, get rid of it
-        if len(block.servers) > 1:
-            for x in block.servers:
-                if not "ssl" in x.filter("Key", "listen")[0].value \
-                and x.filter("key", "return"):
-                    block.remove(x)
-                    break
-
-        # Remove all SSL directives and save
-        server = block.servers[0]
-        listen = server.filter("Key", "listen")[0]
-        if listen.value == "443 ssl":
-            listen.value = "80"
-        else:
-            listen.value = listen.value.rstrip(" ssl")
-        server.remove(*[x for x in server.filter("Key") if x.name.startswith("ssl_")])
-        nginx.dumpf(block, os.path.join("/etc/nginx/sites-available/", self.id))
-
-        # Call site type's SSL disable hook
-        self.disable_ssl()
-
-    def nginx_enable(self, reload=True):
-        origin = os.path.join("/etc/nginx/sites-available", self.id)
-        target = os.path.join("/etc/nginx/sites-enabled", self.id)
-        if not os.path.exists(target):
-            os.symlink(origin, target)
-            self.enabled = True
-        if reload == True:
-            nginx_reload()
-
-    def nginx_disable(self, reload=True):
-        os.unlink(os.path.join("/etc/nginx/sites-enabled", self.id))
-        self.enabled = False
-        if reload == True:
-            nginx_reload()
 
     def as_dict(self):
         return {
@@ -728,6 +652,13 @@ def scan():
             site.name = meta.get("website", "name")
             site.type = meta.get("website", "extra")
             site.meta = None
+        certname = meta.get("website", "ssl", "None")
+        site.cert = certificates.get(certname) if certname != "None" else None
+        if site.cert:
+            site.cert.assigns.append({
+                "type": "website", "id": site.id,
+                "name": site.id if site.meta else site.name
+            })
         site.version = meta.get("website", "version", None)
         site.enabled = os.path.exists(os.path.join("/etc/nginx/sites-enabled", x))
         site.installed = True
@@ -744,16 +675,7 @@ def scan():
             else:
                 server = block.servers[0]
             port_regex = re.compile("(\\d+)\s*(.*)")
-            site.port, ssl = re.match(port_regex, server.filter("Key", "listen")[0].value).group(1, 2)
-            if ssl:
-                cert_path = server.filter("Key", "ssl_certificate")[0].value
-                cert_id = os.path.splitext(os.path.basename(cert_path))[0]
-                site.cert = certificates.get(cert_id)
-                site.cert.assigns.append({
-                    "type": "website", "id": site.id,
-                    "name": site.id if site.meta else site.name
-                })
-            site.port = int(site.port)
+            site.port = int(re.match(port_regex, server.filter("Key", "listen")[0].value).group(1))
             site.addr = server.filter("Key", "server_name")[0].value
             site.path = server.filter("Key", "root")[0].value
             site.php = "php" in server.filter("Key", "index")[0].value
