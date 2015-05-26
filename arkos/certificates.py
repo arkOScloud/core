@@ -5,6 +5,8 @@ import OpenSSL
 import os
 
 from arkos import config, signals, storage, websites, applications
+from arkos.utilities import shell
+from arkos.utilities.logs import DefaultMessage
 from system import systemtime, groups
 
 
@@ -192,7 +194,7 @@ def scan_authorities():
     storage.certs.set("authorities", certs)
     return certs
 
-def upload_certificate(id, cert, key, chain=""):
+def upload_certificate(id, cert, key, chain="", message=DefaultMessage()):
     # Test the certificates are valid
     try:
         crt = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, cert)
@@ -203,7 +205,18 @@ def upload_certificate(id, cert, key, chain=""):
     except Exception, e:
         raise Exception("Could not read private keyfile. Please make sure you've selected the proper file.", e)
     signals.emit("certificates", "pre_add", id)
+
+    # Check to see that we have DH params, if not then do that too
+    if not os.path.exists("/etc/arkos/ssl/dh_params.pem"):
+        message.update("info", "Generating Diffie-Hellman parameters...")
+        s = shell("openssl dhparam 2048 -out /etc/arkos/ssl/dh_params.pem")
+        if s["code"] != 0:
+            raise Exception("Failed to generate Diffie-Hellman parameters")
+        os.chown("/etc/arkos/ssl/dh_params.pem", -1, gid)
+        os.chmod("/etc/arkos/ssl/dh_params.pem", 0750)
+
     # Create actual certificate object
+    message.update("info", "Importing certificate...")
     sha1, md5 = get_cert_hashes(crt)
     c = Certificate(id=id, cert_path=os.path.join(config.get("certificates", "cert_dir"), id+".crt"),
         key_path=os.path.join(config.get("certificates", "key_dir"), id+".key"),
@@ -229,20 +242,31 @@ def upload_certificate(id, cert, key, chain=""):
 
 def generate_certificate(
         id, domain, country, state="", locale="", email="", keytype="RSA",
-        keylength=2048):
+        keylength=2048, message=DefaultMessage()):
     signals.emit("certificates", "pre_add", id)
 
     # Check to see that we have a CA ready; if not, generate one
     basehost = ".".join(domain.split(".")[-2:])
     ca = get_authorities(id=basehost)
     if not ca:
+        message.update("info", "Generating certificate authority...")
         ca = generate_authority(basehost)
     with open(ca.cert_path, "r") as f:
         ca_cert = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, f.read())
     with open(ca.key_path, "r") as f:
         ca_key = OpenSSL.crypto.load_privatekey(OpenSSL.crypto.FILETYPE_PEM, f.read())
 
+    # Check to see that we have DH params, if not then do that too
+    if not os.path.exists("/etc/arkos/ssl/dh_params.pem"):
+        message.update("info", "Generating Diffie-Hellman parameters...")
+        s = shell("openssl dhparam 2048 -out /etc/arkos/ssl/dh_params.pem")
+        if s["code"] != 0:
+            raise Exception("Failed to generate Diffie-Hellman parameters")
+        os.chown("/etc/arkos/ssl/dh_params.pem", -1, gid)
+        os.chmod("/etc/arkos/ssl/dh_params.pem", 0750)
+
     # Generate private key and create X509 certificate, then set options
+    message.update("info", "Generating certificate...")
     kt = OpenSSL.crypto.TYPE_DSA if keytype == "DSA" else OpenSSL.crypto.TYPE_RSA
     try:
         key = OpenSSL.crypto.PKey()
