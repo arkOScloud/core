@@ -273,7 +273,7 @@ class Site:
             nginx.Key("ssl_ciphers", ciphers),
             nginx.Key("ssl_session_timeout", "5m"),
             nginx.Key("ssl_prefer_server_ciphers", "on"),
-            nginx.Key("ssl_dhparam", "/etc/arkos/ssl/dh_param.pem")
+            nginx.Key("ssl_dhparam", "/etc/arkos/ssl/dh_param.pem"),
             nginx.Key("ssl_session_cache", "shared:SSL:50m"),
             )
         nginx.dumpf(block, os.path.join("/etc/nginx/sites-available/", self.id))
