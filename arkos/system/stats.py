@@ -22,7 +22,7 @@ def get_load():
 
 def get_temp():
     # TODO: replace this with libsensors.so / PySensors
-    if config.get("enviro", "board") == "Raspberry Pi":
+    if config.get("enviro", "board").startswith("Raspberry Pi"):
         with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
             return "%3.1f°C"%(float(f.read().rstrip("\n"))/1000)
     else:
