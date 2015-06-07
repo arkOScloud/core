@@ -197,29 +197,23 @@ def get(backup_location=""):
         backup_location = config.get("backups", "location", "/var/lib/arkos/backups")
     if not os.path.exists(backup_location):
         os.makedirs(backup_location)
-    for x in os.listdir(backup_location):
-        # Get backups, sort by date
-        archives = os.listdir(os.path.join(backup_location, x))
-        archives = sorted(archives,
-            key=lambda y: int(os.path.splitext(os.path.splitext(y)[0])[0].split("-")[1]))
-        for y in archives:
-            if not y.endswith(".tar.gz"):
-                continue
-            path = os.path.join(backup_location, x, y)
-            meta = os.path.join(backup_location, x, y.split(".tar.gz")[0]+".meta")
-            stime = y.split("-")[1].split(".tar.gz")[0]
-            if not os.path.exists(meta):
-                backups.append({"id": x+"/"+stime, "pid": x, "path": path,
-                    "icon": None, "type": "Unknown", "time": systemtime.get_iso_time(stime),
-                    "version": "Unknown", "size": os.path.getsize(path),
-                    "site_type": None, "is_ready": True})
-                continue
-            with open(meta, "r") as f:
-                data = json.loads(f.read())
-                backups.append({"id": x+"/"+stime, "pid": x, "path": path,
-                    "icon": data["icon"], "type": data["type"], "time": data["time"],
-                    "version": data["version"], "size": os.path.getsize(path),
-                    "site_type": data.get("site_type", None), "is_ready": True})
+    for x in glob.glob(os.path.join(backup_location, "*/*.tar.gz")):
+        path = x
+        name = os.path.basename(x).split("-")[0]
+        meta = x.split(".tar.gz")[0]+".meta"
+        stime = x.split("-")[1].split(".tar.gz")[0]
+        if not os.path.exists(meta):
+            backups.append({"id": name+"/"+stime, "pid": name, "path": path,
+                "icon": None, "type": "Unknown", "time": systemtime.get_iso_time(stime),
+                "version": "Unknown", "size": os.path.getsize(path),
+                "site_type": None, "is_ready": True})
+            continue
+        with open(meta, "r") as f:
+            data = json.loads(f.read())
+            backups.append({"id": name+"/"+stime, "pid": name, "path": path,
+                "icon": data["icon"], "type": data["type"], "time": data["time"],
+                "version": data["version"], "size": os.path.getsize(path),
+                "site_type": data.get("site_type", None), "is_ready": True})
     return backups
 
 def get_able():
@@ -233,7 +227,8 @@ def get_able():
     for x in get():
         if not x["pid"] in [y["id"] for y in able]:
             able.append({"type": x["type"], "icon": x["icon"], "id": x["pid"]})
-    able.append({"type": "internal", "icon": "fa fa-cog", "id": "arkOS"})
+    if not "arkOS" in [x["id"] for x in able]:
+        able.append({"type": "app", "icon": "fa fa-cog", "id": "arkOS"})
     return able
 
 def create(id, data=True):
@@ -280,6 +275,10 @@ def remove(id, time, backup_location=""):
     for x in backups:
         if x["id"] == id+"/"+time:
             os.unlink(x["path"])
+            try:
+                os.unlink(x["path"].split(".")[1]+".meta")
+            except:
+                pass
 
 def site_load(site):
     if site.__class__.__name__ != "ReverseProxy":

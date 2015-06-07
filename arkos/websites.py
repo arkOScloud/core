@@ -392,7 +392,7 @@ class Site:
         signals.emit("websites", "site_loaded", self)
         if hasattr(self, "site_edited"):
             self.site_edited()
-        nginx_reload():
+        nginx_reload()
 
     def update(self, message=DefaultMessage()):
         if self.version == self.meta.version.rsplit("-", 1)[0]:

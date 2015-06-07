@@ -8,7 +8,7 @@ from arkos.utilities.errors import ConfigurationError
 from arkos.utilities.logs import LoggingControl, new_logger
 from arkos.connections import ConnectionsManager
 
-version = "0.7.0beta3"
+version = "0.7.0"
 
 config = Config("settings.json")
 secrets = Config("secrets.json")

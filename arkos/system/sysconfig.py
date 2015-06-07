@@ -8,6 +8,10 @@ def shutdown():
     signals.emit("config", "shutdown")
     shell("shutdown -P now")
 
+def reload():
+    signals.emit("config", "reload")
+    shell("systemctl restart krakend")
+
 def reboot():
     signals.emit("config", "shutdown")
     shell("reboot")

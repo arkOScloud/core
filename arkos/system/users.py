@@ -18,7 +18,7 @@ class User:
             rootdn="dc=arkos-servers,dc=org", mail=[], admin=False, sudo=False):
         self.name = str(name)
         self.first_name = str(first_name)
-        self.last_name = None if self.last_name == None else str(last_name)
+        self.last_name = None if last_name == None else str(last_name)
         self.uid = uid or get_next_uid()
         self.domain = str(domain)
         self.rootdn = str(rootdn)
