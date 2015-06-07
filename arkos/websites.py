@@ -8,7 +8,6 @@ import shutil
 from arkos import applications, config, databases, signals, storage, tracked_services
 from arkos.system import users, groups, services
 from arkos.utilities import download, shell, random_string, DefaultMessage
-from arkos.utilities.errors import SoftFail
 
 
 # If no cipher preferences set, use the default ones
@@ -224,10 +223,7 @@ class Site:
         storage.sites.add("sites", self)
         signals.emit("websites", "site_installed", self)
         if enable:
-            try:
-                self.nginx_enable()
-            except SoftFail:
-                pass
+            self.nginx_enable()
         if enable and self.php:
             php_reload()
         if specialmsg:
@@ -324,7 +320,8 @@ class Site:
             os.symlink(origin, target)
             self.enabled = True
         if reload == True:
-            nginx_reload()
+            return nginx_reload()
+        return True
 
     def nginx_disable(self, reload=True):
         try:
@@ -333,7 +330,8 @@ class Site:
             pass
         self.enabled = False
         if reload == True:
-            nginx_reload()
+            return nginx_reload()
+        return True
 
     def edit(self, newname=""):
         site_dir = config.get("websites", "site_dir")
@@ -394,7 +392,7 @@ class Site:
         signals.emit("websites", "site_loaded", self)
         if hasattr(self, "site_edited"):
             self.site_edited()
-        nginx_reload()
+        nginx_reload():
 
     def update(self, message=DefaultMessage()):
         if self.version == self.meta.version.rsplit("-", 1)[0]:
@@ -569,10 +567,7 @@ class ReverseProxy(Site):
         self.installed = True
         storage.sites.add("sites", self)
         signals.emit("websites", "site_installed", self)
-        try:
-            self.nginx_enable()
-        except SoftFail:
-            pass
+        self.nginx_enable()
 
     def remove(self, message=None):
         shutil.rmtree(self.path)
@@ -692,8 +687,9 @@ def nginx_reload():
     try:
         s = services.get("nginx")
         s.restart()
+        return True
     except services.ActionError:
-        raise SoftFail("NGINX could not be restarted. Please check your configuration.")
+        return False
 
 def php_reload():
     try:
