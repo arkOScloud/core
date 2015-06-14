@@ -208,6 +208,8 @@ def get(id=None):
     for unit in files:
         if id == unit:
             return files[unit]
+        if unit.endswith("@"):
+            continue
         svcs.append(files[unit])
 
     # Get process info from Supervisor

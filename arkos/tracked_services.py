@@ -4,7 +4,7 @@ import sys
 
 from arkos import config, policies, signals, storage, security
 
-COMMON_PORTS = [3000, 3306, 5222, 5223, 5232, 8000, 8080]
+COMMON_PORTS = [3000, 3306, 5222, 5223, 5232]
 
 
 class SecurityPolicy:

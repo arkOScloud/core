@@ -219,7 +219,7 @@ def get(uid=None, name=None):
         elif name and u.name == name:
             return u
         r.append(u)
-    return r if not uid and not name else None
+    return r if uid == None and name == None else None
 
 def get_system(uid=None):
     r = []

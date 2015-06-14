@@ -302,7 +302,7 @@ class Site:
             listen.value = "80"
         else:
             listen.value = listen.value.rstrip(" ssl")
-        server.remove(*[x for x in s.filter("Key") if x.name.startswith("ssl_")])
+        server.remove(*[x for x in server.filter("Key") if x.name.startswith("ssl_")])
         nginx.dumpf(block, os.path.join("/etc/nginx/sites-available/", self.id))
         meta = ConfigParser.SafeConfigParser()
         meta.read(os.path.join(self.path, ".arkos"))
@@ -385,7 +385,7 @@ class Site:
         server.filter("Key", "listen")[0].value = str(self.port)+" ssl" if self.cert else str(self.port)
         server.filter("Key", "server_name")[0].value = self.addr
         server.filter("Key", "root")[0].value = self.path
-        server.filter("Key", "index")[0].value = "index.php" if self.php else "index.html"
+        server.filter("Key", "index")[0].value = "index.php" if hasattr(self, "php") and self.php else "index.html"
         nginx.dumpf(block, os.path.join("/etc/nginx/sites-available", self.id))
 
         # Call the site's edited hook, if it has one, then reload nginx

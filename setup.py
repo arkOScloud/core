@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='arkos-core',
-    version='0.7.0beta3',
+    version='0.7.0.1',
     install_requires=[
         'ntplib',
         'passlib',
