@@ -564,6 +564,7 @@ class ReverseProxy(Site):
             meta.write(f)
 
         # Track port and reload daemon
+        self.meta = None
         self.installed = True
         storage.sites.add("sites", self)
         signals.emit("websites", "site_installed", self)
