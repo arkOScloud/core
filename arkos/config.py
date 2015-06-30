@@ -46,7 +46,7 @@ class Config:
         return self.config
 
     def set(self, section, key, value=None):
-        if not value:
+        if value == None:
             self.config[section] = key
         elif self.config.has_key(section):
             self.config[section][key] = value

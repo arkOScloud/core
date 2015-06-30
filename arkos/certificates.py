@@ -136,9 +136,9 @@ def scan():
     if config.get("genesis", "ssl"):
         ssl = os.path.splitext(os.path.basename(config.get("genesis", "cert_file", "")))[0]
         if ssl and assigns.has_key(ssl):
-            assigns[ssl].append({"type": "genesis"})
+            assigns[ssl].append({"type": "genesis", "id": "genesis", "name": "arkOS Genesis/API"})
         elif ssl:
-            assigns[ssl] = [{"type": "genesis"}]
+            assigns[ssl] = [{"type": "genesis", "id": "genesis", "name": "arkOS Genesis/API"}]
     for x in applications.get(installed=True):
         if hasattr(x, "ssl"):
             for ssl, data in x.ssl.get_ssl_assigned():

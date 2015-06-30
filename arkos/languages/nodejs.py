@@ -4,12 +4,12 @@ from arkos import logger
 from arkos.utilities import shell
 
 
-def install(*mods, **kwargs):
+def install(*mods, **kwargs, as_global=False):
     # Installs a set of NPM packages.
     cwd = os.getcwd()
     if "install_path" in kwargs:
         os.chdir(kwargs["install_path"])
-    s = shell("npm install %s%s" % (" ".join(x for x in mods), (" --"+" --".join(x for x in kwargs["opts"]) if kwargs.has_key("opts") else "")))
+    s = shell("npm install %s%s%s" % ("-g " if as_global else "", " ".join(x for x in mods), (" --"+" --".join(x for x in kwargs["opts"]) if kwargs.has_key("opts") else "")))
     os.chdir(cwd)
     if s["code"] != 0:
         logger.error("NPM install of %s failed; log output follows:\n%s"%(" ".join(x for x in mods),s["stderr"]))
