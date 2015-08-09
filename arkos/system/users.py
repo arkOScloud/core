@@ -171,7 +171,7 @@ class SystemUser:
             shell("usermod -a -G %s %s" % (x, self.name))
 
     def update_password(self, passwd):
-        shell("passwd %s" % u, stdin="%s\n%s\n" % (self.name,passwd,passwd))
+        shell("passwd %s" % self.name, stdin="%s\n%s\n" % (passwd,passwd))
 
     def delete(self):
         shell("userdel %s" % self.name)

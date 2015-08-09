@@ -57,9 +57,9 @@ def get(id=None, type=None):
         return []
     return data
 
-def register(type, id, name, icon, ports, policy=0, fw=True):
+def register(type, id, name, icon, ports, policy=0, default_policy=2, fw=True):
     if not policy:
-        policy = policies.get(type, id, 2)
+        policy = policies.get(type, id, default_policy)
     pget = get(type=type)
     if pget:
         for x in pget:

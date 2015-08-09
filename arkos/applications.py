@@ -69,7 +69,8 @@ class App:
             for s in self.services:
                 if s["ports"]:
                     tracked_services.register(self.id, s["binary"], s["name"],
-                        self.icon, s["ports"], fw=False)
+                        self.icon, s["ports"], default_policy=s.get("default_policy", 2),
+                        fw=False)
             signals.emit("apps", "post_load", self)
         except Exception, e:
             self.loadable = False

@@ -4,8 +4,9 @@ from arkos import logger
 from arkos.utilities import shell
 
 
-def install(*mods, **kwargs, as_global=False):
+def install(*mods, **kwargs):
     # Installs a set of NPM packages.
+    as_global = kwargs.get("as_global", False)
     cwd = os.getcwd()
     if "install_path" in kwargs:
         os.chdir(kwargs["install_path"])

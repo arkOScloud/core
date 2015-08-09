@@ -23,6 +23,9 @@ def initialize_fw():
     chain.append_rule(rule)
 
     # Accept designated apps
+    app_chain = iptc.Chain(table, "arkos-apps")
+    if not table.is_chain(app_chain):
+        table.create_chain(app_chain)
     rule = iptc.Rule()
     target = iptc.Target(rule, "arkos-apps")
     rule.target = target
@@ -31,7 +34,7 @@ def initialize_fw():
     # Allow ICMP (ping)
     rule = iptc.Rule()
     rule.protocol = "icmp"
-    target = (rule, "ACCEPT")
+    target = iptc.Target(rule, "ACCEPT")
     rule.target = target
     match = iptc.Match(rule, "icmp")
     match.icmp_type = "echo-request"
@@ -39,7 +42,7 @@ def initialize_fw():
 
     # Accept established/related connections
     rule = iptc.Rule()
-    target = (rule, "ACCEPT")
+    target = iptc.Target(rule, "ACCEPT")
     rule.target = target
     match = iptc.Match(rule, "conntrack")
     match.ctstate = "ESTABLISHED,RELATED"
@@ -237,7 +240,7 @@ def get_defense_rules():
                 filter_name = cfg.get(l["id"], "filter")
                 if "%(__name__)s" in filter_name:
                     filter_name = filter_name.replace("%(__name__)s", l["id"])
-                c = fcfg.read([filters+"/common.conf", 
+                c = fcfg.read([filters+"/common.conf",
                     filters+"/"+filter_name+".conf"])
                 filter_opts = fcfg.items("Definition")
                 l["jail_opts"] = jail_opts
@@ -260,7 +263,7 @@ def get_defense_rules():
                 else:
                     jail_opts = cfg.items(l["id"])
                     filter_name = cfg.get(l["id"], "filter")
-                    fcfg.read([filters+"/common.conf", 
+                    fcfg.read([filters+"/common.conf",
                         filters+"/"+filter_name+".conf"])
                     filter_opts = fcfg.items("Definition")
                     l["jail_opts"] = jail_opts
