@@ -258,7 +258,7 @@ def generate_certificate(
 
     # Check to see that we have DH params, if not then do that too
     if not os.path.exists("/etc/arkos/ssl/dh_params.pem"):
-        message.update("info", "Generating Diffie-Hellman parameters...")
+        message.update("info", "Generating Diffie-Hellman parameters. This may take a few minutes...")
         s = shell("openssl dhparam 2048 -out /etc/arkos/ssl/dh_params.pem")
         if s["code"] != 0:
             raise Exception("Failed to generate Diffie-Hellman parameters")
