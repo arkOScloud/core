@@ -53,7 +53,7 @@ class Site:
         message.update("info", "Preparing to install...", head="Installing website")
 
         # Make sure the chosen port is indeed open
-        if not tracked_services.is_open_port(self.port):
+        if not tracked_services.is_open_port(self.port, self.addr):
             raise Exception("This port is taken by another site or service, please choose another")
 
         # Set some metadata values
