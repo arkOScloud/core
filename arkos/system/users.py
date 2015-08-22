@@ -40,7 +40,7 @@ class User:
             "givenName": self.first_name,
             "sn": self.last_name or "NONE",
             "displayName": self.first_name+" "+self.last_name,
-            "cn": self.first_name+" "+self.last_name,
+            "cn": self.first_name+(" "+self.last_name if self.last_name else ""),
             "uid": self.name,
             "mail": [self.name+"@"+self.domain],
             "maildrop": self.name,
@@ -69,7 +69,7 @@ class User:
         ldif = ldif[0][1]
         attrs = {
             "givenName": self.first_name,
-            "sn": self.last_name,
+            "sn": self.last_name || "",
             "displayName": "%s %s" % (self.first_name, self.last_name),
             "cn": "%s %s" % (self.first_name, self.last_name),
             "mail": self.mail
