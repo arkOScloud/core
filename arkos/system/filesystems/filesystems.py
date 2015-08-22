@@ -80,6 +80,8 @@ class DiskPartition:
         f.dump_p = 0
         f.fsck_p = 0
         save_fstab_entry(f)
+        if not os.path.exists(f.dst):
+            os.makedirs(f.dst)
         self.enabled = True
 
     def disable(self):
@@ -301,12 +303,15 @@ def get(id=None):
                 fstype = parted.probeFileSystem(p.geometry)
             except:
                 fstype = "Unknown"
-            dev = DiskPartition(id=p.path.split("/")[-1], path=p.path,
-                mountpoint=mps.get(p.path) or None, size=int(p.getSize("B")),
-                fstype=fstype, enabled=p.path in fstab, crypt=crypto.is_luks(p.path)==0)
-            if id == dev.id:
-                return dev
-            devs.append(dev)
+            try:
+                dev = DiskPartition(id=p.path.split("/")[-1], path=p.path,
+                    mountpoint=mps.get(p.path) or None, size=int(p.getSize("B")),
+                    fstype=fstype, enabled=p.path in fstab, crypt=crypto.is_luks(p.path)==0)
+                if id == dev.id:
+                    return dev
+                devs.append(dev)
+            except:
+                continue
 
     # Replace mount data for virtual disks with loopback id
     dd = losetup.get_loop_devices()

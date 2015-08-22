@@ -8,7 +8,6 @@ def install(*mods, **kwargs):
     # Installs a set of NPM packages.
     as_global = kwargs.get("as_global", False)
     cwd = os.getcwd()
-    as_global = kwargs["as_global"] if "as_global" in kwargs else True
     if "install_path" in kwargs:
         os.chdir(kwargs["install_path"])
     s = shell("npm install %s%s%s" % ("-g " if as_global else "", " ".join(x for x in mods), (" --"+" --".join(k+v if v[0]=='=' else k+" "+v for k,v in kwargs["opts"].items()) if kwargs.has_key("opts") else "")))
@@ -35,7 +34,7 @@ def install_from_package(path, stat="production", opts={}):
         raise Exception("NPM install failed, check logs for info")
 
 def is_installed(name, as_global=True):
-    # Returns whether NPM package is installed. 
+    # Returns whether NPM package is installed.
     s = shell("npm list -p %s%s" % ("-g " if as_global else "", name))
     if name in s['stdout']:
         return True
