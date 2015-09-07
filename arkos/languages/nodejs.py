@@ -35,7 +35,7 @@ def install_from_package(path, stat="production", opts={}):
 
 def is_installed(name, as_global=True):
     # Returns whether NPM package is installed. 
-    s = shell("npm list -p %s%s" % ("-g " if as_global else "", name))
+    s = shell("npm list -p --depth 1 %s%s" % ("-g " if as_global else "", name))
     if name in s['stdout']:
         return True
     return False
