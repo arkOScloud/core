@@ -43,6 +43,12 @@ def is_installed(name, as_global=True):
         return False
     return True
 
+def add_user(user):
+    s = shell("usermod -a -G npm %s" % (user))
+    if s["code"] != 0:
+        logger.error("NPM group add for %s failed; log output follows:\n%s"%(user,s["stderr"]))
+        raise Exception("NPM group add failed, check logs for info")
+
 def _get_npm_command(command, as_global, path=None):
     if as_global:
         return _get_global_npm_command(command)
