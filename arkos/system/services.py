@@ -57,7 +57,7 @@ class Service:
                     self.state = "running"
                     signals.emit("services", "post_start", self)
                     break
-                timeout + 1
+                timeout += 1
                 time.sleep(1)
             else:
                 raise ActionError()
