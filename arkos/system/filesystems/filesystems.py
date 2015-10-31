@@ -122,8 +122,8 @@ class VirtualDisk:
 
     def create(self, mount=False):
         vdisk_dir = config.get("filesystems", "vdisk_dir")
-        if not os.path.exists(os.path.join(config.get("filesystems", "vdisk_dir")):
-            os.mkdir(os.path.join(config.get("filesystems", "vdisk_dir"))
+        if not os.path.exists(os.path.join(config.get("filesystems", "vdisk_dir"))):
+            os.mkdir(os.path.join(config.get("filesystems", "vdisk_dir")))
         self.path = str(os.path.join(vdisk_dir, self.id+".img"))
         if os.path.exists(self.path):
             raise Exception("This virtual disk already exists")

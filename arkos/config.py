@@ -56,6 +56,8 @@ class Config:
 
     def append(self, section, key, value=None):
         if value == None:
+            if not self.config.has_key(section):
+                self.config[section] = []
             self.config[section].append(key)
         elif self.config.has_key(section):
             self.config[section][key].append(value)
