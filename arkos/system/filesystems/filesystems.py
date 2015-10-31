@@ -36,6 +36,8 @@ class DiskPartition:
             raise Exception("Cannot mount a partition of unknown type")
         signals.emit("filesystems", "pre_mount", self)
         mount_point = self.mountpoint if self.mountpoint else os.path.join("/media", self.id)
+        if not os.path.isdir(mount_point):
+            os.makedirs(mount_point)
         if self.crypt and passwd:
             # Decrypt the disk first if it's an encrypted disk
             s = crypto.luks_open(self.path, self.id, passwd)
@@ -120,6 +122,8 @@ class VirtualDisk:
 
     def create(self, mount=False):
         vdisk_dir = config.get("filesystems", "vdisk_dir")
+        if not os.path.exists(os.path.join(config.get("filesystems", "vdisk_dir")):
+            os.mkdir(os.path.join(config.get("filesystems", "vdisk_dir"))
         self.path = str(os.path.join(vdisk_dir, self.id+".img"))
         if os.path.exists(self.path):
             raise Exception("This virtual disk already exists")

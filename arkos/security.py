@@ -75,6 +75,8 @@ def regen_fw(data, range=[]):
     # Create our app chain
     table = iptc.Table(iptc.Table.FILTER)
     chain = iptc.Chain(table, "arkos-apps")
+    if not table.is_chain(chain):
+        table.create_chain(chain)
     rule = iptc.Rule()
     target = iptc.Target(rule, "RETURN")
     rule.target = target

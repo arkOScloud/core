@@ -1,4 +1,3 @@
-import datetime
 import glob
 import hashlib
 import OpenSSL
@@ -92,7 +91,7 @@ class Certificate:
             "keytype": self.keytype,
             "keylength": self.keylength,
             "assigns": self.assigns,
-            "expiry": datetime.datetime.strptime(self.expiry, "%Y%m%d%H%M%SZ").isoformat(),
+            "expiry": systemtime.get_iso_time(self.expiry),
             "sha1": self.sha1,
             "md5": self.md5,
             "is_ready": ready
@@ -116,7 +115,7 @@ class CertificateAuthority:
     def as_dict(self):
         return {
             "id": self.id,
-            "expiry": datetime.datetime.strptime(self.expiry, "%Y%m%d%H%M%SZ").isoformat()
+            "expiry": systemtime.get_iso_time(self.expiry),
         }
 
 

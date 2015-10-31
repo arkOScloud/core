@@ -46,5 +46,5 @@ class Storage:
                 if item == x.id:
                     storage.remove(x)
                     return
-        else:
+        elif item in storage:
             storage.remove(item)

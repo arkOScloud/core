@@ -187,6 +187,9 @@ def extract(pin, pout, delete=False):
     if name.endswith((".tar.gz", ".tgz")):
         with tarfile.open(pin, "r:gz") as t:
             t.extractall(pout)
+    elif name.endswith(".tar"):
+        with tarfile.open(pin, "r") as t:
+            t.extractall(pout)
     elif name.endswith(".gz"):
         f = gzip.open(pin, "rb")
         i = f.read()

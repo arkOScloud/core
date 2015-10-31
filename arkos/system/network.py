@@ -16,7 +16,7 @@ class Connection:
         self.connected = connected
         self.enabled = enabled
         self.config = config
-    
+
     def add(self):
         signals.emit("networks", "pre_add", self)
         with open(os.path.join("/etc/netctl", self.id), "w") as f:
@@ -48,13 +48,13 @@ class Connection:
         self.add()
         if connected:
             self.connect()
-    
+
     def remove(self):
         signals.emit("networks", "pre_remove", self)
         if os.path.exists(os.path.join("/etc/netctl", self.id)):
             os.unlink(os.path.join("/etc/netctl", self.id))
         signals.emit("networks", "post_remove", self)
-    
+
     def connect(self):
         signals.emit("networks", "pre_connect", self)
         for x in get_connections(iface=self.config.get("interface")):
@@ -65,7 +65,7 @@ class Connection:
             signals.emit("networks", "post_connect", self)
         else:
             raise Exception("Network connection failed")
-    
+
     def disconnect(self):
         signals.emit("networks", "pre_disconnect", self)
         s = shell("netctl stop %s" % self.id)
@@ -74,27 +74,27 @@ class Connection:
             signals.emit("networks", "post_disconnect", self)
         else:
             raise Exception("Network disconnection failed")
-    
+
     def toggle(self):
         if self.connected:
             self.disconnect()
         else:
             self.connect()
-    
+
     def enable(self):
         s = shell("netctl enable %s" % self.id)
         if s["code"] == 0:
             self.enabled = True
         else:
             raise Exception("Network enable failed")
-    
+
     def disable(self):
         s = shell("netctl disable %s" % self.id)
         if s["code"] == 0:
             self.enabled = False
         else:
             raise Exception("Network disable failed")
-    
+
     def as_dict(self):
         return {
             "id": self.id,
@@ -119,13 +119,13 @@ class Interface:
 
     def bring_down(self):
         shell("ip link set dev %s down" % self.id)
-    
+
     def enable(self):
         shell("systemctl enable netctl-auto@%s.service" % self.id)
-    
+
     def disable(self):
         shell("systemctl disable netctl-auto@%s.service" % self.id)
-    
+
     def as_dict(self):
         return {
             "id": self.id,
@@ -182,13 +182,13 @@ def get_interfaces(id=None):
         data = data[x] if type(data) == dict else data
         i.rx, i.tx = data[0], data[1]
         addrs = netifaces.ifaddresses(x)
-        i.ip = addrs.get(netifaces.AF_INET, None)
-        i.ip6 = addrs.get(netifaces.AF_INET6, None)
+        i.ip = addrs.get(netifaces.AF_INET, [])
+        i.ip6 = addrs.get(netifaces.AF_INET6, [])
         if not i.ip and not i.ip6:
             i.up = False
             continue
         # Determine if the interface is up or not
-        s = socket.socket(socket.AF_INET if i.ip else socket.AF_INET6, 
+        s = socket.socket(socket.AF_INET if i.ip else socket.AF_INET6,
             socket.SOCK_DGRAM)
         r = fcntl.ioctl(s.fileno(), 0x8913, i.id + ("\0"*256))
         flags, = struct.unpack("H", r[16:18])
