@@ -91,7 +91,7 @@ class Certificate:
             "keytype": self.keytype,
             "keylength": self.keylength,
             "assigns": self.assigns,
-            "expiry": systemtime.get_iso_time(self.expiry),
+            "expiry": systemtime.get_iso_time(self.expiry.rstrip("Z")),
             "sha1": self.sha1,
             "md5": self.md5,
             "is_ready": ready
