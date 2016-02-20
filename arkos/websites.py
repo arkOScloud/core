@@ -6,6 +6,7 @@ import re
 import shutil
 
 from arkos import applications, config, databases, signals, storage, tracked_services
+from arkos.languages import php
 from arkos.system import users, groups, services
 from arkos.utilities import download, shell, random_string, DefaultMessage
 
@@ -146,7 +147,7 @@ class Site:
 
         # Set proper starting permissions on source directory
         uid, gid = users.get_system("http").uid, groups.get_system("http").gid
-        os.chmod(self.path, 0644)
+        os.chmod(self.path, 0755)
         os.chown(self.path, uid, gid)
         for r, d, f in os.walk(self.path):
             for x in d:
@@ -227,6 +228,7 @@ class Site:
         if enable:
             self.nginx_enable()
         if enable and self.php:
+            php.open_basedir("add", "/srv/http/")
             php_reload()
         if specialmsg:
             return specialmsg
