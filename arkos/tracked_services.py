@@ -32,6 +32,7 @@ class SecurityPolicy:
             security.regen_fw(get())
         storage.policies.remove("policies", self)
 
+    @property
     def as_dict(self):
         return {
             "type": self.type,
@@ -42,6 +43,10 @@ class SecurityPolicy:
             "policy": self.policy,
             "is_ready": True
         }
+
+    @property
+    def serialized(self):
+        return self.as_dict
 
 
 def get(id=None, type=None):

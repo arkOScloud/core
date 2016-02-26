@@ -143,6 +143,7 @@ class User:
         conns.LDAP.delete_s("uid=%s,ou=users,%s" % (self.name,self.rootdn))
         signals.emit("users", "post_remove", self)
 
+    @property
     def as_dict(self, ready=True):
         return {
             "id": self.uid,
@@ -155,6 +156,10 @@ class User:
             "mail_addresses": self.mail,
             "is_ready": ready
         }
+
+    @property
+    def serialized(self):
+        return self.as_dict
 
 
 class SystemUser:
@@ -176,12 +181,17 @@ class SystemUser:
     def delete(self):
         shell("userdel %s" % self.name)
 
+    @property
     def as_dict(self):
         return {
             "id": self.uid,
             "name": self.name,
             "groups": self.groups
         }
+
+    @property
+    def serialized(self):
+        return self.as_dict
 
 
 def get(uid=None, name=None):

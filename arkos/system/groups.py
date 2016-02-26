@@ -12,7 +12,7 @@ class Group:
         self.gid = gid or get_next_gid()
         self.users = [str(user) for user in users]
         self.rootdn = rootdn
-    
+
     def add(self):
         try:
             ldif = conns.LDAP.search_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn),
@@ -30,7 +30,7 @@ class Group:
         signals.emit("groups", "pre_add", self)
         conns.LDAP.add_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn), ldif)
         signals.emit("groups", "post_add", self)
-    
+
     def update(self):
         try:
             ldif = conns.LDAP.search_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn),
@@ -38,17 +38,18 @@ class Group:
         except ldap.NO_SUCH_OBJECT:
             raise Exception("This group does not exist")
 
-        ldif = ldap.modlist.modifyModlist(ldif[0][1], {"memberUid": self.users}, 
+        ldif = ldap.modlist.modifyModlist(ldif[0][1], {"memberUid": self.users},
             ignore_oldexistent=1)
         signals.emit("groups", "pre_update", self)
         conns.LDAP.modify_ext_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn), ldif)
         signals.emit("groups", "post_update", self)
-    
+
     def delete(self):
         signals.emit("groups", "pre_remove", self)
         conns.LDAP.delete_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn))
         signals.emit("groups", "post_remove", self)
-    
+
+    @property
     def as_dict(self, ready=True):
         return {
             "id": self.gid,
@@ -57,8 +58,12 @@ class Group:
             "is_ready": ready
         }
 
+    @property
+    def serialized(self):
+        return self.as_dict
 
-class SystemGroup:    
+
+class SystemGroup:
     def __init__(self, name="", gid=0, users=[]):
         self.name = name
         self.gid = gid
@@ -70,7 +75,7 @@ class SystemGroup:
         for x in grp.getgrall():
             if x.gr_name == self.name:
                 self.gid = x.gr_gid
-    
+
     def update(self):
         for x in self.users:
             shell("usermod -a -G %s %s" % (self.name, x))
@@ -81,7 +86,7 @@ class SystemGroup:
 
 def get(gid=None):
     r = []
-    for x in conns.LDAP.search_s("ou=groups,%s" % config.get("general", "ldap_rootdn", "dc=arkos-servers,dc=org"), 
+    for x in conns.LDAP.search_s("ou=groups,%s" % config.get("general", "ldap_rootdn", "dc=arkos-servers,dc=org"),
             ldap.SCOPE_SUBTREE, "(objectClass=posixGroup)", None):
         for y in x[1]:
             if type(x[1][y]) == list and len(x[1][y]) == 1 and y != "memberUid":

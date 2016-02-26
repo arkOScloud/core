@@ -77,3 +77,9 @@ def get_iso_time(ts=None, fmt="%Y%m%d%H%M%S"):
         return datetime.datetime.strptime(ts, fmt).isoformat()+tz
     else:
         return datetime.datetime.now().isoformat()+tz
+
+def ts_to_datetime(ts, fmt="%Y%m%d%H%M%S"):
+    if fmt == "unix":
+        return datetime.datetime.fromtimestamp(ts)
+    else:
+        return datetime.datetime.strptime(ts, fmt)

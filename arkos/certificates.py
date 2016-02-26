@@ -84,18 +84,25 @@ class Certificate:
         storage.certs.remove("certificates", self)
         signals.emit("certificates", "post_remove", self)
 
-    def as_dict(self, ready=True):
+    @property
+    def as_dict(self):
         return {
             "id": self.id,
             "domain": self.domain,
             "keytype": self.keytype,
             "keylength": self.keylength,
             "assigns": self.assigns,
-            "expiry": systemtime.get_iso_time(self.expiry.rstrip("Z")),
+            "expiry": systemtime.ts_to_datetime(self.expiry.rstrip("Z")),
             "sha1": self.sha1,
             "md5": self.md5,
-            "is_ready": ready
+            "is_ready": True
         }
+
+    @property
+    def serialized(self):
+        data = self.as_dict
+        data["expiry"] = systemtime.get_iso_time(self.expiry.rstrip("Z"))
+        return data
 
 
 class CertificateAuthority:
@@ -112,11 +119,18 @@ class CertificateAuthority:
             os.unlink(self.key_path)
         storage.certs.remove("authorities", self)
 
+    @property
     def as_dict(self):
         return {
             "id": self.id,
-            "expiry": systemtime.get_iso_time(self.expiry),
+            "expiry": systemtime.ts_to_datetime(self.expiry.rstrip("Z"))
         }
+
+    @property
+    def serialized(self):
+        data = self.as_dict
+        data["expiry"] = systemtime.get_iso_time(self.expiry.rstrip("Z"))
+        return data
 
 
 def get(id=None):

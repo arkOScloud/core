@@ -183,6 +183,7 @@ class Service:
             conns.Supervisor.restart()
             signals.emit("services", "post_remove", self)
 
+    @property
     def as_dict(self):
         return {
             "id": self.name,
@@ -193,6 +194,10 @@ class Service:
             "cfg": self.cfg,
             "is_ready": True
         }
+
+    @property
+    def serialized(self):
+        return self.as_dict
 
 
 def get(id=None):

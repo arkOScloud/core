@@ -94,6 +94,7 @@ class DiskPartition:
                 self.disabled = False
                 break
 
+    @property
     def as_dict(self):
         return {
             "id": self.id,
@@ -106,6 +107,10 @@ class DiskPartition:
             "enabled": self.enabled,
             "is_ready": True
         }
+
+    @property
+    def serialized(self):
+        return self.as_dict
 
 
 class VirtualDisk:
@@ -254,6 +259,7 @@ class VirtualDisk:
         os.unlink(self.path)
         signals.emit("filesystems", "post_remove", self)
 
+    @property
     def as_dict(self):
         return {
             "id": self.id,
@@ -267,6 +273,10 @@ class VirtualDisk:
             "is_ready": True
         }
 
+    @property
+    def serialized(self):
+        return self.as_dict
+
 
 class PointOfInterest:
     def __init__(self, id="", path="", stype="", icon=""):
@@ -275,6 +285,7 @@ class PointOfInterest:
         self.stype = stype
         self.icon = icon
 
+    @property
     def as_dict(self):
         return {
             "id": self.id,
@@ -282,6 +293,10 @@ class PointOfInterest:
             "type": self.stype,
             "icon": self.icon
         }
+
+    @property
+    def serialized(self):
+        return self.as_dict
 
 
 def get(id=None):

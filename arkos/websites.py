@@ -480,6 +480,7 @@ class Site:
         storage.sites.remove("sites", self)
         signals.emit("websites", "site_removed", self)
 
+    @property
     def as_dict(self):
         return {
             "id": self.id,
@@ -497,6 +498,10 @@ class Site:
             "has_actions": self.meta.website_extra_actions if hasattr(self.meta, "website_extra_actions") else None,
             "is_ready": True
         }
+
+    @property
+    def serialized(self):
+        return self.as_dict
 
 
 class ReverseProxy(Site):
@@ -584,6 +589,7 @@ class ReverseProxy(Site):
         storage.sites.remove("sites", self)
         signals.emit("websites", "site_removed", self)
 
+    @property
     def as_dict(self):
         return {
             "id": self.id,
@@ -601,6 +607,10 @@ class ReverseProxy(Site):
             "enabled": self.enabled,
             "is_ready": True
         }
+
+    @property
+    def serialized(self):
+        return self.as_dict
 
 
 def get(id=None, type=None, verify=True):

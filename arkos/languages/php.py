@@ -89,6 +89,8 @@ def open_basedir(op, path):
         for l in ic:
             if "open_basedir = " in l and path not in l:
                 l = l.rstrip("\n") + ":%s\n" % path
+                if l.startswith(";open_basedir"):
+                    l = l.replace(";open_basedir", "open_basedir")
                 oc.append(l)
             else:
                 oc.append(l)

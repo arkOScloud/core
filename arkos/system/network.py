@@ -95,6 +95,7 @@ class Connection:
         else:
             raise Exception("Network disable failed")
 
+    @property
     def as_dict(self):
         return {
             "id": self.id,
@@ -103,6 +104,10 @@ class Connection:
             "config": self.config,
             "is_ready": True
         }
+
+    @property
+    def serialized(self):
+        return self.as_dict
 
 
 class Interface:
@@ -126,6 +131,7 @@ class Interface:
     def disable(self):
         shell("systemctl disable netctl-auto@%s.service" % self.id)
 
+    @property
     def as_dict(self):
         return {
             "id": self.id,
@@ -135,6 +141,10 @@ class Interface:
             "rx": self.rx,
             "tx": self.tx
         }
+
+    @property
+    def serialized(self):
+        return self.as_dict
 
 
 def get_connections(id=None, iface=None):
