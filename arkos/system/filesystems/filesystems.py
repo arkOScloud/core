@@ -73,6 +73,8 @@ class DiskPartition:
         self.mountpoint = None
 
     def enable(self):
+        if self.crypt:
+            raise Exception("Cannot enable encrypted virutal disks")
         f = FstabEntry()
         f.src = self.path
         f.dst = os.path.join("/media", self.id)

@@ -496,6 +496,7 @@ class Site:
             "php": self.php,
             "enabled": self.enabled,
             "has_actions": self.meta.website_extra_actions if hasattr(self.meta, "website_extra_actions") else None,
+            "has_update": self.meta.website_updates and self.version != self.meta.version.rsplit("-", 1)[0],
             "is_ready": True
         }
 
