@@ -9,10 +9,10 @@ class Domain:
     def __init__(self, name, rootdn="dc=arkos-servers,dc=org"):
         self.name = str(name)
         self.rootdn = rootdn
-    
+
     def __str__(self):
         return self.name
-    
+
     def add(self):
         try:
             ldif = conns.LDAP.search_s("virtualdomain=%s,ou=domains,%s" % (self.name,self.rootdn),
@@ -25,7 +25,7 @@ class Domain:
         conns.LDAP.add_s("virtualdomain=%s,ou=domains,%s" % (self.name,self.rootdn),
             ldap.modlist.addModlist(ldif))
         signals.emit("domains", "post_add", self)
-    
+
     def remove(self):
         if self.name in [x.domain for x in users.get()]:
             raise Exception("A user is still using this domain")
@@ -33,8 +33,13 @@ class Domain:
         conns.LDAP.delete_s("virtualdomain=%s,ou=domains,%s" % (self.name,self.rootdn))
         signals.emit("domains", "post_remove", self)
 
+    @property
     def as_dict(self, ready=True):
         return {"id": self.name, "is_ready": ready}
+
+    @property
+    def serialized(self):
+        return self.as_dict
 
 
 def get(id=None):

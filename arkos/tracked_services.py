@@ -8,13 +8,14 @@ COMMON_PORTS = [3000, 3306, 5222, 5223, 5232]
 
 
 class SecurityPolicy:
-    def __init__(self, type="", id="", name="", icon="", ports=[], policy=2):
+    def __init__(self, type="", id="", name="", icon="", ports=[], policy=2, addr=None):
         self.type = type
         self.id = id
         self.name = name
         self.icon = icon
         self.ports = ports
         self.policy = policy
+        self.addr = addr
 
     def save(self, fw=True):
         policies.set(self.type, self.id, self.policy)
@@ -31,6 +32,7 @@ class SecurityPolicy:
             security.regen_fw(get())
         storage.policies.remove("policies", self)
 
+    @property
     def as_dict(self):
         return {
             "type": self.type,
@@ -41,6 +43,10 @@ class SecurityPolicy:
             "policy": self.policy,
             "is_ready": True
         }
+
+    @property
+    def serialized(self):
+        return self.as_dict
 
 
 def get(id=None, type=None):
@@ -57,15 +63,15 @@ def get(id=None, type=None):
         return []
     return data
 
-def register(type, id, name, icon, ports, policy=0, fw=True):
+def register(type, id, name, icon, ports, addr=None, policy=0, default_policy=2, fw=True):
     if not policy:
-        policy = policies.get(type, id, 2)
+        policy = policies.get(type, id, default_policy)
     pget = get(type=type)
     if pget:
         for x in pget:
             if x.id == id:
                 storage.policies.remove("policies", x)
-    svc = SecurityPolicy(type, id, name, icon, ports, policy)
+    svc = SecurityPolicy(type, id, name, icon, ports, policy, addr)
     svc.save(fw)
 
 def deregister(type, id="", fw=True):
@@ -94,10 +100,12 @@ def refresh_policies():
     policies.config = newpolicies
     policies.save()
 
-def is_open_port(port, ignore_common=False):
+def is_open_port(port, addr=None, ignore_common=False):
     data = get()
     ports = []
     for x in data:
+        if addr and x.type == "website" and addr != x.addr:
+            continue
         for y in x.ports:
             ports.append(int(y[1]))
     if not ignore_common: ports = ports + COMMON_PORTS
@@ -123,12 +131,11 @@ def initialize():
             x["name"], x["icon"], x["ports"], x["policy"]))
 
 def register_website(site):
-    register(site.meta.id if site.meta else "website", site.id,
-        site.name if hasattr(site, "name") and site.name else site.id,
-        site.meta.icon if site.meta else "fa fa-globe", [("tcp", site.port)])
+    register("website", site.id, site.name if hasattr(site, "name") and site.name else site.id,
+        site.meta.icon if site.meta else "fa fa-globe", [("tcp", site.port)], site.addr)
 
 def deregister_website(site):
-    deregister(site.meta.id if site.meta else "website", site.id)
+    deregister("website", site.id)
 
 signals.add("tracked_services", "websites", "site_loaded", register_website)
 signals.add("tracked_services", "websites", "site_installed", register_website)

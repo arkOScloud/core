@@ -8,7 +8,7 @@ from errors import DefaultException
 class DefaultMessage:
     PRINT = False
 
-    def __init__(self, cls="", msg=""):
+    def __init__(self, cls="", msg="", head=""):
         if cls == "error" and msg:
             raise DefaultException(str(msg))
         elif self.PRINT and cls == "warning" and msg:
@@ -16,7 +16,7 @@ class DefaultMessage:
         elif self.PRINT and msg:
             print "\033[32m%s\033[0m" % msg
 
-    def update(self, cls, msg):
+    def update(self, cls, msg, head=""):
         if cls == "error":
             raise DefaultException(str(msg))
         elif self.PRINT and cls == "warning":
@@ -24,7 +24,7 @@ class DefaultMessage:
         elif self.PRINT:
             print "\033[32m%s\033[0m" % msg
 
-    def complete(self, cls, msg):
+    def complete(self, cls, msg, head=""):
         if cls == "error":
             raise DefaultException(str(msg))
         elif self.PRINT and cls == "warning":

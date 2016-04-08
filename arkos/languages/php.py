@@ -40,25 +40,32 @@ def composer_install(path):
     if s["code"] != 0:
         raise Exception("Composer failed to install this app's bundle. Error: %s"%str(s["stderr"]))
 
-def change_setting(name, value):
+def change_setting(name, value, config_file="/etc/php/php.ini"):
     # Change a key value in php.ini
-    with open("/etc/php/php.ini", "r") as f:
+    with open(config_file, "r") as f:
         lines = f.readlines()
-    with open("/etc/php/php.ini", "w") as f:
+    with open(config_file, "w") as f:
+        matched = False
         for line in lines:
-            if name+" = " in line:
+            if re.search(re.escape(name) + "\s*=", line):
                 line = name+" = "+value+"\n"
+                matched = True
             f.write(line)
+        if not matched:
+            f.write(name+" = "+value+"\n")
 
-def enable_mod(*mod):
+def enable_mod(*args, **kwargs):
     # Enable a PHP extension in php.ini
-    with open("/etc/php/php.ini", "r") as f:
+    config_file = kwargs.get("config_file", "/etc/php/php.ini")
+    with open(config_file, "r") as f:
         lines = f.readlines()
-    with open("/etc/php/php.ini", "w") as f:
+    with open(config_file, "w") as f:
         for line in lines:
-            for x in mod:
+            for x in args:
                 if ";extension=%s.so"%x in line:
                     line = "extension=%s.so\n"%x
+                if ";zend_extension=%s.so"%x in line:
+                    line = "zend_extension=%s.so\n"%x
             f.write(line)
 
 def disable_mod(*mod):
@@ -89,6 +96,8 @@ def open_basedir(op, path):
         for l in ic:
             if "open_basedir = " in l and path not in l:
                 l = l.rstrip("\n") + ":%s\n" % path
+                if l.startswith(";open_basedir"):
+                    l = l.replace(";open_basedir", "open_basedir")
                 oc.append(l)
             else:
                 oc.append(l)

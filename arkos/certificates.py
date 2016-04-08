@@ -1,4 +1,3 @@
-import datetime
 import glob
 import hashlib
 import OpenSSL
@@ -85,18 +84,25 @@ class Certificate:
         storage.certs.remove("certificates", self)
         signals.emit("certificates", "post_remove", self)
 
-    def as_dict(self, ready=True):
+    @property
+    def as_dict(self):
         return {
             "id": self.id,
             "domain": self.domain,
             "keytype": self.keytype,
             "keylength": self.keylength,
             "assigns": self.assigns,
-            "expiry": datetime.datetime.strptime(self.expiry, "%Y%m%d%H%M%SZ").isoformat(),
+            "expiry": systemtime.ts_to_datetime(self.expiry.rstrip("Z")),
             "sha1": self.sha1,
             "md5": self.md5,
-            "is_ready": ready
+            "is_ready": True
         }
+
+    @property
+    def serialized(self):
+        data = self.as_dict
+        data["expiry"] = systemtime.get_iso_time(self.expiry.rstrip("Z"))
+        return data
 
 
 class CertificateAuthority:
@@ -113,11 +119,18 @@ class CertificateAuthority:
             os.unlink(self.key_path)
         storage.certs.remove("authorities", self)
 
+    @property
     def as_dict(self):
         return {
             "id": self.id,
-            "expiry": datetime.datetime.strptime(self.expiry, "%Y%m%d%H%M%SZ").isoformat()
+            "expiry": systemtime.ts_to_datetime(self.expiry.rstrip("Z"))
         }
+
+    @property
+    def serialized(self):
+        data = self.as_dict
+        data["expiry"] = systemtime.get_iso_time(self.expiry.rstrip("Z"))
+        return data
 
 
 def get(id=None):
@@ -258,7 +271,7 @@ def generate_certificate(
 
     # Check to see that we have DH params, if not then do that too
     if not os.path.exists("/etc/arkos/ssl/dh_params.pem"):
-        message.update("info", "Generating Diffie-Hellman parameters...")
+        message.update("info", "Generating Diffie-Hellman parameters. This may take a few minutes...")
         s = shell("openssl dhparam 2048 -out /etc/arkos/ssl/dh_params.pem")
         if s["code"] != 0:
             raise Exception("Failed to generate Diffie-Hellman parameters")

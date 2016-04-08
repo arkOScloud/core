@@ -36,6 +36,8 @@ class DiskPartition:
             raise Exception("Cannot mount a partition of unknown type")
         signals.emit("filesystems", "pre_mount", self)
         mount_point = self.mountpoint if self.mountpoint else os.path.join("/media", self.id)
+        if not os.path.isdir(mount_point):
+            os.makedirs(mount_point)
         if self.crypt and passwd:
             # Decrypt the disk first if it's an encrypted disk
             s = crypto.luks_open(self.path, self.id, passwd)
@@ -71,6 +73,8 @@ class DiskPartition:
         self.mountpoint = None
 
     def enable(self):
+        if self.crypt:
+            raise Exception("Cannot enable encrypted virutal disks")
         f = FstabEntry()
         f.src = self.path
         f.dst = os.path.join("/media", self.id)
@@ -80,6 +84,8 @@ class DiskPartition:
         f.dump_p = 0
         f.fsck_p = 0
         save_fstab_entry(f)
+        if not os.path.exists(f.dst):
+            os.makedirs(f.dst)
         self.enabled = True
 
     def disable(self):
@@ -90,6 +96,7 @@ class DiskPartition:
                 self.disabled = False
                 break
 
+    @property
     def as_dict(self):
         return {
             "id": self.id,
@@ -102,6 +109,10 @@ class DiskPartition:
             "enabled": self.enabled,
             "is_ready": True
         }
+
+    @property
+    def serialized(self):
+        return self.as_dict
 
 
 class VirtualDisk:
@@ -118,6 +129,8 @@ class VirtualDisk:
 
     def create(self, mount=False):
         vdisk_dir = config.get("filesystems", "vdisk_dir")
+        if not os.path.exists(os.path.join(config.get("filesystems", "vdisk_dir"))):
+            os.mkdir(os.path.join(config.get("filesystems", "vdisk_dir")))
         self.path = str(os.path.join(vdisk_dir, self.id+".img"))
         if os.path.exists(self.path):
             raise Exception("This virtual disk already exists")
@@ -248,6 +261,7 @@ class VirtualDisk:
         os.unlink(self.path)
         signals.emit("filesystems", "post_remove", self)
 
+    @property
     def as_dict(self):
         return {
             "id": self.id,
@@ -261,6 +275,10 @@ class VirtualDisk:
             "is_ready": True
         }
 
+    @property
+    def serialized(self):
+        return self.as_dict
+
 
 class PointOfInterest:
     def __init__(self, id="", path="", stype="", icon=""):
@@ -269,6 +287,7 @@ class PointOfInterest:
         self.stype = stype
         self.icon = icon
 
+    @property
     def as_dict(self):
         return {
             "id": self.id,
@@ -276,6 +295,10 @@ class PointOfInterest:
             "type": self.stype,
             "icon": self.icon
         }
+
+    @property
+    def serialized(self):
+        return self.as_dict
 
 
 def get(id=None):
@@ -301,12 +324,15 @@ def get(id=None):
                 fstype = parted.probeFileSystem(p.geometry)
             except:
                 fstype = "Unknown"
-            dev = DiskPartition(id=p.path.split("/")[-1], path=p.path,
-                mountpoint=mps.get(p.path) or None, size=int(p.getSize("B")),
-                fstype=fstype, enabled=p.path in fstab, crypt=crypto.is_luks(p.path)==0)
-            if id == dev.id:
-                return dev
-            devs.append(dev)
+            try:
+                dev = DiskPartition(id=p.path.split("/")[-1], path=p.path,
+                    mountpoint=mps.get(p.path) or None, size=int(p.getSize("B")),
+                    fstype=fstype, enabled=p.path in fstab, crypt=crypto.is_luks(p.path)==0)
+                if id == dev.id:
+                    return dev
+                devs.append(dev)
+            except:
+                continue
 
     # Replace mount data for virtual disks with loopback id
     dd = losetup.get_loop_devices()

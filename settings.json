@@ -1,6 +1,6 @@
 {
     "general": {
-        "repo_server": "grm-test.arkos.io",
+        "repo_server": "grm.arkos.io",
         "policy_path": "/etc/arkos/policies.json",
         "task_workers": 1,
         "firewall": true,

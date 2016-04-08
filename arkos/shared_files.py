@@ -8,30 +8,37 @@ class Share:
         self.path = path
         self.expires = expires
         self.fetch_count = 0
-    
+
     def add(self):
         storage.files.add("shares", self)
-    
+
     def delete(self):
         storage.files.remove("shares", self)
-    
+
     def is_expired(self):
         return (self.expires != 0 and self.expires < systemtime.get_unix_time())
-    
+
     def update_expiry(self, nexpiry):
         if nexpiry == False:
             self.expires = 0
         else:
             self.expires = systemtime.get_unix_time(nexpiry)
-    
+
+    @property
     def as_dict(self):
         return {
             "id": self.id,
             "path": self.path,
-            "expires": self.expires!=0,
-            "expires_at": systemtime.get_iso_time(self.expires, "unix") if self.expires != 0 else "",
+            "expires": self.expires != 0,
+            "expires_at": systemtime.ts_to_datetime(self.expires, "unix") if self.expires != 0 else "",
             "fetch_count": self.fetch_count
         }
+
+    @property
+    def serialized(self):
+        data = self.as_dict
+        data["expires_at"] = systemtime.get_iso_time(self.expires, "unix") if self.expires != 0 else "",
+        return data
 
 
 def get(id=None):

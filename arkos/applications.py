@@ -69,7 +69,8 @@ class App:
             for s in self.services:
                 if s["ports"]:
                     tracked_services.register(self.id, s["binary"], s["name"],
-                        self.icon, s["ports"], fw=False)
+                        self.icon, s["ports"], default_policy=s.get("default_policy", 2),
+                        fw=False)
             signals.emit("apps", "post_load", self)
         except Exception, e:
             self.loadable = False
@@ -198,6 +199,7 @@ class App:
     def get_ssl_able(self):
         return self.ssl.get_ssl_able()
 
+    @property
     def as_dict(self):
         data = {}
         for x in self.__dict__:
@@ -205,6 +207,10 @@ class App:
                 data[x] = self.__dict__[x]
         data["is_ready"] = True
         return data
+
+    @property
+    def serialized(self):
+        return self.as_dict
 
 
 def get(id=None, type=None, loadable=None, installed=None, verify=True):

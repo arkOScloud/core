@@ -6,28 +6,29 @@ class Database:
     def __init__(self, id="", manager=None):
         self.id = id
         self.manager = manager
-    
+
     def add(self):
         signals.emit("databases", "pre_add", self)
         self.add_db()
         storage.dbs.add("databases", self)
         signals.emit("databases", "post_add", self)
-    
+
     def add_db(self):
         pass
-    
+
     def remove(self):
         signals.emit("databases", "pre_remove", self)
         self.remove_db()
         storage.dbs.remove("databases", self)
         signals.emit("databases", "post_remove", self)
-    
+
     def remove_db(self):
         pass
-    
+
     def execute(self):
         pass
-    
+
+    @property
     def as_dict(self):
         return {
             "id": self.id,
@@ -37,34 +38,39 @@ class Database:
             "is_ready": True
         }
 
+    @property
+    def serialized(self):
+        return self.as_dict
+
 
 class DatabaseUser:
     def __init__(self, id="", passwd="", manager=None):
         self.id = id
         self.passwd = passwd
         self.manager = manager
-    
+
     def add(self, passwd):
         signals.emit("databases", "pre_user_add", self)
         self.add_user(passwd)
         storage.dbs.add("users", self)
         signals.emit("databases", "post_user_add", self)
-    
+
     def add_user(self):
         pass
-    
+
     def remove(self):
         signals.emit("databases", "pre_user_remove", self)
         self.remove_user()
         storage.dbs.remove("users", self)
         signals.emit("databases", "post_user_remove", self)
-    
+
     def remove_user(self):
         pass
-    
+
     def chperm(self):
         pass
 
+    @property
     def as_dict(self):
         return {
             "id": self.id,
@@ -73,6 +79,10 @@ class DatabaseUser:
             "permissions": self.chperm("check"),
             "is_ready": True
         }
+
+    @property
+    def serialized(self):
+        return self.as_dict
 
 
 class DatabaseManager:
@@ -85,22 +95,23 @@ class DatabaseManager:
             self.connect()
         except:
             pass
-    
+
     def connect(self):
         pass
 
     def get_dbs(self):
         return []
-    
+
     def add_db(self, name):
         pass
-    
+
     def get_users(self):
         return []
-    
+
     def add_user(self, name, passwd):
         pass
-    
+
+    @property
     def as_dict(self):
         return {
             "id": self.id,
@@ -108,6 +119,10 @@ class DatabaseManager:
             "state": self.state,
             "supports_users": self.meta.database_multiuser
         }
+
+    @property
+    def serialized(self):
+        return self.as_dict
 
 
 def get(id=None, type=None):

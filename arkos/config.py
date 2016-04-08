@@ -54,6 +54,17 @@ class Config:
             self.config[section] = {}
             self.config[section][key] = value
 
+    def append(self, section, key, value=None):
+        if value == None:
+            if not self.config.has_key(section):
+                self.config[section] = []
+            self.config[section].append(key)
+        elif self.config.has_key(section):
+            self.config[section][key].append(value)
+        else:
+            self.config[section] = {}
+            self.config[section][key] = [value]
+
     def remove(self, section, key):
         if self.config.has_key(section) and len(self.config[section]) <= 1:
             del self.config[section]

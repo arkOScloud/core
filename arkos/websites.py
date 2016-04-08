@@ -6,6 +6,7 @@ import re
 import shutil
 
 from arkos import applications, config, databases, signals, storage, tracked_services
+from arkos.languages import php
 from arkos.system import users, groups, services
 from arkos.utilities import download, shell, random_string, DefaultMessage
 
@@ -53,7 +54,7 @@ class Site:
         message.update("info", "Preparing to install...", head="Installing website")
 
         # Make sure the chosen port is indeed open
-        if not tracked_services.is_open_port(self.port):
+        if not tracked_services.is_open_port(self.port, self.addr):
             raise Exception("This port is taken by another site or service, please choose another")
 
         # Set some metadata values
@@ -146,6 +147,8 @@ class Site:
 
         # Set proper starting permissions on source directory
         uid, gid = users.get_system("http").uid, groups.get_system("http").gid
+        os.chmod(self.path, 0755)
+        os.chown(self.path, uid, gid)
         for r, d, f in os.walk(self.path):
             for x in d:
                 os.chmod(os.path.join(r, x), 0755)
@@ -225,6 +228,7 @@ class Site:
         if enable:
             self.nginx_enable()
         if enable and self.php:
+            php.open_basedir("add", "/srv/http/")
             php_reload()
         if specialmsg:
             return specialmsg
@@ -476,6 +480,7 @@ class Site:
         storage.sites.remove("sites", self)
         signals.emit("websites", "site_removed", self)
 
+    @property
     def as_dict(self):
         return {
             "id": self.id,
@@ -491,8 +496,13 @@ class Site:
             "php": self.php,
             "enabled": self.enabled,
             "has_actions": self.meta.website_extra_actions if hasattr(self.meta, "website_extra_actions") else None,
+            "has_update": self.meta.website_updates and self.version != self.meta.version.rsplit("-", 1)[0],
             "is_ready": True
         }
+
+    @property
+    def serialized(self):
+        return self.as_dict
 
 
 class ReverseProxy(Site):
@@ -580,6 +590,7 @@ class ReverseProxy(Site):
         storage.sites.remove("sites", self)
         signals.emit("websites", "site_removed", self)
 
+    @property
     def as_dict(self):
         return {
             "id": self.id,
@@ -597,6 +608,10 @@ class ReverseProxy(Site):
             "enabled": self.enabled,
             "is_ready": True
         }
+
+    @property
+    def serialized(self):
+        return self.as_dict
 
 
 def get(id=None, type=None, verify=True):
@@ -635,7 +650,7 @@ def scan():
         if site_type != "ReverseProxy":
             # If it's a regular website, initialize its class, metadata, etc
             app = applications.get(site_type)
-            if not app.loadable or not app.installed:
+            if not app or not app.loadable or not app.installed:
                 continue
             site = app._website(id=meta.get("website", "id"))
             site.meta = app

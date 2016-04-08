@@ -94,15 +94,16 @@ def shell(c, stdin=None, env={}):
     environ["LC_ALL"] = "C"
     for x in env:
         environ[x] = env[x]
+    if not "HOME" in environ:
+        environ["HOME"] = "/root"
     p = subprocess.Popen(shlex.split(c),
             stderr=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stdin=subprocess.PIPE,
             env=environ)
     data = p.communicate(stdin)
-    data = {"code": p.returncode, "stdout": data[0], 
+    return {"code": p.returncode, "stdout": data[0],
         "stderr": data[1]}
-    return data
 
 def hashpw(passw, scheme="sha512_crypt"):
     if scheme == "sha512_crypt":
@@ -116,7 +117,7 @@ def hashpw(passw, scheme="sha512_crypt"):
     return sha512_crypt.encrypt(passw)
 
 def can_be_int(data):
-    try: 
+    try:
         int(data)
         return True
     except ValueError:
@@ -185,6 +186,9 @@ def extract(pin, pout, delete=False):
     name = os.path.basename(pin)
     if name.endswith((".tar.gz", ".tgz")):
         with tarfile.open(pin, "r:gz") as t:
+            t.extractall(pout)
+    elif name.endswith(".tar"):
+        with tarfile.open(pin, "r") as t:
             t.extractall(pout)
     elif name.endswith(".gz"):
         f = gzip.open(pin, "rb")

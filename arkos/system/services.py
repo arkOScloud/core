@@ -1,4 +1,5 @@
 import ConfigParser
+from dbus.exceptions import DBusException
 import glob
 import os
 import time
@@ -8,7 +9,9 @@ from arkos.utilities import shell
 
 
 class ActionError(Exception):
-    pass
+    def __init__(self, etype, emsg):
+        self.etype = etype
+        self.emsg = emsg
 
 
 class Service:
@@ -43,8 +46,11 @@ class Service:
                 raise ActionError()
         else:
             # Send the start command to systemd
-            path = conns.SystemD.LoadUnit(self.name+".service")
-            conns.SystemD.StartUnit(self.name+".service", "replace")
+            try:
+                path = conns.SystemD.LoadUnit(self.name+".service")
+                conns.SystemD.StartUnit(self.name+".service", "replace")
+            except DBusException, e:
+                raise ActionError("dbus", str(e))
             timeout = 0
             time.sleep(1)
             # Wait for the service to start, raise exception if it fails
@@ -52,15 +58,15 @@ class Service:
                 data = conns.SystemDConnect(path, "org.freedesktop.DBus.Properties")
                 data = data.GetAll("org.freedesktop.systemd1.Unit")
                 if str(data["ActiveState"]) == "failed":
-                    raise ActionError()
+                    raise ActionError("svc", "The service failed to start. Please check `sudo systemctl -l status {}.service`".format(self.name))
                 elif str(data["ActiveState"]) == "active":
                     self.state = "running"
                     signals.emit("services", "post_start", self)
                     break
-                timeout + 1
+                timeout += 1
                 time.sleep(1)
             else:
-                raise ActionError()
+                raise ActionError("svc", "The service start timed out. Please check `sudo systemctl -l status {}.service`".format(self.name))
 
     def stop(self):
         signals.emit("services", "pre_stop", self)
@@ -71,8 +77,11 @@ class Service:
             self.state = "stopped"
         else:
             # Send the stop command to systemd
-            path = conns.SystemD.LoadUnit(self.name+".service")
-            conns.SystemD.StopUnit(self.name+".service", "replace")
+            try:
+                path = conns.SystemD.LoadUnit(self.name+".service")
+                conns.SystemD.StopUnit(self.name+".service", "replace")
+            except DBusException, e:
+                raise ActionError("dbus", str(e))
             timeout = 0
             time.sleep(1)
             # Wait for the service to stop, raise exception if it fails
@@ -86,7 +95,7 @@ class Service:
                 timeout + 1
                 time.sleep(1)
             else:
-                raise ActionError()
+                raise ActionError("svc", "The service stop timed out. Please check `sudo systemctl -l status {}.service`".format(self.name))
 
     def restart(self, real=False):
         signals.emit("services", "pre_restart", self)
@@ -97,11 +106,14 @@ class Service:
             signals.emit("services", "post_restart", self)
         else:
             # Send the restart command to systemd
-            path = conns.SystemD.LoadUnit(self.name+".service")
-            if real:
-                conns.SystemD.RestartUnit(self.name+".service", "replace")
-            else:
-                conns.SystemD.ReloadOrRestartUnit(self.name+".service", "replace")
+            try:
+                path = conns.SystemD.LoadUnit(self.name+".service")
+                if real:
+                    conns.SystemD.RestartUnit(self.name+".service", "replace")
+                else:
+                    conns.SystemD.ReloadOrRestartUnit(self.name+".service", "replace")
+            except DBusException, e:
+                raise ActionError("dbus", str(e))
             timeout = 0
             time.sleep(1)
             # Wait for the service to restart, raise exception if it fails
@@ -109,7 +121,7 @@ class Service:
                 data = conns.SystemDConnect(path, "org.freedesktop.DBus.Properties")
                 data = data.GetAll("org.freedesktop.systemd1.Unit")
                 if str(data["ActiveState"]) == "failed":
-                    raise ActionError()
+                    raise ActionError("svc", "The service failed to restart. Please check `sudo systemctl -l status {}.service`".format(self.name))
                 elif str(data["ActiveState"]) == "active":
                     self.state = "running"
                     signals.emit("services", "post_restart", self)
@@ -117,7 +129,7 @@ class Service:
                 timeout + 1
                 time.sleep(1)
             else:
-                raise ActionError()
+                raise ActionError("svc", "The service restart timed out. Please check `sudo systemctl -l status {}.service`".format(self.name))
 
     def get_log(self):
         if self.stype == "supervisor":
@@ -135,7 +147,10 @@ class Service:
                     os.path.join("/etc/supervisor.d", self.name+".ini"))
             conns.Supervisor.restart()
         else:
-            conns.SystemD.EnableUnitFiles([self.name+".service"], False, True)
+            try:
+                conns.SystemD.EnableUnitFiles([self.name+".service"], False, True)
+            except DBusException, e:
+                raise ActionError("dbus", str(e))
         self.enabled = True
 
     def disable(self):
@@ -146,7 +161,10 @@ class Service:
                 os.path.join("/etc/supervisor.d", self.name+".ini.disabled"))
             self.state = "stopped"
         else:
-            conns.SystemD.DisableUnitFiles([self.name+".service"], False)
+            try:
+                conns.SystemD.DisableUnitFiles([self.name+".service"], False)
+            except DBusException, e:
+                raise ActionError("dbus", str(e))
         self.enabled = False
 
     def remove(self):
@@ -165,6 +183,7 @@ class Service:
             conns.Supervisor.restart()
             signals.emit("services", "post_remove", self)
 
+    @property
     def as_dict(self):
         return {
             "id": self.name,
@@ -176,19 +195,33 @@ class Service:
             "is_ready": True
         }
 
+    @property
+    def serialized(self):
+        return self.as_dict
+
 
 def get(id=None):
     svcs, files = [], {}
 
     # Get all unit files, loaded or not
-    for unit in conns.SystemD.ListUnitFiles():
+    try:
+        units = conns.SystemD.ListUnitFiles()
+    except DBusException, e:
+        raise ActionError("dbus", str(e))
+
+    for unit in units:
         if not unit[0].endswith(".service"):
             continue
         sname = os.path.splitext(os.path.split(unit[0])[-1])[0]
         files[sname] = Service(name=sname, stype="system", state="stopped", enabled=unit[1]=="enabled")
 
     # Get all loaded services
-    for unit in conns.SystemD.ListUnits():
+    try:
+        units = conns.SystemD.ListUnits()
+    except DBusException, e:
+        raise ActionError("dbus", str(e))
+
+    for unit in units:
         if not unit[0].endswith(".service"):
             continue
         sname = unit[0].split(".service")[0]

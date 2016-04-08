@@ -40,7 +40,7 @@ class User:
             "givenName": self.first_name,
             "sn": self.last_name or "NONE",
             "displayName": self.first_name+" "+self.last_name,
-            "cn": self.first_name+" "+self.last_name,
+            "cn": self.first_name+(" "+self.last_name if self.last_name else ""),
             "uid": self.name,
             "mail": [self.name+"@"+self.domain],
             "maildrop": self.name,
@@ -69,7 +69,7 @@ class User:
         ldif = ldif[0][1]
         attrs = {
             "givenName": self.first_name,
-            "sn": self.last_name,
+            "sn": self.last_name or "",
             "displayName": "%s %s" % (self.first_name, self.last_name),
             "cn": "%s %s" % (self.first_name, self.last_name),
             "mail": self.mail
@@ -143,6 +143,7 @@ class User:
         conns.LDAP.delete_s("uid=%s,ou=users,%s" % (self.name,self.rootdn))
         signals.emit("users", "post_remove", self)
 
+    @property
     def as_dict(self, ready=True):
         return {
             "id": self.uid,
@@ -155,6 +156,10 @@ class User:
             "mail_addresses": self.mail,
             "is_ready": ready
         }
+
+    @property
+    def serialized(self):
+        return self.as_dict
 
 
 class SystemUser:
@@ -171,17 +176,22 @@ class SystemUser:
             shell("usermod -a -G %s %s" % (x, self.name))
 
     def update_password(self, passwd):
-        shell("passwd %s" % u, stdin="%s\n%s\n" % (self.name,passwd,passwd))
+        shell("passwd %s" % self.name, stdin="%s\n%s\n" % (passwd,passwd))
 
     def delete(self):
         shell("userdel %s" % self.name)
 
+    @property
     def as_dict(self):
         return {
             "id": self.uid,
             "name": self.name,
             "groups": self.groups
         }
+
+    @property
+    def serialized(self):
+        return self.as_dict
 
 
 def get(uid=None, name=None):
