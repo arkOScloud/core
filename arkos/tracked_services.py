@@ -1,6 +1,13 @@
-import os
+"""
+Classes and functions to manage arkOS tracked services.
+
+arkOS Core
+(c) 2016 CitizenWeb
+Written by Jacob Cook
+Licensed under GPLv3, see LICENSE.md
+"""
+
 import random
-import sys
 
 from arkos import config, policies, signals, storage, security
 
@@ -8,7 +15,31 @@ COMMON_PORTS = [3000, 3306, 5222, 5223, 5232]
 
 
 class SecurityPolicy:
-    def __init__(self, type="", id="", name="", icon="", ports=[], policy=2, addr=None):
+    """
+    An object representing an arkOS firewall policy for a service.
+
+    SecurityPolicies are created for all websites, as well as for all apps
+    that have port-based services registered in their metadata files. They
+    are used to compute the proper values to put into the arkOS firewall
+    (iptables) on regeneration or app update.
+    """
+
+    def __init__(self, type="", id="", name="", icon="", ports=[],
+                 policy=2, addr=None):
+        """
+        Initialize the policy object.
+
+        To create a new policy or to see more info about these parameters,
+        see ``tracked_services.register()`` below.
+
+        :param str type: Policy type ('website', 'app', etc)
+        :param str id: Website or app ID
+        :param str name: Display name to use in Security settings pane
+        :param str icon: FontAwesome icon class name
+        :param list ports: List of port tuples to allow/restrict
+        :param int policy: Policy identifier
+        :param str addr: Address and port (for websites)
+        """
         self.type = type
         self.id = id
         self.name = name
@@ -18,6 +49,11 @@ class SecurityPolicy:
         self.addr = addr
 
     def save(self, fw=True):
+        """
+        Save changes to a security policy to disk.
+
+        :param bool fw: Regenerate the firewall after save?
+        """
         policies.set(self.type, self.id, self.policy)
         policies.save()
         if config.get("general", "firewall", True) and fw:
@@ -26,6 +62,13 @@ class SecurityPolicy:
             storage.policies.add("policies", self)
 
     def remove(self, fw=True):
+        """
+        Remove a security policy from the firewall and config.
+
+        You should probably use ``tracked_services.deregister()`` for this.
+
+        :param bool fw: Regenerate the firewall after save?
+        """
         policies.remove(self.type, self.id)
         policies.save()
         if config.get("general", "firewall", True) and fw:
@@ -34,6 +77,7 @@ class SecurityPolicy:
 
     @property
     def as_dict(self):
+        """Return policy metadata as dict."""
         return {
             "type": self.type,
             "id": self.id,
@@ -46,10 +90,17 @@ class SecurityPolicy:
 
     @property
     def serialized(self):
+        """Return serializable policy metadata as dict."""
         return self.as_dict
 
 
 def get(id=None, type=None):
+    """
+    Get all security policies from cache storage.
+
+    :param str id: App or website ID
+    :param str type: Filter by type ('website', 'app', etc)
+    """
     data = storage.policies.get("policies")
     if id or type:
         tlist = []
@@ -63,7 +114,35 @@ def get(id=None, type=None):
         return []
     return data
 
-def register(type, id, name, icon, ports, addr=None, policy=0, default_policy=2, fw=True):
+
+def register(type, id, name, icon, ports, addr=None, policy=0,
+             default_policy=2, fw=True):
+    """
+    Register a new security policy with the system.
+
+    The ``ports`` parameter takes tuples of ports to manage, like so:
+
+        ports = [('tcp', 8000), ('udp', 21500)]
+
+    The ``policy`` parameter is an integer with the following meaning:
+
+    0 = Restrict access from all outside hosts. (excludes loopback)
+    1 = Restrict access to local networks only.
+    2 = Allow access to all networks and ultimately the whole Internet.
+
+    Addresses should be provided for websites, because multiple websites can
+    be served from the same port (SNI) as long as the address is different.
+
+    :param str type: Policy type ('website', 'app', etc)
+    :param str id: Website or app ID
+    :param str name: Display name to use in Security settings pane
+    :param str icon: FontAwesome icon class name
+    :param list ports: List of port tuples to allow/restrict
+    :param str addr: Address (for websites)
+    :param int policy: Policy identifier
+    :param int default_policy: Application default policy to use on first init
+    :param bool fw: Regenerate the firewall after save?
+    """
     if not policy:
         policy = policies.get(type, id, default_policy)
     pget = get(type=type)
@@ -74,7 +153,15 @@ def register(type, id, name, icon, ports, addr=None, policy=0, default_policy=2,
     svc = SecurityPolicy(type, id, name, icon, ports, policy, addr)
     svc.save(fw)
 
+
 def deregister(type, id="", fw=True):
+    """
+    Deregister a security policy.
+
+    :param str type: Policy type ('website', 'app', etc)
+    :param str id: Website or app ID
+    :param bool fw: Regenerate the firewall after save?
+    """
     for x in get(type=type):
         if not id:
             x.remove(fw=False)
@@ -84,7 +171,9 @@ def deregister(type, id="", fw=True):
     if config.get("general", "firewall", True) and fw:
         security.regen_fw(get())
 
+
 def refresh_policies():
+    """Recreate security policies based on what is stored in config."""
     svcs = get()
     newpolicies = {}
     for x in policies.get_all():
@@ -92,7 +181,7 @@ def refresh_policies():
             newpolicies["custom"] = policies.get_all("custom")
         for y in svcs:
             if x == y.type:
-                if not x in newpolicies:
+                if x not in newpolicies:
                     newpolicies[x] = {}
                 for s in policies.get_all(x):
                     if s == y.id:
@@ -100,7 +189,20 @@ def refresh_policies():
     policies.config = newpolicies
     policies.save()
 
+
 def is_open_port(port, addr=None, ignore_common=False):
+    """
+    Check if the specified port is taken by a tracked service or not.
+
+    Addresses should be provided for websites, because multiple websites can
+    be served from the same port (SNI) as long as the address is different.
+
+    :param int port: Port number to check
+    :param str addr: Address to check (for websites)
+    :param bool ignore_common: Don't return False for commonly used ports?
+    :returns: True if port is open
+    :rtype bool:
+    """
     data = get()
     ports = []
     for x in data:
@@ -108,34 +210,54 @@ def is_open_port(port, addr=None, ignore_common=False):
             continue
         for y in x.ports:
             ports.append(int(y[1]))
-    if not ignore_common: ports = ports + COMMON_PORTS
+    if not ignore_common:
+        ports = ports + COMMON_PORTS
     return port not in ports
 
+
 def get_open_port(ignore_common=False):
+    """
+    Get a random TCP port not currently in use by a tracked service.
+
+    :param bool ignore_common: Don't exclude commonly used ports?
+    :returns: Port number
+    :rtype: int
+    """
     data = get()
     ports = []
     for x in data:
         for y in x.ports:
             ports.append(int(y[1]))
-    if not ignore_common: ports = ports + COMMON_PORTS
+    if not ignore_common:
+        ports = ports + COMMON_PORTS
     r = random.randint(8001, 65534)
-    return r if not r in ports else get_open_port()
+    return r if r not in ports else get_open_port()
+
 
 def initialize():
+    """Initialize security policy tracking."""
     policy = policies.get("arkos", "arkos", 2)
-    storage.policies.add("policies", SecurityPolicy("arkos", "arkos",
-        "System Management (Genesis/APIs)", "fa fa-desktop",
-        [("tcp", int(config.get("genesis", "port")))], policy))
+    port = [("tcp", int(config.get("genesis", "port")))]
+    pol = SecurityPolicy("arkos", "arkos", "System Management (Genesis/APIs)",
+                         "fa fa-desktop", port, policy)
+    storage.policies.add("policies", pol)
     for x in policies.get_all("custom"):
-        storage.policies.add("policies", SecurityPolicy("custom", x["id"],
-            x["name"], x["icon"], x["ports"], x["policy"]))
+        pol = SecurityPolicy("custom", x["id"], x["name"], x["icon"],
+                             x["ports"], x["policy"])
+        storage.policies.add("policies", pol)
+
 
 def register_website(site):
-    register("website", site.id, site.name if hasattr(site, "name") and site.name else site.id,
-        site.meta.icon if site.meta else "fa fa-globe", [("tcp", site.port)], site.addr)
+    """Convenience function to register a website as tracked service."""
+    register("website", site.id, getattr(site, "name", site.id),
+             site.meta.icon if site.meta else "fa fa-globe",
+             [("tcp", site.port)], site.addr)
+
 
 def deregister_website(site):
+    """Convenience function to deregister a website as tracked service."""
     deregister("website", site.id)
+
 
 signals.add("tracked_services", "websites", "site_loaded", register_website)
 signals.add("tracked_services", "websites", "site_installed", register_website)
