@@ -57,7 +57,7 @@ class SecurityPolicy:
         policies.set(self.type, self.id, self.policy)
         policies.save()
         if config.get("general", "firewall", True) and fw:
-            security.regen_fw(get())
+            security.regenerate_firewall(get())
         if not storage.policies.get("policies", self.id):
             storage.policies.add("policies", self)
 
@@ -72,7 +72,7 @@ class SecurityPolicy:
         policies.remove(self.type, self.id)
         policies.save()
         if config.get("general", "firewall", True) and fw:
-            security.regen_fw(get())
+            security.regenerate_firewall(get())
         storage.policies.remove("policies", self)
 
     @property
@@ -169,7 +169,7 @@ def deregister(type, id="", fw=True):
             x.remove(fw=False)
             break
     if config.get("general", "firewall", True) and fw:
-        security.regen_fw(get())
+        security.regenerate_firewall(get())
 
 
 def refresh_policies():

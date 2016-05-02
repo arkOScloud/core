@@ -18,7 +18,6 @@ setup(
         'ntplib',
         'passlib',
         'pyOpenSSL',
-        'python-iptables',
         'python-nginx',
         'dbus-python',
         'pycryptsetup',
