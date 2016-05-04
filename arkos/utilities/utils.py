@@ -9,9 +9,11 @@ Licensed under GPLv3, see LICENSE.md
 
 import bz2
 import base64
+import binascii
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
 import crypt
 import gzip
-import hashlib
 import os
 import random
 import requests
@@ -21,8 +23,6 @@ import subprocess
 import tarfile
 import tempfile
 import zipfile
-
-from passlib.hash import sha512_crypt
 
 
 def cidr_to_netmask(cidr):
@@ -70,7 +70,9 @@ def get_current_entropy():
 
 def random_string():
     """Create a random alphanumeric string."""
-    return hashlib.sha1(str(random.random())).hexdigest()
+    digest = hashes.Hash(hashes.SHA1(), backend=default_backend())
+    digest.update(str(random.random()))
+    return binascii.hexlify(digest.finalize())
 
 
 def api(url, post=None, method="get", returns="json", headers=[], crit=False):
@@ -139,19 +141,11 @@ def shell(c, stdin=None, env={}):
             "stderr": data[1]}
 
 
-def hashpw(passw, scheme="sha512_crypt"):
+def hashpw(passw):
     """Create a password hash."""
-    if scheme == "sha512_crypt":
-        return sha512_crypt.encrypt(passw)
-    elif scheme == "crypt":
-        rnd = "".join(random.sample(string.ascii_uppercase+string.digits, 8))
-        salt = "$1$" + rnd + "$"
-        return "{CRYPT}" + crypt.crypt(passw, salt)
-    elif scheme == "ssha":
-        salt = os.urandom(32)
-        hsh = base64.b64encode(hashlib.sha1(passw + salt).digest() + salt)
-        return "{SSHA}" + hsh
-    return sha512_crypt.encrypt(passw)
+    rnd = "".join(random.sample(string.ascii_uppercase+string.digits, 8))
+    salt = "$6$" + rnd + "$"
+    return "{CRYPT}" + crypt.crypt(passw, salt)
 
 
 def can_be_int(data):

@@ -15,9 +15,8 @@ setup(
     name='arkos-core',
     version='0.8.0',
     install_requires=[
+        'cryptography',
         'ntplib',
-        'passlib',
-        'pyOpenSSL',
         'python-nginx',
         'dbus-python',
         'pycryptsetup',

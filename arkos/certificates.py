@@ -7,9 +7,13 @@ Written by Jacob Cook
 Licensed under GPLv3, see LICENSE.md
 """
 
+from cryptography import x509
+from cryptography.x509.oid import NameOID
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives.asymmetric import dsa, rsa
+import datetime
 import glob
-import hashlib
-import OpenSSL
 import os
 
 from arkos import config, signals, storage, websites, applications
@@ -21,9 +25,6 @@ from arkos.utilities.logs import DefaultMessage
 if not groups.get_system("ssl-cert"):
     groups.SystemGroup("ssl-cert").add()
 gid = groups.get_system("ssl-cert").gid
-
-fpem = OpenSSL.crypto.FILETYPE_PEM
-fasn = OpenSSL.crypto.FILETYPE_ASN1
 
 
 class Certificate:
@@ -267,18 +268,25 @@ def scan():
     cert_glob = os.path.join(config.get("certificates", "cert_dir"), "*.crt")
     for x in glob.glob(cert_glob):
         id = os.path.splitext(os.path.basename(x))[0]
-        with open(x, "r") as f:
-            crt = OpenSSL.crypto.load_certificate(fpem, f.read())
+        with open(x, "rb") as f:
+            crt = x509.load_pem_x509_certificate(f.read(), default_backend())
         key_path = os.path.join(config.get("certificates", "key_dir"),
                                 "{0}.key".format(id))
-        with open(key_path, "r") as f:
-            key = OpenSSL.crypto.load_privatekey(fpem, f.read())
-        sha1, md5 = get_cert_hashes(crt)
+        with open(key_path, "rb") as f:
+            key = serialization.load_pem_private_key(
+                f.read(),
+                password=None,
+                backend=default_backend()
+            )
+        sha1 = crt.fingerprint(hashes.SHA1())
+        md5 = crt.fingerprint(hashes.MD5())
+        kt = "RSA" if isinstance(key.public_key(), rsa.RSAPublicKey) else "DSA"
+        common_name = crt.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
         c = Certificate(id=id, cert_path=x, key_path=key_path,
-                        keytype=get_key_type(key), keylength=int(key.bits()),
-                        domain=crt.get_subject().CN,
+                        keytype=kt, keylength=key.key_size,
+                        domain=common_name,
                         assigns=assigns.get(id, []),
-                        expiry=crt.get_notAfter(),
+                        expiry=crt.not_valid_after,
                         sha1=sha1, md5=md5)
         certs.append(c)
     storage.certs.set("certificates", certs)
@@ -326,10 +334,10 @@ def scan_authorities():
         os.makedirs(ca_key_dir)
     for x in glob.glob(os.path.join(ca_cert_dir, "*.pem")):
         id = os.path.splitext(os.path.split(x)[1])[0]
-        with open(x, "r") as f:
-            cert = OpenSSL.crypto.load_certificate(fpem, f.read())
+        with open(x, "rb") as f:
+            cert = x509.load_pem_x509_certificate(f.read(), default_backend())
         key_path = os.path.join(ca_key_dir, "{0}.key".format(id))
-        ca = CertificateAuthority(id, x, key_path, cert.get_notAfter())
+        ca = CertificateAuthority(id, x, key_path, cert.not_valid_after())
         certs.append(ca)
     storage.certs.set("authorities", certs)
     return certs
@@ -349,12 +357,16 @@ def upload_certificate(id, cert, key, chain="", message=DefaultMessage()):
     """
     # Test the certificates are valid
     try:
-        crt = OpenSSL.crypto.load_certificate(fpem, cert)
+        crt = x509.load_pem_x509_certificate(cert, default_backend())
     except Exception as e:
         raise Exception("Could not read certificate file. "
                         "Please make sure you've selected the proper file.", e)
     try:
-        ky = OpenSSL.crypto.load_privatekey(fpem, key)
+        ky = serialization.load_pem_private_key(
+            key,
+            password=None,
+            backend=default_backend()
+        )
     except Exception as e:
         raise Exception("Could not read private keyfile. "
                         "Please make sure you've selected the proper file.", e)
@@ -373,22 +385,25 @@ def upload_certificate(id, cert, key, chain="", message=DefaultMessage()):
     message.update("info", "Importing certificate...")
     cert_dir = config.get("certificates", "cert_dir")
     key_dir = config.get("certificates", "key_dir")
-    sha1, md5 = get_cert_hashes(crt)
+    sha1 = crt.fingerprint(hashes.SHA1())
+    md5 = crt.fingerprint(hashes.MD5())
+    kt = "RSA" if isinstance(ky.public_key(), rsa.RSAPublicKey) else "DSA"
+    common_name = crt.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
     c = Certificate(id=id,
                     cert_path=os.path.join(cert_dir, "{0}.crt".format(id)),
                     key_path=os.path.join(key_dir, "{0}.key".format(id)),
-                    keytype=get_key_type(ky), keylength=int(ky.bits()),
-                    domain=crt.get_subject().CN, expiry=crt.get_notAfter(),
+                    keytype=kt, keylength=ky.key_size,
+                    domain=common_name, expiry=crt.not_valid_after,
                     sha1=sha1, md5=md5)
 
     # Save certificate, key and chainfile (if applicable) to files
     # and set perms
-    with open(c.cert_path, "w") as f:
+    with open(c.cert_path, "wb") as f:
         f.write(cert)
         if chain:
             f.write("\n") if not cert.endswith("\n") else None
             f.write(chain)
-    with open(c.key_path, "w") as f:
+    with open(c.key_path, "wb") as f:
         f.write(key)
     os.chown(c.cert_path, -1, gid)
     os.chmod(c.cert_path, 0o660)
@@ -428,10 +443,14 @@ def generate_certificate(
     if not ca:
         message.update("info", "Generating certificate authority...")
         ca = generate_authority(basehost)
-    with open(ca.cert_path, "r") as f:
-        ca_cert = OpenSSL.crypto.load_certificate(fpem, f.read())
-    with open(ca.key_path, "r") as f:
-        ca_key = OpenSSL.crypto.load_privatekey(fpem, f.read())
+    with open(ca.cert_path, "rb") as f:
+        ca_cert = x509.load_pem_x509_certificate(f.read(), default_backend())
+    with open(ca.key_path, "rb") as f:
+        ca_key = serialization.load_pem_private_key(
+            f.read(),
+            password=None,
+            backend=default_backend()
+        )
 
     # Check to see that we have DH params, if not then do that too
     if not os.path.exists("/etc/arkos/ssl/dh_params.pem"):
@@ -445,53 +464,52 @@ def generate_certificate(
 
     # Generate private key and create X509 certificate, then set options
     message.update("info", "Generating certificate...")
-    if keytype == "DSA":
-        kt = OpenSSL.crypto.TYPE_DSA
-    else:
-        kt = OpenSSL.crypto.TYPE_RSA
-    try:
-        key = OpenSSL.crypto.PKey()
-        key.generate_key(kt, keylength)
-        crt = OpenSSL.crypto.X509()
-        crt.set_version(3)
-        crt.get_subject().C = country
-        crt.get_subject().CN = domain
-        if state:
-            crt.get_subject().ST = state
-        if locale:
-            crt.get_subject().L = locale
-        if email:
-            crt.get_subject().emailAddress = email
-        crt.get_subject().O = "arkOS Servers"
-        crt.set_serial_number(int(systemtime.get_serial_time()))
-        crt.gmtime_adj_notBefore(0)
-        crt.gmtime_adj_notAfter(2*365*24*60*60)
-        crt.set_issuer(ca_cert.get_subject())
-        crt.set_pubkey(key)
-        crt.sign(ca_key, "sha256")
-    except Exception as e:
-        exc_str = "Error generating self-signed certificate: {0}"
-        raise Exception(exc_str.format(e))
-
-    # Save to files
     cert_path = os.path.join(config.get("certificates", "cert_dir"),
                              "{0}.crt".format(id))
     key_path = os.path.join(config.get("certificates", "key_dir"),
                             "{0}.key".format(id))
-    with open(cert_path, "wt") as f:
-        f.write(OpenSSL.crypto.dump_certificate(fpem, crt))
+    kt = dsa if keytype == "DSA" else rsa
+
+    key = kt.generate_private_key(
+        public_exponent=65537,
+        key_size=keylength,
+        backend=default_backend()
+    )
+    with open(key_path, "wb") as f:
+        f.write(key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.TraditionalOpenSSL,
+            encryption_algorithm=serialization.BestAvailableEncryption(),
+        ))
+    subject = x509.Name([
+        x509.NameAttribute(NameOID.COUNTRY_NAME, country),
+        x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, state or ""),
+        x509.NameAttribute(NameOID.LOCALITY_NAME, locale or ""),
+        x509.NameAttribute(NameOID.ORGANIZATION_NAME, u"arkOS Servers"),
+        x509.NameAttribute(NameOID.COMMON_NAME, domain),
+    ])
+    cert = x509.CertificateBuilder()
+    cert.subject_name(subject)
+    cert.issuer_name(ca_cert.issuer)
+    cert.public_key(key.public_key())
+    cert.not_valid_before(datetime.datetime.utcnow())
+    cert.not_valid_after(
+        datetime.datetime.utcnow() + datetime.timedelta(years=2)
+    )
+    cert.sign(ca_key, hashes.SHA256(), default_backend())
+    with open(cert_path, "wb") as f:
+        f.write(cert.public_bytes(serialization.Encoding.PEM))
+
     os.chown(cert_path, -1, gid)
     os.chmod(cert_path, 0o660)
-    with open(key_path, "wt") as f:
-        f.write(OpenSSL.crypto.dump_privatekey(fpem, key))
     os.chown(key_path, -1, gid)
     os.chmod(key_path, 0o660)
 
     # Create actual certificate object
-    sha1, md5 = get_cert_hashes(crt)
-    Certificate()
+    sha1 = cert.fingerprint(hashes.SHA1())
+    md5 = cert.fingerprint(hashes.MD5())
     c = Certificate(id, domain, cert_path, key_path, keytype, keylength,
-                    [], crt.get_notAfter(), sha1, md5)
+                    [], cert.not_valid_after, sha1, md5)
     storage.certs.add("certificates", c)
     signals.emit("certificates", "post_add", c)
     return c
@@ -512,63 +530,46 @@ def generate_authority(domain):
     ca = CertificateAuthority(domain, cert_path, key_path)
 
     # Generate private key and create X509 certificate, then set options
-    key = OpenSSL.crypto.PKey()
-    key.generate_key(OpenSSL.crypto.TYPE_RSA, 2048)
-    crt = OpenSSL.crypto.X509()
-    crt.set_version(3)
-    crt.set_serial_number(int(systemtime.get_serial_time()))
-    crt.get_subject().O = "arkOS Servers"
-    crt.get_subject().CN = domain
-    crt.gmtime_adj_notBefore(0)
-    crt.gmtime_adj_notAfter(5*365*24*60*60)
-    crt.set_issuer(crt.get_subject())
-    crt.set_pubkey(key)
-    crt.add_extensions([
-        OpenSSL.crypto.X509Extension("basicConstraints", True,
-                                     "CA:TRUE, pathlen:0"),
-        OpenSSL.crypto.X509Extension("keyUsage", True, "keyCertSign, cRLSign"),
-        OpenSSL.crypto.X509Extension("subjectKeyIdentifier", False,
-                                     "hash", subject=crt),
+    key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+        backend=default_backend()
+    )
+    with open(key_path, "wb") as f:
+        f.write(key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.TraditionalOpenSSL,
+            encryption_algorithm=serialization.BestAvailableEncryption(),
+        ))
+    subject = issuer = x509.Name([
+        x509.NameAttribute(NameOID.ORGANIZATION_NAME, u"arkOS Servers"),
+        x509.NameAttribute(NameOID.COMMON_NAME, domain)
     ])
-    crt.sign(key, "sha256")
-    # Save to files
-    with open(ca.cert_path, "wt") as f:
-        f.write(OpenSSL.crypto.dump_certificate(fpem, crt))
-    os.chmod(ca.cert_path, 0o660)
-    with open(ca.key_path, "wt") as f:
-        f.write(OpenSSL.crypto.dump_privatekey(fpem, key))
-    ca.expiry = crt.get_notAfter()
+    cert = x509.CertificateBuilder()
+    cert.subject_name(subject)
+    cert.issuer_name(issuer)
+    cert.public_key(key.public_key())
+    cert.not_valid_before(datetime.datetime.utcnow())
+    cert.not_valid_after(
+        datetime.datetime.utcnow() + datetime.timedelta(years=5)
+    )
+    cert.add_extension(
+        x509.BasicConstraints(ca=True, path_length=0),
+        critical=True
+    )
+    cert.add_extension(
+        x509.KeyUsage(key_cert_sign=True, crl_sign=True),
+        critical=True
+    )
+    cert.add_extension(
+        x509.SubejctKeyIdentifier(cert.public_key()),
+        critical=False
+    )
+    cert.sign(key, hashes.SHA256(), default_backend())
+    with open(cert_path, "wb") as f:
+        f.write(cert.public_bytes(serialization.Encoding.PEM))
+    os.chmod(cert_path, 0o660)
+
+    ca.expiry = cert.not_valid_after
     storage.certs.add("authorities", ca)
     return ca
-
-
-def get_cert_hashes(cert):
-    """
-    Obtain validation hashes for the provided certificate.
-
-    :param Certificate cert: Certificate to hash
-    :returns: SHA-1 and md5 hashes of certificate
-    :rtype: tuple
-    """
-    h, m = hashlib.sha1(), hashlib.md5()
-    h.update(OpenSSL.crypto.dump_certificate(fasn, cert))
-    m.update(OpenSSL.crypto.dump_certificate(fasn, cert))
-    h, m = h.hexdigest(), m.hexdigest()
-    return (":".join([h[i:i+2].upper() for i in range(0, len(h), 2)]),
-            ":".join([m[i:i+2].upper() for i in range(0, len(m), 2)]))
-
-
-def get_key_type(key):
-    """
-    Return the key type of a provided key.
-
-    :param key: pyOpenSSL private key object
-    :returns: Either "RSA", "DSA" or "Unknown"
-    :rtype: str
-    """
-    if key.type() == OpenSSL.crypto.TYPE_RSA:
-        return "RSA"
-    elif key.type() == OpenSSL.crypto.TYPE_DSA:
-        return "DSA"
-    else:
-        return "Unknown"

@@ -80,7 +80,7 @@ class User:
             "uid": self.name,
             "mail": [self.name+"@"+self.domain],
             "maildrop": self.name,
-            "userPassword": hashpw(passwd, "crypt"),
+            "userPassword": hashpw(passwd),
             "gidNumber": "100",
             "uidNumber": str(self.uid),
             "homeDirectory": "/home/%s" % self.name,
@@ -118,7 +118,7 @@ class User:
             "mail": self.mail
         }
         if newpasswd:
-            attrs["userPassword"] = hashpw(newpasswd, "crypt")
+            attrs["userPassword"] = hashpw(newpasswd)
         signals.emit("users", "pre_update", self)
         nldif = ldap.modlist.modifyModlist(ldif, attrs, ignore_oldexistent=1)
         conns.LDAP.modify_ext_s(self.ldap_id, nldif)
