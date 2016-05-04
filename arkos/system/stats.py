@@ -36,7 +36,7 @@ def get_load():
 def get_temp():
     """Get CPU temperature readings."""
     # TODO: replace this with libsensors.so / PySensors
-    if config.get("enviro", "board").startswith("Raspberry Pi"):
+    if config.get("enviro", "board", "Unknown").startswith("Raspberry Pi"):
         with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
             return "{:3.1f}°C".format(float(f.read().rstrip("\n"))/1000)
     else:
