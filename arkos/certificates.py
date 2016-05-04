@@ -151,7 +151,7 @@ class Certificate:
             "keytype": self.keytype,
             "keylength": self.keylength,
             "assigns": self.assigns,
-            "expiry": systemtime.ts_to_datetime(self.expiry.rstrip("Z")),
+            "expiry": self.expiry,
             "sha1": self.sha1,
             "md5": self.md5,
             "is_ready": True
@@ -161,7 +161,7 @@ class Certificate:
     def serialized(self):
         """Return serializable certificate metadata as dict."""
         data = self.as_dict
-        data["expiry"] = systemtime.get_iso_time(self.expiry.rstrip("Z"))
+        data["expiry"] = data["expiry"].isoformat()
         return data
 
 
@@ -200,14 +200,14 @@ class CertificateAuthority:
         """Return certificate metadata as dict."""
         return {
             "id": self.id,
-            "expiry": systemtime.ts_to_datetime(self.expiry.rstrip("Z"))
+            "expiry": self.expiry
         }
 
     @property
     def serialized(self):
         """Return serializable certificate metadata as dict."""
         data = self.as_dict
-        data["expiry"] = systemtime.get_iso_time(self.expiry.rstrip("Z"))
+        data["expiry"] = data["expiry"].isoformat()
         return data
 
 
