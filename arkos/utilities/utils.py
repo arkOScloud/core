@@ -18,6 +18,7 @@ import os
 import random
 import requests
 import shlex
+import socket
 import string
 import subprocess
 import tarfile
@@ -40,6 +41,20 @@ def netmask_to_cidr(mask):
     for octet in mask:
         binary_str += bin(int(octet))[2:].zfill(8)
     return len(binary_str.rstrip("0"))
+
+
+def test_dns(host):
+    """
+    Test DNS resolution.
+
+    :param str host: hostname
+    :returns: True if resolution was successful
+    """
+    try:
+        test = socket.gethostbyname_ex("arkos.io")
+    except:
+        return False
+    return True if test else False
 
 
 def download(url, file=None, crit=False):
