@@ -11,6 +11,8 @@ import miniupnpc
 import random
 
 from arkos import config, policies, logger, signals, storage, security
+from arkos.utilities import test_port
+from arkos.utilities.errors import SoftFail
 
 COMMON_PORTS = [3000, 3306, 5222, 5223, 5232]
 
@@ -234,15 +236,15 @@ def open_upnp(port):
     except Exception as e:
         logger.error("Failed to register {0} with uPnP IGD: {1}"
                      .format(port, str(e)))
-    if upnpc.getspecificportmapping(port[1], port[0]):
+    if upnpc.getspecificportmapping(port[1], port[0].upper()):
         try:
-            upnpc.deleteportmapping(port[1], port[0])
+            upnpc.deleteportmapping(port[1], port[0].upper())
         except:
             pass
     try:
         pf = 'arkOS Port Forwarding: {0}'
-        upnpc.addportmapping(port[1], port[0], upnpc.lanaddr, port[1],
-                             pf.format(port[0]), '')
+        upnpc.addportmapping(port[1], port[0].upper(), upnpc.lanaddr, port[1],
+                             pf.format(port[1]), '')
     except Exception as e:
         logger.error("Failed to register {0} with uPnP IGD: {1}"
                      .format(port, str(e)))
@@ -266,9 +268,9 @@ def close_upnp(port):
     except Exception as e:
         logger.error("Failed to register {0} with uPnP IGD: {1}"
                      .format(port, str(e)))
-    if upnpc.getspecificportmapping(port[1], port[0]):
+    if upnpc.getspecificportmapping(port[1], port[0].upper()):
         try:
-            upnpc.deleteportmapping(port[1], port[0])
+            upnpc.deleteportmapping(port[1], port[0].upper())
         except:
             pass
 
@@ -291,15 +293,15 @@ def initialize_upnp(svcs):
         logger.error("Failed to register with uPnP IGD: {0}"
                      .format(str(e)))
     for port in [y for x in svcs.ports for y in x]:
-        if upnpc.getspecificportmapping(port[1], port[0]):
+        if upnpc.getspecificportmapping(port[1], port[0].upper()):
             try:
-                upnpc.deleteportmapping(port[1], port[0])
+                upnpc.deleteportmapping(port[1], port[0].upper())
             except:
                 pass
         try:
             pf = 'arkOS Port Forwarding: {0}'
-            upnpc.addportmapping(port[1], port[0], upnpc.lanaddr, port[1],
-                                 pf.format(port[0]), '')
+            upnpc.addportmapping(port[1], port[0].upper(), upnpc.lanaddr,
+                                 port[1], pf.format(port[1]), '')
         except Exception as e:
             logger.error("Failed to register {0} with uPnP IGD: {1}"
                          .format(port, str(e)))
@@ -323,15 +325,15 @@ def open_all_upnp(ports):
         logger.error("Failed to register with uPnP IGD: {0}"
                      .format(str(e)))
     for port in [x for x in ports]:
-        if upnpc.getspecificportmapping(port[1], port[0]):
+        if upnpc.getspecificportmapping(port[1], port[0].upper()):
             try:
-                upnpc.deleteportmapping(port[1], port[0])
+                upnpc.deleteportmapping(port[1], port[0].upper())
             except:
                 pass
         try:
             pf = 'arkOS Port Forwarding: {0}'
-            upnpc.addportmapping(port[1], port[0], upnpc.lanaddr, port[1],
-                                 pf.format(port[0]), '')
+            upnpc.addportmapping(port[1], port[0].upper(), upnpc.lanaddr,
+                                 port[1], pf.format(port[1]), '')
         except Exception as e:
             logger.error("Failed to register {0} with uPnP IGD: {1}"
                          .format(port, str(e)))
@@ -355,9 +357,9 @@ def close_all_upnp(ports):
         logger.error("Failed to register with uPnP IGD: {0}"
                      .format(str(e)))
     for port in [x for x in ports]:
-        if upnpc.getspecificportmapping(port[1], port[0]):
+        if upnpc.getspecificportmapping(port[1], port[0].upper()):
             try:
-                upnpc.deleteportmapping(port[1], port[0])
+                upnpc.deleteportmapping(port[1], port[0].upper())
             except:
                 pass
 
@@ -419,6 +421,16 @@ def open_upnp_site(site):
     """Convenience function to register a website with uPnP."""
     if config.get("general", "enable_upnp", True):
         open_upnp(("tcp", site.port))
+    addr = site.addr
+    if addr == "localhost" or addr.endswith(".local"):
+        addr = None
+    try:
+        test_port(config.get("general", "repo_server"), site.port, addr)
+    except:
+        raise SoftFail("Port {0} and/or domain {1} could not be tested."
+                       " Make sure your ports are properly forwarded and"
+                       " that your domain is properly set up."
+                       .format(site.port, site.addr))
 
 
 def close_upnp_site(site):

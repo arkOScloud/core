@@ -23,6 +23,7 @@ import string
 import subprocess
 import tarfile
 import tempfile
+import time
 import zipfile
 
 
@@ -55,6 +56,33 @@ def test_dns(host):
     except:
         return False
     return True if test else False
+
+
+def test_port(server, port, host=None):
+    """
+    Use an arkOS GRM server to test local port connectivity.
+
+    :param str server: GRM server address
+    :param int port: Port number
+    :param str host: Host (if domain is to be tested instead of IP)
+    :returns: True if port test was successful
+    """
+    timer = 5
+    id = random_string(16)
+    pfile = os.path.join(os.path.dirname(__file__), "test-port.py")
+    p = subprocess.Popen(["python", pfile, str(port), id])
+    data = {"id": id, "port": port, "host": host or ""}
+    requests.post("https://" + server + "/api/v1/echo", data=data)
+    while timer > 0:
+        p.poll()
+        if p.returncode is None:
+            timer -= 1
+            time.sleep(1)
+        elif p.returncode is not None:
+            break
+    if p.returncode is None:
+        p.kill()
+    return True if p.returncode == 0 else False
 
 
 def download(url, file=None, crit=False):
