@@ -292,19 +292,22 @@ def initialize_upnp(svcs):
     except Exception as e:
         logger.error("Failed to register with uPnP IGD: {0}"
                      .format(str(e)))
-    for port in [y for x in svcs.ports for y in x]:
-        if upnpc.getspecificportmapping(port[1], port[0].upper()):
+    for svc in svcs:
+        if svc.policy != 2:
+            continue
+        for port in [y for x in svc.ports for y in x]:
+            if upnpc.getspecificportmapping(port[1], port[0].upper()):
+                try:
+                    upnpc.deleteportmapping(port[1], port[0].upper())
+                except:
+                    pass
             try:
-                upnpc.deleteportmapping(port[1], port[0].upper())
-            except:
-                pass
-        try:
-            pf = 'arkOS Port Forwarding: {0}'
-            upnpc.addportmapping(port[1], port[0].upper(), upnpc.lanaddr,
-                                 port[1], pf.format(port[1]), '')
-        except Exception as e:
-            logger.error("Failed to register {0} with uPnP IGD: {1}"
-                         .format(port, str(e)))
+                pf = 'arkOS Port Forwarding: {0}'
+                upnpc.addportmapping(port[1], port[0].upper(), upnpc.lanaddr,
+                                     port[1], pf.format(port[1]), '')
+            except Exception as e:
+                logger.error("Failed to register {0} with uPnP IGD: {1}"
+                             .format(port, str(e)))
 
 
 def open_all_upnp(ports):

@@ -16,7 +16,7 @@ import parted
 from . import crypto
 from . import losetup
 
-from arkos import config, signals
+from arkos import config, signals, sharers
 from arkos.utilities import shell
 
 libc = ctypes.CDLL(ctypes.util.find_library("libc"), use_errno=True)
@@ -509,6 +509,12 @@ def get_points(id=None, path=None):
             p = PointOfInterest(x.id, x.data_path or x.path, "site",
                                 x.meta.icon)
             points.append(p)
+    for x in sharers.get_shares():
+        p = PointOfInterest(x.id, x.path, "share", "fa-folder-open")
+        points.append(p)
+    for x in sharers.get_mounts():
+        p = PointOfInterest(x.id, x.path, "mount", "fa-folder-open-o")
+        points.append(p)
     if id:
         for x in points:
             if x.id == id:

@@ -11,7 +11,7 @@ from arkos import storage
 from arkos.system import systemtime
 
 
-class Share:
+class SharedFile:
     """
     Class representing a Shared File.
 
@@ -37,11 +37,11 @@ class Share:
 
     def add(self):
         """Add a shared file reference to cache."""
-        storage.files.add("shares", self)
+        storage.files.add("sharedfiles", self)
 
     def delete(self):
         """Delete a shared file reference from cache."""
-        storage.files.remove("shares", self)
+        storage.files.remove("sharedfiles", self)
 
     def update_expiry(self, nexpiry):
         """
@@ -84,7 +84,7 @@ class Share:
 
 def get(id=None):
     """List all shared file objects present in cache storage."""
-    data = storage.files.get("shares")
+    data = storage.files.get("sharedfiles")
     to_purge = []
     for x in data:
         if x.is_expired:
