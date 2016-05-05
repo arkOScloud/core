@@ -36,6 +36,10 @@ def initialize_firewall():
     # Accept established/related connections
     shell("iptables -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT")
 
+    # Allow mDNS (Avahi/Bonjour/Zeroconf)
+    shell("iptables -A INPUT -p udp --dport mdns -j ACCEPT")
+    shell("iptables -A OUTPUT -p udp --dport mdns -j ACCEPT")
+
     # Reject all else by default
     shell("iptables -A INPUT -j DROP")
 
