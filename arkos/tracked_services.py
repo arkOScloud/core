@@ -7,9 +7,10 @@ Written by Jacob Cook
 Licensed under GPLv3, see LICENSE.md
 """
 
+import miniupnpc
 import random
 
-from arkos import config, policies, signals, storage, security
+from arkos import config, policies, logger, signals, storage, security
 
 COMMON_PORTS = [3000, 3306, 5222, 5223, 5232]
 
@@ -215,6 +216,152 @@ def is_open_port(port, addr=None, ignore_common=False):
     return port not in ports
 
 
+def open_upnp(port):
+    """
+    Open and forward a port with the local uPnP IGD.
+
+    :param tuple port: Port protocol and number
+    """
+    upnpc = miniupnpc.UPnP()
+    upnpc.discoverdelay = 3000
+    devs = upnpc.discover()
+    if devs == 0:
+        logger.error("Failed to register {0} with uPnP IGD: no devices found"
+                     .format(port))
+        return
+    try:
+        upnpc.selectigd()
+    except Exception as e:
+        logger.error("Failed to register {0} with uPnP IGD: {1}"
+                     .format(port, str(e)))
+    if upnpc.getspecificportmapping(port[1], port[0]):
+        try:
+            upnpc.deleteportmapping(port[1], port[0])
+        except:
+            pass
+    try:
+        pf = 'arkOS Port Forwarding: {0}'
+        upnpc.addportmapping(port[1], port[0], upnpc.lanaddr, port[1],
+                             pf.format(port[0]), '')
+    except Exception as e:
+        logger.error("Failed to register {0} with uPnP IGD: {1}"
+                     .format(port, str(e)))
+
+
+def close_upnp(port):
+    """
+    Remove forwarding of a port with the local uPnP IGD.
+
+    :param tuple port: Port protocol and number
+    """
+    upnpc = miniupnpc.UPnP()
+    upnpc.discoverdelay = 3000
+    devs = upnpc.discover()
+    if devs == 0:
+        logger.error("Failed to register {0} with uPnP IGD: no devices found"
+                     .format(port))
+        return
+    try:
+        upnpc.selectigd()
+    except Exception as e:
+        logger.error("Failed to register {0} with uPnP IGD: {1}"
+                     .format(port, str(e)))
+    if upnpc.getspecificportmapping(port[1], port[0]):
+        try:
+            upnpc.deleteportmapping(port[1], port[0])
+        except:
+            pass
+
+
+def initialize_upnp(svcs):
+    """
+    Initialize uPnP port forwarding with the IGD.
+
+    :param SecurityPolicy svcs: SecurityPolicies to open
+    """
+    upnpc = miniupnpc.UPnP()
+    upnpc.discoverdelay = 3000
+    devs = upnpc.discover()
+    if devs == 0:
+        logger.error("Failed to register with uPnP IGD: no devices found")
+        return
+    try:
+        upnpc.selectigd()
+    except Exception as e:
+        logger.error("Failed to register with uPnP IGD: {0}"
+                     .format(str(e)))
+    for port in [y for x in svcs.ports for y in x]:
+        if upnpc.getspecificportmapping(port[1], port[0]):
+            try:
+                upnpc.deleteportmapping(port[1], port[0])
+            except:
+                pass
+        try:
+            pf = 'arkOS Port Forwarding: {0}'
+            upnpc.addportmapping(port[1], port[0], upnpc.lanaddr, port[1],
+                                 pf.format(port[0]), '')
+        except Exception as e:
+            logger.error("Failed to register {0} with uPnP IGD: {1}"
+                         .format(port, str(e)))
+
+
+def open_all_upnp(ports):
+    """
+    Open and forward multiple ports with the local uPnP IGD.
+
+    :param list ports: List of port objects to open
+    """
+    upnpc = miniupnpc.UPnP()
+    upnpc.discoverdelay = 3000
+    devs = upnpc.discover()
+    if devs == 0:
+        logger.error("Failed to register with uPnP IGD: no devices found")
+        return
+    try:
+        upnpc.selectigd()
+    except Exception as e:
+        logger.error("Failed to register with uPnP IGD: {0}"
+                     .format(str(e)))
+    for port in [x for x in ports]:
+        if upnpc.getspecificportmapping(port[1], port[0]):
+            try:
+                upnpc.deleteportmapping(port[1], port[0])
+            except:
+                pass
+        try:
+            pf = 'arkOS Port Forwarding: {0}'
+            upnpc.addportmapping(port[1], port[0], upnpc.lanaddr, port[1],
+                                 pf.format(port[0]), '')
+        except Exception as e:
+            logger.error("Failed to register {0} with uPnP IGD: {1}"
+                         .format(port, str(e)))
+
+
+def close_all_upnp(ports):
+    """
+    Remove forwarding of multiple ports with the local uPnP IGD.
+
+    :param list ports: List of port objects to close
+    """
+    upnpc = miniupnpc.UPnP()
+    upnpc.discoverdelay = 3000
+    devs = upnpc.discover()
+    if devs == 0:
+        logger.error("Failed to register with uPnP IGD: no devices found")
+        return
+    try:
+        upnpc.selectigd()
+    except Exception as e:
+        logger.error("Failed to register with uPnP IGD: {0}"
+                     .format(str(e)))
+    for port in [x for x in ports]:
+        if upnpc.getspecificportmapping(port[1], port[0]):
+            try:
+                upnpc.deleteportmapping(port[1], port[0])
+            except:
+                pass
+
+
 def get_open_port(ignore_common=False):
     """
     Get a random TCP port not currently in use by a tracked service.
@@ -236,10 +383,19 @@ def get_open_port(ignore_common=False):
 
 def initialize():
     """Initialize security policy tracking."""
+    # arkOS
     policy = policies.get("arkos", "arkos", 2)
     port = [("tcp", int(config.get("genesis", "port")))]
     pol = SecurityPolicy("arkos", "arkos", "System Management (Genesis/APIs)",
                          "fa fa-desktop", port, policy)
+
+    # uPNP
+    policy = policies.get("arkos", "upnp", 1)
+    pol = SecurityPolicy("arkos", "upnp", "uPnP Firewall Comms",
+                         "fa fa-desktop", [("udp", 1900)], policy)
+    if config.get("general", "enable_upnp", True):
+        storage.policies.add("policies", pol)
+
     storage.policies.add("policies", pol)
     for x in policies.get_all("custom"):
         pol = SecurityPolicy("custom", x["id"], x["name"], x["icon"],
@@ -259,6 +415,20 @@ def deregister_website(site):
     deregister("website", site.id)
 
 
+def open_upnp_site(site):
+    """Convenience function to register a website with uPnP."""
+    if config.get("general", "enable_upnp", True):
+        open_upnp(("tcp", site.port))
+
+
+def close_upnp_site(site):
+    """Convenience function to deregister a website with uPnP."""
+    if config.get("general", "enable_upnp", True):
+        close_upnp(("tcp", site.port))
+
+
 signals.add("tracked_services", "websites", "site_loaded", register_website)
 signals.add("tracked_services", "websites", "site_installed", register_website)
+signals.add("tracked_services", "websites", "site_installed", open_upnp_site)
 signals.add("tracked_services", "websites", "site_removed", deregister_website)
+signals.add("tracked_services", "websites", "site_removed", close_upnp_site)

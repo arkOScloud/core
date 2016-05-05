@@ -74,7 +74,7 @@ class Site:
         self.meta = None
         self.enabled = enabled
         self.data_path = data_path
-        if hasattr(self, "addtoblock") and self.addtoblock and block:
+        if getattr(self, "addtoblock", None) and block:
             self.addtoblock += block
         elif block:
             self.addtoblock = block
@@ -264,8 +264,8 @@ class Site:
                 and self.data_path:
             meta.set("website", "data_path", self.data_path)
         meta.set("website", "dbengine", "")
-        if hasattr(self.meta, "selected_dbengine"):
-            meta.set("website", "dbengine", self.meta.selected_dbengine or "")
+        meta.set("website", "dbengine",
+                 getattr(self.meta, "selected_dbengine", ""))
         with open(os.path.join(self.path, ".arkos"), "w") as f:
             meta.write(f)
 

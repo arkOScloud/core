@@ -23,6 +23,7 @@ setup(
         'pyparted',
         'python-ldap',
         'psutil',
+        'miniupnpc',
         'netifaces',
         'GitPython',
         'python-gnupg',

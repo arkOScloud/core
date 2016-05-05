@@ -68,9 +68,7 @@ def install_updates(message=DefaultMessage()):
                 try:
                     download(x["order"], x["data"], True)
                 except Exception as e:
-                    code = 1
-                    if hasattr(e, "code"):
-                        code = e.code
+                    code = getattr(e, "code", 1)
                     responses.append((x["step"], str(code)))
                     break
         else:

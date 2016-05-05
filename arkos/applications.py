@@ -89,8 +89,7 @@ class App:
                         if issubclass(y[1], mgr) and y[1] != mgr:
                             setattr(self, "_backup", y[1])
                 elif module == "api":
-                    if hasattr(self, "_backend"):
-                        setattr(submod, self.id, self._backend)
+                    setattr(submod, self.id, getattr(self, "_backend", None))
                     setattr(self, "_api", submod)
                 elif module == "ssl":
                     self.ssl = submod
@@ -193,6 +192,12 @@ class App:
         logger.debug("Installing {0}".format(self.name))
         message.update("info", "Installing {0}...".format(self.name))
         _install(self.id, load=load)
+        ports = []
+        for s in self.services:
+            if s.get("default_policy", 0) and s["ports"]:
+                ports.append(s["ports"])
+        if ports and config.get("general", "enable_upnp", True):
+            tracked_services.open_all_upnp(ports)
         verify_app_dependencies()
         signals.emit("apps", "post_install", self)
 
@@ -241,6 +246,12 @@ class App:
                 regen_fw = True
         if regen_fw:
             tracked_services.deregister(self.id)
+        ports = []
+        for s in self.services:
+            if s.get("default_policy", 0) and s["ports"]:
+                ports.append(s["ports"])
+        if ports and config.get("general", "enable_upnp", True):
+            tracked_services.close_all_upnp(ports)
         signals.emit("apps", "post_remove", self)
 
     def ssl_enable(self, cert, sid=""):
