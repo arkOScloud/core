@@ -1,5 +1,4 @@
 import ConfigParser
-import iptc
 
 from arkos import storage, signals
 from arkos.system import network
@@ -9,142 +8,71 @@ jailconf = "/etc/fail2ban/jail.conf"
 filters = "/etc/fail2ban/filter.d"
 
 
-def initialize_fw():
+def initialize_firewall():
     signals.emit("security", "pre_fw_init")
-    table = iptc.Table(iptc.Table.FILTER)
-    chain = iptc.Chain(table, "INPUT")
-    chain.flush()
+    flush_chain("INPUT")
 
     # Accept loopback
-    rule = iptc.Rule()
-    rule.in_interface = "lo"
-    target = iptc.Target(rule, "ACCEPT")
-    rule.target = target
-    chain.append_rule(rule)
+    shell("iptables -A INPUT -i lo -j ACCEPT")
 
     # Accept designated apps
-    app_chain = iptc.Chain(table, "arkos-apps")
-    if not table.is_chain(app_chain):
-        table.create_chain(app_chain)
-    rule = iptc.Rule()
-    target = iptc.Target(rule, "arkos-apps")
-    rule.target = target
-    chain.append_rule(rule)
+    shell("iptables -N arkos-apps")
+    shell("iptables -A INPUT -j arkos-apps")
 
     # Allow ICMP (ping)
-    rule = iptc.Rule()
-    rule.protocol = "icmp"
-    target = iptc.Target(rule, "ACCEPT")
-    rule.target = target
-    match = iptc.Match(rule, "icmp")
-    match.icmp_type = "echo-request"
-    chain.append_rule(rule)
+    shell("iptables -A INPUT -p icmp -m icmp --icmp-type echo-request -j ACCEPT")
 
     # Accept established/related connections
-    rule = iptc.Rule()
-    target = iptc.Target(rule, "ACCEPT")
-    rule.target = target
-    match = iptc.Match(rule, "conntrack")
-    match.ctstate = "ESTABLISHED,RELATED"
-    chain.append_rule(rule)
+    shell("iptables -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT")
 
     # Reject all else by default
-    rule = iptc.Rule()
-    target = iptc.Target(rule, "DROP")
-    rule.target = target
-    chain.append_rule(rule)
-    save_fw()
+    shell("iptables -A INPUT -j DROP")
+
+    save_rules()
     signals.emit("security", "post_fw_init")
 
-def regen_fw(data, range=[]):
+def regenerate_firewall(data, range=[]):
     # Regenerate our chain.
     # If local ranges are not provided, get them.
     signals.emit("security", "pre_fw_regen")
-    flush_fw()
+    flush_chain("arkos-apps")
     default_range = range or network.get_active_ranges()
     # For each policy in the system, add a rule
     for x in data:
-        range = x.allowed_ranges if hasattr(x, "allowed_ranges") else default_range
+        range = getattr(x, "allowed_ranges", default_range)
         for port in x.ports:
             if x.policy == 2:
-                add_fw(port[0], port[1], ["anywhere"])
+                add_rule("ACCEPT", port[0], port[1], ["anywhere"])
             elif x.policy == 1:
-                add_fw(port[0], port[1], range)
+                add_rule("ACCEPT", port[0], port[1], range)
             else:
-                remove_fw(port[0], port[1])
-    # Create our app chain
-    table = iptc.Table(iptc.Table.FILTER)
-    chain = iptc.Chain(table, "arkos-apps")
-    if not table.is_chain(chain):
-        table.create_chain(chain)
-    rule = iptc.Rule()
-    target = iptc.Target(rule, "RETURN")
-    rule.target = target
-    chain.append_rule(rule)
-    save_fw()
+                add_rule("REJECT", port[0], port[1])
+    shell("iptables -A arkos-apps -j RETURN")
+    save_rules()
     signals.emit("security", "post_fw_regen")
 
-def add_fw(protocol, port, ranges=[]):
+def add_rule(opt, protocol, port, ranges=[]):
     # Add rule for this port
     # If range is not provided, assume "0.0.0.0"
-    for range in ranges:
-        table = iptc.Table(iptc.Table.FILTER)
-        chain = iptc.Chain(table, "arkos-apps")
-        if not table.is_chain(chain):
-            table.create_chain(chain)
-        rule = iptc.Rule()
-        rule.protocol = protocol
-        if not range in ["", "anywhere", "0.0.0.0"]:
-            ip, cidr = range.split("/")
-            mask = cidr_to_netmask(int(cidr))
-            rule.src = ip + "/" + mask
-        match = iptc.Match(rule, protocol)
-        match.dport = str(port)
-        rule.add_match(match)
-        target = iptc.Target(rule, "ACCEPT")
-        rule.target = target
-        chain.insert_rule(rule)
+    cmd = "iptables -I arkos-apps {src} -p {ptc} -m {ptc} --dport {prt} -j {opt}"
+    src = ""
+    for x in [r for r in ranges if r not in ["", "anywhere", "0.0.0.0"]]:
+        src = "-s " if not src else (src + ",")
+        ip, cidr = x.split("/")
+        mask = cidr_to_netmask(int(cidr))
+        src += ip + "/" + mask
+    s = shell(cmd.format(src=src, ptc=protocol, prt=port, opt=opt))
+    if s["code"] != 0 and "No chain/target/match by that name" in s["stderr"]:
+        # Create chain if not exists
+        shell("iptables -N arkos-apps")
+        shell(cmd.format(src=src, ptc=protocol, prt=port, opt=opt))
 
-def remove_fw(protocol, port, ranges=[]):
-    # Remove rule(s) in our chain matching this port
-    # If range is not provided, delete all rules for this port
-    for range in ranges:
-        table = iptc.Table(iptc.Table.FILTER)
-        chain = iptc.Chain(table, "arkos-apps")
-        if not table.is_chain(chain):
-            return
-        for rule in chain.rules:
-            if range not in ["", "anywhere", "0.0.0.0"]:
-                if rule.matches[0].dport == port and range in rule.dst:
-                    chain.delete_rule(rule)
-            else:
-                if rule.matches[0].dport == port:
-                    chain.delete_rule(rule)
-
-def find_fw(protocol, port, range=""):
-    # Returns true if rule is found for this port
-    # If range IS provided, return true only if range is the same
-    table = iptc.Table(iptc.Table.FILTER)
-    chain = iptc.Chain(table, "arkos-apps")
-    if not table.is_chain(chain):
-        return False
-    for rule in chain.rules:
-        if range:
-            if rule.matches[0].dport == port and range in rule.dst:
-                return True
-        elif not range and rule.matches[0].dport == port:
-            return True
-    return False
-
-def flush_fw():
+def flush_chain(chain):
     # Flush out our chain
     signals.emit("security", "fw_flush")
-    table = iptc.Table(iptc.Table.FILTER)
-    chain = iptc.Chain(table, "arkos-apps")
-    if table.is_chain(chain):
-        chain.flush()
+    shell("iptables -F {0}".format(chain))
 
-def save_fw():
+def save_rules():
     # Save rules to file loaded on boot
     with open("/etc/iptables/iptables.rules", "w") as f:
         f.write(shell("iptables-save")["stdout"])
