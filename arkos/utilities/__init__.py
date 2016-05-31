@@ -16,7 +16,6 @@ __all__ = [
     "b64_to_path",
     "extract",
     "compress",
-    "dictfilter",
     "cidr_to_netmask",
     "netmask_to_cidr",
     "download",

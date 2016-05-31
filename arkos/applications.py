@@ -14,6 +14,7 @@ import os
 import pacman
 import shutil
 import tarfile
+import traceback
 
 from distutils.spawn import find_executable
 
@@ -107,6 +108,8 @@ class App:
             self.loadable = False
             self.error = "Module error: {0}".format(e)
             logger.warn("Failed to load {0} -- {1}".format(self.name, str(e)))
+            logger.warn("Stacktrace follows:")
+            logger.warn(traceback.format_exc())
 
     def verify_dependencies(self):
         """

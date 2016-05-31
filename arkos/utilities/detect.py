@@ -82,7 +82,7 @@ def detect_platform(mapping=True):
 
     dist = ""
     (maj, min, patch) = platform.python_version_tuple()
-    if (maj * 10 + min) >= 26:
+    if (int(maj) * 10 + int(min)) >= 26:
         dist = platform.linux_distribution()[0]
     else:
         dist = platform.dist()[0]

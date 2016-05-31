@@ -99,6 +99,7 @@ def add_rule(opt, protocol, port, ranges=[]):
         shell("iptables -N arkos-apps")
         shell(cmd.format(src=src, ptc=protocol, prt=port, opt=opt))
 
+
 def flush_chain(chain):
     """Flush the firewall chain."""
     signals.emit("security", "fw_flush")

@@ -114,7 +114,7 @@ def get_current_entropy():
 def random_string():
     """Create a random alphanumeric string."""
     digest = hashes.Hash(hashes.SHA1(), backend=default_backend())
-    digest.update(str(random.random()))
+    digest.update(str(random.random()).encode('utf-8'))
     return binascii.hexlify(digest.finalize())
 
 
