@@ -239,6 +239,7 @@ class Site:
             block = nginx.Conf()
             server = nginx.Server(
                 nginx.Key("listen", str(self.port)),
+                nginx.Key("listen", "[::]:" + str(self.port)),
                 nginx.Key("server_name", self.addr),
                 nginx.Key("root", self.path),
                 nginx.Key("index", getattr(self.meta, "website_index", None) or
@@ -312,21 +313,28 @@ class Site:
 
         # If the site is on port 80, setup an HTTP redirect to new port 443
         server = block.servers[0]
-        listen = server.filter("Key", "listen")[0]
-        if listen.value == "80":
-            listen.value = "443 ssl"
-            block.add(nginx.Server(
-                nginx.Key("listen", "80"),
-                nginx.Key("server_name", self.addr),
-                nginx.Key("return", "301 https://{0}$request_uri"
-                                    .format(self.addr))
-            ))
-            for x in block.servers:
-                if x.filter("Key", "listen")[0].value == "443 ssl":
-                    server = x
-                    break
-        else:
-            listen.value = listen.value.split(" ssl")[0] + " ssl"
+        listens = server.filter("Key", "listen")
+        for listen in listens:
+            httport = "80"
+            sslport = "443"
+            if listen.value.startswith("[::]"):
+                # IPv6
+                httport = "[::]:80"
+                sslport = "[::]:443"
+            if listen.value == httport:
+                listen.value = (sslport + " ssl http2")
+                block.add(nginx.Server(
+                    nginx.Key("listen", httport),
+                    nginx.Key("server_name", self.addr),
+                    nginx.Key("return", "301 https://{0}$request_uri"
+                                        .format(self.addr))
+                ))
+                for x in block.servers:
+                    if " ssl" in x.filter("Key", "listen")[0].value:
+                        server = x
+                        break
+            else:
+                listen.value = listen.value.split(" ssl")[0] + " ssl http2"
 
         # Clean up any pre-existing SSL directives that no longer apply
         for x in server.all():
@@ -372,11 +380,14 @@ class Site:
 
         # Remove all SSL directives and save
         server = block.servers[0]
-        listen = server.filter("Key", "listen")[0]
-        if listen.value == "443 ssl":
-            listen.value = "80"
-        else:
-            listen.value = listen.value.rstrip(" ssl")
+        listens = server.filter("Key", "listen")
+        for listen in listens:
+            if listen.value.startswith("443"):
+                listen.value = "80"
+            elif listen.value.startswith("[::]:443"):
+                listen.value = "[::]:80"
+            else:
+                listen.value = listen.value.split(" ssl")[0]
         skeys = [x for x in server.filter("Key") if x.name.startswith("ssl_")]
         server.remove(*skeys)
         nginx.dumpf(block, os.path.join("/etc/nginx/sites-available/",
@@ -438,16 +449,17 @@ class Site:
         server = block.servers[0]
         if self.cert and self.port == 443:
             for x in block.servers:
-                if x.filter("Key", "listen")[0].value == "443 ssl":
+                if "443 ssl" in x.filter("Key", "listen")[0].value:
                     server = x
             if self.port != 443:
                 for x in block.servers:
-                    if "ssl" not in x.filter("Key", "listen")[0].value \
+                    if "ssl" not in x.filter("Key", "listen")[0].value\
                             and x.filter("key", "return"):
                         block.remove(x)
         elif self.port == 443:
             block.add(nginx.Server(
                 nginx.Key("listen", "80"),
+                nginx.Key("listen", "[::]:80"),
                 nginx.Key("server_name", self.addr),
                 nginx.Key("return", "301 https://{0}$request_uri"
                                     .format(self.addr))
@@ -481,7 +493,11 @@ class Site:
 
         # Pass any necessary updates to the nginx serverblock and save
         port = "{0} ssl".format(self.port) if self.cert else str(self.port)
-        server.filter("Key", "listen")[0].value = port
+        for listen in server.filter("Key", "listen"):
+            if listen.value.startswith("[::]:"):
+                listen.value = "[::]:" + str(port)
+            else:
+                listen.value = str(port)
         server.filter("Key", "server_name")[0].value = self.addr
         server.filter("Key", "root")[0].value = self.path
         server.filter("Key", "index")[0].value = "index.php" \
@@ -706,6 +722,7 @@ class ReverseProxy(Site):
         block = nginx.Conf()
         server = nginx.Server(
             nginx.Key("listen", self.port),
+            nginx.Key("listen", "[::]:" + str(self.port)),
             nginx.Key("server_name", self.addr),
             nginx.Key("root", self.base_path or self.path),
         )
@@ -861,7 +878,7 @@ def scan():
             else:
                 server = block.servers[0]
             port_regex = re.compile("(\\d+)\s*(.*)")
-            listen_val = server.filter("Key", "listen")[0].value
+            listen_val = server.filter("Key", "listen")[0].value.lstrip("[::]:")
             site.port = int(re.match(port_regex, listen_val).group(1))
             site.addr = server.filter("Key", "server_name")[0].value
             site.path = server.filter("Key", "root")[0].value
