@@ -1,2 +1,9 @@
 dist
 arkos_core.egg-info
+
+# Compiled python files
+*.pyc
+
+# Eclipse project files 
+.project
+.pydevproject
