@@ -1,7 +1,17 @@
+"""
+Helper functions to detect system architecture and platform.
+
+arkOS Core
+(c) 2016 CitizenWeb
+Written by Jacob Cook
+Licensed under GPLv3, see LICENSE
+"""
+
 import platform
 
 
 def detect_architecture():
+    """Detect system architecture and board type."""
     arch, btype = "Unknown", "Unknown"
     cpuinfo = {}
     # Get architecture
@@ -43,6 +53,7 @@ def detect_architecture():
     return (arch, btype)
 
 def detect_platform(mapping=True):
+    """Detect distro platform."""
     base_mapping = {
         "gentoo base system": "gentoo",
         "centos linux": "centos",

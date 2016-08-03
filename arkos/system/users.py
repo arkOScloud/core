@@ -1,21 +1,43 @@
-import grp
-import json
-import ldap, ldap.modlist
+"""
+Classes and functions for interacting with system management daemons.
+
+arkOS Core
+(c) 2016 CitizenWeb
+Written by Jacob Cook
+Licensed under GPLv3, see LICENSE
+"""
+
+import ldap3
 import os
 import pwd
 import shutil
-import sys
 
-import groups
+from . import groups
 
 from arkos import conns, config, signals
 from arkos.utilities import hashpw, shell
 
 
 class User:
+    """Class for managing arkOS users in LDAP."""
+    
     def __init__(
             self, name="", first_name="", last_name=None, uid=0, domain="",
-            rootdn="dc=arkos-servers,dc=org", mail=[], admin=False, sudo=False):
+            rootdn="dc=arkos-servers,dc=org", mail=[], admin=False, 
+            sudo=False):
+        """
+        Initialize the user object.
+
+        :param str name: Username
+        :param str first_name: First name or pseudonym of user
+        :param str last_name: Last name of user, or None
+        :param int uid: user ID number
+        :param str domain: Associated domain name
+        :param str rootdn: Associated root DN in LDAP
+        :param list mail: List of mail addresses and aliases
+        :param bool admin: Is admin user?
+        :param bool sudo: Can execute with sudo?
+        """
         self.name = str(name)
         self.first_name = str(first_name)
         self.last_name = None if last_name == None else str(last_name)
@@ -25,8 +47,20 @@ class User:
         self.mail = [str(x) for x in mail]
         self.admin = admin
         self.sudo = sudo
+        
+    @property
+    def ldap_id(self):
+        """Fetch LDAP ID."""
+        qry = "uid={0},ou=users,{1}"
+        return qry.format(self.name, self.rootdn)
 
     def add(self, passwd):
+        """
+        Add the user to LDAP.
+
+        :param str passwd: user password to set
+        """
+        
         try:
             ldif = conns.LDAP.search_s("uid=%s,ou=users,%s" % (self.name,self.rootdn),
                 ldap.SCOPE_SUBTREE, "(objectClass=*)", None)
@@ -57,6 +91,13 @@ class User:
         signals.emit("users", "post_add", self)
 
     def update(self, newpasswd=""):
+        """
+        Update a user's object in LDAP. Change params on the object first.
+
+        To change password, do so via the ``newpasswd`` param here.
+
+        :param str newpasswd: new password to set
+        """
         try:
             ldif = conns.LDAP.search_s("uid=%s,ou=users,%s" % (self.name,self.rootdn),
                 ldap.SCOPE_SUBTREE, "(objectClass=*)", None)
@@ -83,7 +124,7 @@ class User:
         signals.emit("users", "post_update", self)
 
     def update_adminsudo(self):
-        # Update the user's admin and sudo group settings in LDAP with current values
+        """Update the user's admin and sudo group settings in LDAP."""
         ldif = conns.LDAP.search_s("cn=admins,ou=groups,%s" % self.rootdn,
             ldap.SCOPE_SUBTREE, "(objectClass=*)", None)[0][1]
         memlist = ldif["member"]
@@ -119,7 +160,11 @@ class User:
             conns.LDAP.delete_s("cn=%s,ou=sudo,%s" % (self.name, self.rootdn))
 
     def verify_passwd(self, passwd):
-        # Validate the provided password against the hash stored in LDAP
+        """
+        Validate the provided password against the hash stored in LDAP.
+
+        :param str passwd: password to check
+        """
         try:
             c = ldap.initialize("ldap://localhost")
             c.simple_bind_s("uid=%s,ou=users,%s" % (self.name, self.rootdn), passwd)
@@ -132,6 +177,11 @@ class User:
             return False
 
     def delete(self, delete_home=True):
+        """
+        Delete user.
+
+        :param bool delete_home: Delete the user's home directory too?
+        """
         signals.emit("users", "pre_remove", self)
         self.admin, self.sudo = False, False
         self.update_adminsudo()
@@ -145,6 +195,7 @@ class User:
 
     @property
     def as_dict(self, ready=True):
+        """Return user metadata as dict."""
         return {
             "id": self.uid,
             "name": self.name,
@@ -159,30 +210,50 @@ class User:
 
     @property
     def serialized(self):
+        """Return serializable user metadata as dict."""
         return self.as_dict
 
 
 class SystemUser:
+    """Class for managing system user records."""
+    
     def __init__(self, name="", uid=0, groups=[]):
+        """
+        Initialize system user object.
+
+        :param str name: username
+        :param int uid: user ID number
+        :param list groups: groups this user is a member of
+        """
         self.name = name
         self.uid = uid or get_next_uid()
         self.groups = groups
 
     def add(self):
-        shell("useradd -rm %s" % self.name)
+        """Add user."""
+        shell("useradd -rm {0}".format(self.name))
 
     def update(self):
+        """Update user groups."""
         for x in self.groups:
-            shell("usermod -a -G %s %s" % (x, self.name))
+            shell("usermod -a -G {0} {1}".format(x, self.name))
 
     def update_password(self, passwd):
-        shell("passwd %s" % self.name, stdin="%s\n%s\n" % (passwd,passwd))
+        """
+        Set password.
+
+        :param str passwd: password to set
+        """
+        shell("passwd {0}".format(self.name),
+              stdin="{0}\n{1}\n".format(passwd, passwd))
 
     def delete(self):
-        shell("userdel %s" % self.name)
+        """Delete user."""
+        shell("userdel {0}".format(self.name))
 
     @property
     def as_dict(self):
+        """Return system user metadata as dict."""
         return {
             "id": self.uid,
             "name": self.name,
@@ -191,10 +262,19 @@ class SystemUser:
 
     @property
     def serialized(self):
+        """Return serialized system user metadata as dict."""
         return self.as_dict
 
 
 def get(uid=None, name=None):
+    """
+    Get all LDAP users.
+
+    :param str id: ID of single user to fetch
+    :param str name: username of single user to fetch
+    :returns: User(s)
+    :rtype: User or list thereof
+    """
     r = []
     rootdn = config.get("general", "ldap_rootdn", "dc=arkos-servers,dc=org")
     ldap_users = conns.LDAP.search_s("ou=users,%s" % rootdn, ldap.SCOPE_SUBTREE,
@@ -232,6 +312,14 @@ def get(uid=None, name=None):
     return r if uid == None and name == None else None
 
 def get_system(uid=None):
+    """
+    Get all system users.
+
+    :param str id: ID of single user to fetch
+    :param str name: username of single user to fetch
+    :returns: SystemUser(s)
+    :rtype: SystemUser or list thereof
+    """
     r = []
     grps = groups.get_system()
     for x in pwd.getpwall():
@@ -247,4 +335,5 @@ def get_system(uid=None):
     return sorted(r, key=lambda x: x.uid) if not uid else None
 
 def get_next_uid():
+    """Get the next available user ID number in sequence."""
     return max([x.uid for x in get_system()]) + 1

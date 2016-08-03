@@ -1,6 +1,14 @@
-import ConfigParser
+"""
+Classes and functions for interacting with system management daemons.
+
+arkOS Core
+(c) 2016 CitizenWeb
+Written by Jacob Cook
+Licensed under GPLv3, see LICENSE
+"""
+
+import configparser
 from dbus.exceptions import DBusException
-import glob
 import os
 import time
 
@@ -9,20 +17,46 @@ from arkos.utilities import shell
 
 
 class ActionError(Exception):
+    """An exception raised when a start/stop action can't be performed."""
+    
     def __init__(self, etype, emsg):
+        """Initialize the exception."""
         self.etype = etype
         self.emsg = emsg
 
 
 class Service:
+    """
+    A class representing a system-level service.
+
+    Services can be of type ``systemd`` or ``supervisor``.
+    """
     def __init__(self, name="", stype="", state=False, enabled=False, cfg={}):
+        """
+        Initialize the service.
+
+        :param str name: Service name
+        :param str stype: either ``systemd`` or ``supervisor``
+        :param bool state: Running state of the service
+        :param bool enabled: Service starts on boot?
+        :param dict cfg: Config (for supervisor services)
+        """
         self.name = name
         self.stype = stype
         self.state = state
         self.enabled = enabled
         self.cfg = cfg
+        
+    @property
+    def sfname(self):
+        """Return service file name."""
+        if self.stype == "supervisor":
+            return "{0}.ini".format(self.name)
+        else:
+            return "{0}.service".format(self.name)
 
     def add(self, enable=True):
+        """Add a new Supervisor service."""
         signals.emit("services", "pre_add", self)
         title = "program:%s" % self.name
         c = ConfigParser.RawConfigParser()
@@ -36,6 +70,7 @@ class Service:
         signals.emit("services", "post_add", self)
 
     def start(self):
+        """Start service."""
         signals.emit("services", "pre_start", self)
         if self.stype == "supervisor":
             supervisor_ping()
@@ -49,7 +84,7 @@ class Service:
             try:
                 path = conns.SystemD.LoadUnit(self.name+".service")
                 conns.SystemD.StartUnit(self.name+".service", "replace")
-            except DBusException, e:
+            except DBusException as e:
                 raise ActionError("dbus", str(e))
             timeout = 0
             time.sleep(1)
@@ -69,6 +104,7 @@ class Service:
                 raise ActionError("svc", "The service start timed out. Please check `sudo systemctl -l status {}.service`".format(self.name))
 
     def stop(self):
+        """Stop service."""
         signals.emit("services", "pre_stop", self)
         if self.stype == "supervisor":
             supervisor_ping()
@@ -80,7 +116,7 @@ class Service:
             try:
                 path = conns.SystemD.LoadUnit(self.name+".service")
                 conns.SystemD.StopUnit(self.name+".service", "replace")
-            except DBusException, e:
+            except DBusException as e:
                 raise ActionError("dbus", str(e))
             timeout = 0
             time.sleep(1)
@@ -98,6 +134,7 @@ class Service:
                 raise ActionError("svc", "The service stop timed out. Please check `sudo systemctl -l status {}.service`".format(self.name))
 
     def restart(self, real=False):
+        """Restart service."""
         signals.emit("services", "pre_restart", self)
         if self.stype == "supervisor":
             supervisor_ping()
@@ -112,7 +149,7 @@ class Service:
                     conns.SystemD.RestartUnit(self.name+".service", "replace")
                 else:
                     conns.SystemD.ReloadOrRestartUnit(self.name+".service", "replace")
-            except DBusException, e:
+            except DBusException as e:
                 raise ActionError("dbus", str(e))
             timeout = 0
             time.sleep(1)
@@ -132,6 +169,7 @@ class Service:
                 raise ActionError("svc", "The service restart timed out. Please check `sudo systemctl -l status {}.service`".format(self.name))
 
     def get_log(self):
+        """Get supervisor service logs."""
         if self.stype == "supervisor":
             supervisor_ping()
             s = conns.Supervisor.tailProcessStdoutLog(self.name)
@@ -140,6 +178,7 @@ class Service:
         return s
 
     def enable(self):
+        """Enable service to start on boot."""
         if self.stype == "supervisor":
             supervisor_ping()
             if os.path.exists(os.path.join("/etc/supervisor.d", self.name+".ini.disabled")):
@@ -149,11 +188,12 @@ class Service:
         else:
             try:
                 conns.SystemD.EnableUnitFiles([self.name+".service"], False, True)
-            except DBusException, e:
+            except DBusException as e:
                 raise ActionError("dbus", str(e))
         self.enabled = True
 
     def disable(self):
+        """Disable service starting on boot."""
         if self.stype == "supervisor":
             if self.state == "running":
                 self.stop()
@@ -163,11 +203,12 @@ class Service:
         else:
             try:
                 conns.SystemD.DisableUnitFiles([self.name+".service"], False)
-            except DBusException, e:
+            except DBusException as e:
                 raise ActionError("dbus", str(e))
         self.enabled = False
 
     def remove(self):
+        """Remove supervisor service."""
         signals.emit("services", "pre_remove", self)
         if self.stype == "supervisor":
             supervisor_ping()
@@ -185,6 +226,7 @@ class Service:
 
     @property
     def as_dict(self):
+        """Return service metadata as dict."""
         return {
             "id": self.name,
             "type": self.stype,
@@ -197,16 +239,24 @@ class Service:
 
     @property
     def serialized(self):
+        """Return serializable service metadata as dict."""
         return self.as_dict
 
 
 def get(id=None):
+    """
+    Get all service objects. If ID is specified, returns just one service.
+
+    :param str id: Service ID to fetch
+    :returns: Service(s)
+    :rtype: Service or list thereof
+    """
     svcs, files = [], {}
 
     # Get all unit files, loaded or not
     try:
         units = conns.SystemD.ListUnitFiles()
-    except DBusException, e:
+    except DBusException as e:
         raise ActionError("dbus", str(e))
 
     for unit in units:
@@ -218,7 +268,7 @@ def get(id=None):
     # Get all loaded services
     try:
         units = conns.SystemD.ListUnits()
-    except DBusException, e:
+    except DBusException as e:
         raise ActionError("dbus", str(e))
 
     for unit in units:
@@ -269,6 +319,7 @@ def get(id=None):
     return sorted(svcs, key=lambda s: s.name) if not id else None
 
 def supervisor_ping():
+    """Check to make sure Supervisor API connection is functional."""
     try:
         conns.Supervisor.getState()
     except:

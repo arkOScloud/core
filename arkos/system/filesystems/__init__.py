@@ -1,6 +1,15 @@
-import crypto
-import losetup
-from filesystems import *
+"""
+Initializer for filesystems module.
+
+arkOS Core
+(c) 2016 CitizenWeb
+Written by Jacob Cook
+Licensed under GPLv3, see LICENSE
+"""
+
+from . import crypto
+from . import losetup
+from .filesystems import *
 
 __all__ = [
     "crypto",

@@ -1,4 +1,14 @@
-import ctypes, ctypes.util
+"""
+Classes and functions for interacting with system management daemons.
+
+arkOS Core
+(c) 2016 CitizenWeb
+Written by Jacob Cook
+Licensed under GPLv3, see LICENSE
+"""
+
+import ctypes
+import ctypes.util
 import datetime
 import ntplib
 import os
@@ -10,14 +20,21 @@ ntp = ntplib.NTPClient()
 
 
 class timespec(ctypes.Structure):
-        _fields_ = [("tv_sec", ctypes.c_long), ("tv_nsec", ctypes.c_long)]
+    """C struct for timespec."""
+    
+    _fields_ = [("tv_sec", ctypes.c_long), ("tv_nsec", ctypes.c_long)]
 
 
 def verify_time(update=True, crit=True):
-    # Verifies system time with NTP, sets it if it is more than an hour off
+    """
+    Verify system time with NTP, set it if it is more than an hour off.
+
+    :param bool update: Update system time if it is too far off.
+    :param bool crit: Raise an exception if time cannot be retrieved.
+    """
     try:
         os = get_offset()
-    except Exception, e:
+    except Exception as e:
         if crit:
             raise Exception("System time could not be retrieved. Error: %s" % str(e))
         else:
@@ -27,28 +44,53 @@ def verify_time(update=True, crit=True):
     return os
 
 def get_offset():
-    # Get the amount of seconds that system time is off from NTP
+    """
+    Get the amount of seconds that system time is off from NTP.
+
+    :returns: NTP offset
+    :rtype: float
+    """
     resp = ntp.request(config.get("general", "ntp_server"), version=3)
     return resp.offset
 
 def get_date():
+    """
+    Get current date.
+
+    :returns: Date in config's ``date_format``
+    :rtype: str
+    """
     return time.strftime(config.get("general", "date_format", "%d %b %Y"))
 
 def get_time():
+    """
+    Get current time.
+
+    :returns: Time in config's ``time_format``
+    :rtype: str
+    """
     return time.strftime(config.get("general", "time_format", "%H:%M"))
 
 def get_unix_time(ts=None, fmt="%Y-%m-%dT%H:%M:%S"):
-    # Gets Unix time from provided timestamp (or current time if None)
+    """
+    Get Unix time from provided timestamp (or current time if None).
+
+    :param str ts: timestamp string
+    :param str fmt: format to parse provided timestamp by
+    :returns: Unix timestamp
+    :rtype: int
+    """
     if ts:
         return int(datetime.datetime.strptime(ts, fmt).strftime("%s"))
     else:
         return int(time.time())
 
-def get_datetime():
-    return get_date() + " " + get_time()
-
 def set_datetime(ut=0):
-    # Sets system time from provided Unix timestamp (or current time via NTP)
+    """
+    Set system time from provided Unix timestamp (or current time via NTP).
+
+    :param int ut: Unix timestamp
+    """
     ut = int(ut) if ut else int(get_idatetime())
     librt = ctypes.CDLL(ctypes.util.find_library("rt"), use_errno=True)
     ts = timespec()
@@ -58,19 +100,47 @@ def set_datetime(ut=0):
         raise Exception("Could not set time: %s" % os.strerror(ctypes.get_errno()))
     signals.emit("config", "time_changed", ut)
 
+def get_datetime():
+    """
+    Get date and time from NTP server.
+
+    :returns: Unix timestamp
+    :rtype: float
+    """
+    return get_date() + " " + get_time()
+
+
+
 def get_idatetime():
-    # Gets date and time from NTP server
+    """
+    Get date and time from NTP server.
+
+    :returns: Unix timestamp
+    :rtype: float
+    """
     resp = ntp.request(config.get("general", "ntp_server"), version=3)
     return resp.tx_time
 
 def get_serial_time():
-    # Get current time in serial format (e.g. 20150420213000)
+    """
+    Get current time in serial format (e.g. 20150420213000).
+
+    :returns: time in serial format
+    :rtype: str
+    """
     return time.strftime("%Y%m%d%H%M%S")
 
 def get_iso_time(ts=None, fmt="%Y%m%d%H%M%S"):
-    # Gets time in ISO-8601 format from provided timestamp (or current time if None)
+    """
+    Get time in ISO-8601 format from provided timestamp (or current time).
+
+    :param str ts: timestamp string. If None, time returned is current time.
+    :param str fmt: format to parse provided timestamp by
+    :returns: ISO-8601 timestamp
+    :rtype: str
+    """
     tz = time.strftime("%z")
-    tz = tz[:3]+":"+tz[3:]
+    tz = "{0}:{1}".format(tz[:3], tz[3:])
     if ts and fmt == "unix":
         return datetime.datetime.fromtimestamp(ts).isoformat()+tz
     elif ts:
@@ -79,6 +149,14 @@ def get_iso_time(ts=None, fmt="%Y%m%d%H%M%S"):
         return datetime.datetime.now().isoformat()+tz
 
 def ts_to_datetime(ts, fmt="%Y%m%d%H%M%S"):
+    """
+    Get datetime object from provided timestamp (or current time).
+
+    :param str ts: timestamp string
+    :param str fmt: format to parse provided timestamp by
+    :returns: datetime object
+    :rtype: datetime.datetime
+    """
     if fmt == "unix":
         return datetime.datetime.fromtimestamp(ts)
     else:

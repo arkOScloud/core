@@ -1,3 +1,12 @@
+"""
+Classes and functions for management of arkOS applications.
+
+arkOS Core
+(c) 2016 CitizenWeb
+Written by Jacob Cook
+Licensed under GPLv3, see LICENSE
+"""
+
 import imp
 import inspect
 import json
@@ -5,6 +14,7 @@ import os
 import pacman
 import shutil
 import tarfile
+import traceback
 
 from distutils.spawn import find_executable
 
@@ -15,7 +25,14 @@ from arkos.utilities import api, DefaultMessage
 
 
 class App:
+    """Class representing an arkOS Application."""
+    
     def __init__(self, **entries):
+        """
+        Initialize application properties.
+
+        :param entries: ``**kwargs`` of application metadata to populate.
+        """
         self.__dict__.update(entries)
         self.loadable = False
         self.upgradable = ""
@@ -23,28 +40,43 @@ class App:
         self.error = ""
 
     def get_module(self, mod_type):
-        return getattr(self, "_%s" % mod_type) if hasattr(self, "_%s" % mod_type) else None
+        """
+        Helper function to get linked auxillary modules.
+
+        :param mod_type: Type of module to return (``backup``, ``ssl``, etc)
+        :returns: Auxillary module (Backup, SSL, etc)
+        :rtype: module
+        """
+        return getattr(self, "_{0}".format(mod_type), None)
 
     def load(self, verify=True):
+        """
+        Load an application and associated metadata into the running process.
+
+        :param bool verify: Verify System/Python/OS dependencies
+        """
         try:
             signals.emit("apps", "pre_load", self)
             if verify:
                 self.verify_dependencies()
 
             # Load the application module into Python
-            imp.load_module(self.id, *imp.find_module(self.id,
-                [os.path.join(config.get("apps", "app_dir"))]))
+            app_dir = config.get("apps", "app_dir")
+            imp.load_module(self.id, *imp.find_module(self.id, [app_dir]))
             # Get module and its important classes and track them on this object
             for module in self.modules:
-                submod = imp.load_module("%s.%s" % (self.id, module),
-                    *imp.find_module(module, [os.path.join(config.get("apps", "app_dir"), self.id)]))
+                submod = imp.load_module(
+                    "{0}.{1}".format(self.id, module),
+                    *imp.find_module(module, [os.path.join(app_dir, self.id)])
+                )
                 classes = inspect.getmembers(submod, inspect.isclass)
                 mgr = None
                 for y in classes:
                     if y[0] in ["DatabaseManager", "Site", "BackupController"]:
                         mgr = y[1]
                         break
-                logger.debug(" *** Registering %s module on %s" % (module, self.id))
+                debug_str = " *** Registering {0} module on {1}"
+                logger.debug(debug_str.format(module, self.id))
                 if module == "database":
                     for y in classes:
                         if issubclass(y[1], mgr) and y[1] != mgr:
@@ -64,20 +96,33 @@ class App:
                 elif module == "ssl":
                     self.ssl = submod
                 else:
-                    setattr(self, "_%s" % module, submod)
+                                        setattr(self, "_{0}".format(module), submod)
             # Set up tracking of ports associated with this app
             for s in self.services:
                 if s["ports"]:
-                    tracked_services.register(self.id, s["binary"], s["name"],
-                        self.icon, s["ports"], default_policy=s.get("default_policy", 2),
-                        fw=False)
+                    tracked_services.register(
+                        self.id, s["binary"], s["name"], self.icon, 
+                        s["ports"], default_policy=s.get("default_policy", 2), fw=False
+                    )
             signals.emit("apps", "post_load", self)
-        except Exception, e:
+        except Exception as e:
             self.loadable = False
-            self.error = "Module error: %s" % str(e)
-            logger.warn("Failed to load %s -- %s" % (self.name, str(e)))
+            self.error = "Module error: {0}".format(e)
+            logger.warn("Failed to load {0} -- {1}".format(self.name, str(e)))
+            logger.warn("Stacktrace follows:")
+            logger.warn(traceback.format_exc())
 
     def verify_dependencies(self):
+        """
+        Verify that the associated dependencies are all properly installed.
+
+        Checks system-level packages, Python packages and arkOS Apps for
+        installed status. Sets ``self.loadable`` with verify status and
+        ``self.error`` with error message encountered on check.
+
+        :returns: True if all verify checks passed
+        :rtype: bool
+        """
         verify, error, to_pacman = True, "", []
         # If dependency isn't installed, add it to "to install" list
         # If it can't be installed, mark the app as not loadable and say why
@@ -86,7 +131,7 @@ class App:
                 if (dep["binary"] and not find_executable(dep["binary"])) \
                 or not pacman.is_installed(dep["package"]):
                     to_pacman.append(dep["package"])
-                    if dep.has_key("internal") and dep["internal"]:
+                    if dep.get("internal"):
                         error = "Restart required"
                         verify = False
             if dep["type"] == "python":
@@ -101,13 +146,14 @@ class App:
                         to_pip = dep["package"]
                 if to_pip:
                     try:
-                        logger.debug(" *** Installing %s (via pip)..." % to_pip)
+                        debug_str = " *** Installing {0} (via pip)..."
+                        logger.debug(debug_str.format(to_pip))
                         python.install(to_pip)
                     except:
-                        error = "Couldn't install %s" % to_pip
+                        error = "Couldn't install {0}".format(to_pip)
                         verify = False
                     finally:
-                        if dep.has_key("internal") and dep["internal"]:
+                        if dep.get("internal"):
                             error = "Restart required"
                             verify = False
         # Execute the "to install" list actions
@@ -115,16 +161,24 @@ class App:
             pacman.refresh()
         for x in to_pacman:
             try:
-                logger.debug(" *** Installing %s..." % x)
+                logger.debug(" *** Installing {0}...".format(x))
                 pacman.install(x)
             except:
-                error = "Couldn't install %s" % x
+                error = "Couldn't install {0}".format(x)
                 verify = False
         self.loadable = verify
         self.error = error
         return verify
 
     def install(self, install_deps=True, load=True, force=False, message=DefaultMessage()):
+        """
+        Install the arkOS application to the system.
+
+        :param bool install_deps: Install the app's dependencies too?
+        :param bool load: Load the app after install?
+        :param bool force: Force reinstall if app is already installed?
+        :param message message: Message object to update with status
+        """
         if self.installed and not force:
             return
         signals.emit("apps", "pre_install", self)
@@ -132,17 +186,31 @@ class App:
         deps = get_dependent(self.id, "install")
         if install_deps and deps:
             for x in deps:
-                logger.debug("Installing %s (dependency for %s)" % (x, self.name))
-                message.update("info", "Installing dependencies for %s... (%s)" % (self.name, x))
+                debug_str = "Installing {0} (dependency for {1})"
+                logger.debug(debug_str.format(x, self.name))
+                msg_str = "Installing dependencies for {0}... ({1})"
+                message.update("info", msg_str.format(self.name, x))
                 _install(x, load=load)
         # Install this app
-        logger.debug("Installing %s" % self.name)
-        message.update("info", "Installing %s..." % self.name)
+        logger.debug("Installing {0}".format(self.name))
+        message.update("info", "Installing {0}...".format(self.name))
         _install(self.id, load=load)
+        ports = []
+        for s in self.services:
+            if s.get("default_policy", 0) and s["ports"]:
+                ports.append(s["ports"])
+        if ports and config.get("general", "enable_upnp", True):
+            tracked_services.open_all_upnp(ports)
         verify_app_dependencies()
         signals.emit("apps", "post_install", self)
 
     def uninstall(self, force=False, message=DefaultMessage()):
+        """
+        Uninstall the arkOS application from the system.
+
+        :param bool force: Uninstall the app even if others depend on it?
+        :param message message: Message object to update with status
+        """
         signals.emit("apps", "pre_remove", self)
         message.update("info", "Uninstalling application...")
         exclude = ["openssl", "openssh", "nginx", "python2", "git", "nodejs", "npm"]
@@ -177,9 +245,25 @@ class App:
                 regen_fw = True
         if regen_fw:
             tracked_services.deregister(self.id)
+        ports = []
+        for s in self.services:
+            if s.get("default_policy", 0) and s["ports"]:
+                ports.append(s["ports"])
+        if ports and config.get("general", "enable_upnp", True):
+            tracked_services.close_all_upnp(ports)
         signals.emit("apps", "post_remove", self)
 
     def ssl_enable(self, cert, sid=""):
+        """
+        Enable TLS on the selected application and service.
+
+        The accompanying service ID is forwarded to the app-specific code to
+        act as an identifier for which internal service is being specified.
+        Ex. the XMPP plugin uses the domain name (xmpp.example.com) as ``sid``.
+
+        :param Certificate cert: Certificate object to enable TLS with.
+        :param str sid: ID for the associated app's service to enable TLS on.
+        """
         signals.emit("apps", "pre_ssl_enable", self)
         if sid:
             d = self.ssl.ssl_enable(cert, sid)
@@ -189,6 +273,11 @@ class App:
         return d
 
     def ssl_disable(self, sid=""):
+        """
+        Disable TLS on the selected application and service.
+
+        :param str sid: ID for the associated app's service to disable TLS on.
+        """
         signals.emit("apps", "pre_ssl_disable", self)
         if sid:
             self.ssl.ssl_disable(sid)
@@ -197,10 +286,22 @@ class App:
         signals.emit("apps", "post_ssl_disable", self)
 
     def get_ssl_able(self):
+        """
+        Return list of application services that can support TLS.
+
+        Example dict format:
+
+            {"type": "app", "id": "xmpp_example.com", "aid": "xmpp",
+              "sid": domain, "name": "Chat Server (example.com)"}
+
+        :returns: List of TLS support dicts
+        :rtype: list
+        """
         return self.ssl.get_ssl_able()
 
     @property
     def as_dict(self):
+        """Return app metadata as dict."""
         data = {}
         for x in self.__dict__:
             if not x.startswith("_") and x != "ssl":
@@ -210,10 +311,27 @@ class App:
 
     @property
     def serialized(self):
+        """Return serializable app metadata as dict."""
         return self.as_dict
 
 
 def get(id=None, type=None, loadable=None, installed=None, verify=True):
+    """
+    Retrieve arkOS application data from the system.
+
+    If the cache is up and populated, applications are loaded from
+    metadata stored there. If not (or ``force`` is set), the app directory is
+    searched, modules are loaded and verified. This is used on first boot.
+
+    :param str id: If present, obtain one app that matches this ID
+    :param str type: Filter by ``app``, ``website``, ``database``, etc
+    :param bool loadable: Filter by loadable (True) or not loadable (False)
+    :param bool installed: Filter by installed (True) or uninstalled (False)
+    :param bool verify: Verify app dependencies as the apps are scanned
+    :param bool force: Force a rescan (do not rely on cache)
+    :return: Application(s)
+    :rtype: Application or list thereof
+    """
     data = storage.apps.get("applications")
     if not data:
         data = scan(verify)
@@ -232,6 +350,16 @@ def get(id=None, type=None, loadable=None, installed=None, verify=True):
     return data
 
 def scan(verify=True):
+    """
+    Search app directory for applications, load them and store metadata.
+
+    Also contacts arkOS repo servers to obtain current list of available
+    apps, and merges in any updates as necessary.
+
+    :param bool verify: Verify app dependencies as the apps are scanned
+    :return: list of Application objects
+    :rtype: list
+    """
     signals.emit("apps", "pre_scan")
     app_dir = config.get("apps", "app_dir")
     apps = []
@@ -285,6 +413,11 @@ def scan(verify=True):
     return storage.apps.get("applications")
 
 def verify_app_dependencies():
+    """
+    Verify that any dependent arkOS apps are properly installed/verified.
+
+    Assigns ``loadable`` and ``error`` properties to all apps in the cache.
+    """
     apps = [x for x in storage.apps.get("applications") if x.installed]
     for x in apps:
         for dep in x.dependencies:
@@ -293,25 +426,44 @@ def verify_app_dependencies():
                 # If the needed app isn't yet installed, put a fail message
                 if not dep["package"] in [y.id for y in apps]:
                     x.loadable = False
-                    x.error = "Depends on %s, which is not installed" % dep["name"]
-                    logger.debug("*** Verify failed for %s -- dependent on %s which is not installed" % (x.name,dep["name"]))
-                    # Cascade this fail message to all apps in the dependency chain
+                    x.error = "Depends on {0}, which is not installed"\
+                              .format(dep["name"])
+                    error_str = "*** Verify failed for {0} -- dependent on "\
+                                "{1} which is not installed"
+                    logger.debug(error_str.format(x.name, dep["name"]))
+                    # Cascade this fail message to all apps in dependency chain
                     for z in get_dependent(x.id, "remove"):
                         z = storage.apps.get("applications", z)
                         z.loadable = False
-                        z.error = "Depends on %s, which cannot be loaded because %s is not installed" % (x.name,dep["name"])
-                # Also put a fail message if the app we depended on failed to load
-                elif not storage.apps.get("applications", dep["package"]).loadable:
+                        error_str = "Depends on {0}, which cannot be loaded "\
+                                    "because {1} is not installed"
+                        z.error = error_str.format(x.name, dep["name"])
+                # Also put fail msg if the app we depended on failed to load
+                elif not storage.apps.get("applications", dep["package"])\
+                        .loadable:
                     x.loadable = False
-                    x.error = "Depends on %s, which also failed" % dep["name"]
-                    logger.debug("*** Verify failed for %s -- dependent on %s which failed to load" % (x.name,dep["name"]))
-                    # Cascade this fail message to all apps in the dependency chain
+                    x.error = "Depends on {0}, which also failed"\
+                              .format(dep["name"])
+                    error_str = "*** Verify failed for {0} -- dependent on "\
+                                "{1} which failed to load"
+                    logger.debug(error_str.format(x.name, dep["name"]))
+                    # Cascade this fail message to all apps in dependency chain
                     for z in get_dependent(x.id, "remove"):
                         z = storage.apps.get("applications", z)
                         z.loadable = False
-                        z.error = "Depends on %s, which cannot be loaded because %s failed to load" % (x.name,dep["name"])
+                        error_str = "Depends on {0}, which cannot be loaded"\
+                                    " because {1} failed to load"
+                        z.error = error_str.format(x.name, dep["name"])
 
 def get_dependent(id, op):
+    """
+    Return list of all apps to install or remove based on specified operation.
+
+    :param str id: ID for arkOS app to check
+    :param str op: ``install`` or ``remove``
+    :returns: list of arkOS app IDs
+    :rtype: list
+    """
     metoo = []
     apps = storage.apps.get("applications")
     installed = [x.id for x in apps if x.installed]
@@ -332,6 +484,12 @@ def get_dependent(id, op):
     return metoo
 
 def _install(id, load=True):
+    """
+    Utility function to download and install arkOS app packages.
+
+    :param str id: ID of arkOS app to install
+    :param bool load: Load the app after install?
+    """
     app_dir = config.get("apps", "app_dir")
     # Download and extract the app source package
     data = api("https://%s/api/v1/apps/%s" % (config.get("general", "repo_server"), id),

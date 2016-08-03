@@ -4,13 +4,11 @@ Python API for 'loop' Linux module.
 This module allows Python program to mount file as loop device.
 
 
-Some parts of this code based on util-linux-ng project (http://userweb.kernel.org/~kzak/util-linux-ng/)
+Some parts of this code based on util-linux-ng project
+(http://userweb.kernel.org/~kzak/util-linux-ng/)
 
 Copyright (C) 2008 Sergey Kirillov, Rainboo Software
- 
 """
-
-__version__ = '2.0.7'
 
 import os
 import re
@@ -18,7 +16,8 @@ import stat
 import struct
 import array
 import fcntl
-#import _losetup
+
+__version__ = '2.0.7'
 
 DEV_LOOP_PATH = "/dev/loop/"
 DEV_PATH = "/dev/"
@@ -46,10 +45,13 @@ class NotLoopError(LosetupError):
 
 
 class Status64(object):
+    """Status64 object."""
+    
     _fmt = "=QQQQQLLLL64s64s32s2Q"
     size = struct.calcsize(_fmt)
     
     def __init__(self, buf=None):
+        """Initialize Status64 object."""
         # If buf is None initialize with zeroes
         if buf is None:
             buf = array.array('B', [0] * self.size)
@@ -70,8 +72,8 @@ class Status64(object):
         self.lo_encrypt_key = i.next()[:self.lo_encrypt_key_size]
         self.lo_init = (i.next(), i.next())
 
-
     def dump(self):
+        """Dump properties."""
         return struct.pack(self._fmt, 
                            self.lo_device, 
                            self.lo_inode,
@@ -88,8 +90,10 @@ class Status64(object):
                            self.lo_init[0],
                            self.lo_init[1])
     
-class LoopDevice(object):
     
+class LoopDevice(object):
+    """LoopDevice object."""
+
     LOOP_SET_FD = 0x4C00
     LOOP_CLR_FD = 0x4C01
     LOOP_SET_STATUS = 0x4C02
@@ -97,18 +101,16 @@ class LoopDevice(object):
     LOOP_SET_STATUS64 = 0x4C04
     LOOP_GET_STATUS64 = 0x4C05
     
-    
     LO_FLAGS_READ_ONLY  = 1
     LO_FLAGS_USE_AOPS   = 2
     LO_FLAGS_AUTOCLEAR  = 4 # New in 2.6.25
     
-    
     def __init__(self, device):
+        """Initialize LoopDevice object."""
         self.device = device
         
         if not is_loop(device):
             raise NotLoopError("'%s' is not a loop device" % device)        
-        
         
     def is_used(self):
         """Check if device is used"""
@@ -128,6 +130,7 @@ class LoopDevice(object):
         self._do_mount(target_path, status)
 
     def mount_ex(self, target_path, display_as):
+        """Mount a file to loop device with display name."""
         status = Status64()
         status.lo_filename = display_as
         
@@ -142,10 +145,12 @@ class LoopDevice(object):
             os.close(fd)
 
     def get_filename(self):
+        """Get loop device's image filename."""
         status = self.get_status()
         return status.lo_filename
 
     def get_status(self):
+        """Get loop device status."""
         try:
             fd = self._open_fd()
             return self._get_status64(fd)
@@ -184,6 +189,7 @@ class LoopDevice(object):
         fcntl.ioctl(fd, self.LOOP_CLR_FD)
     
     def __repr__(self):
+         """Get name."""
         return 'LoopDevice("%s")' % self.device
     
     def _get_status64(self, fd):
@@ -220,6 +226,7 @@ def find_unused_loop_device():
     raise LoopNotFoundError("Unable to find free loop device")
 
 def get_loop_devices():
+    """Get loop devices."""
     global _loop_devices
     
     if _loop_devices is None:

@@ -1,6 +1,15 @@
-from arkos.utilities.detect import *
-from arkos.utilities.utils import *
-from arkos.utilities.logs import *
+"""
+Initializer functions for arkOS utilities.
+
+arkOS Core
+(c) 2016 CitizenWeb
+Written by Jacob Cook
+Licensed under GPLv3, see LICENSE
+"""
+
+from .detect import *
+from .utils import *
+from .logs import *
 
 __all__ = [
     "path_to_b64",

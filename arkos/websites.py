@@ -10,7 +10,6 @@ from arkos.languages import php
 from arkos.system import users, groups, services
 from arkos.utilities import download, shell, random_string, DefaultMessage
 
-
 # If no cipher preferences set, use the default ones
 # As per Mozilla recommendations, but substituting 3DES for RC4
 ciphers = ":".join([
@@ -62,7 +61,7 @@ class Site:
         site_dir = config.get("websites", "site_dir")
         self.meta = meta
         self.path = self.path.encode("utf-8") or os.path.join(site_dir, self.id).encode("utf-8")
-        self.php = extra_vars.get("php") or self.php or self.meta.uses_php or False
+        self.php = extra_vars.get("php") or self.php or self.meta.php or False
         self.version = self.meta.version.rsplit("-", 1)[0] if self.meta.website_updates else None
 
         # Classify the source package type
@@ -120,6 +119,10 @@ class Site:
         pkg_path = "/tmp/"+self.id+ending
         if os.path.isdir(self.path):
             shutil.rmtree(self.path)
+        
+        #debug = environment in ["dev", "vagrant"]
+        #if debug: 
+        #    shell("gksu mkdir -p %s" % (self.path))
         os.makedirs(self.path)
 
         # Download and extract the source repo / package
