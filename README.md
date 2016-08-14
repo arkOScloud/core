@@ -1,6 +1,6 @@
 # arkOS Core Libraries
 
-| master   | develop |
+| **Production** (`master`)   | **Development** (`develop`) |
 | -------- | -------- |
 | ![Build Status: Master](https://git.coderouge.co/arkOS/core/badges/master/build.svg)   | ![Build Status: Development](https://git.coderouge.co/arkOS/core/badges/develop/build.svg)   |
 
