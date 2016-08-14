@@ -3,7 +3,7 @@ image: python:3.5
 before_script:
   - pip install -r requirements.txt
 
-all_tests:
+build:
   script:
     - python setup.py build
   when: on_success
