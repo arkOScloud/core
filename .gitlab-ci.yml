@@ -1,7 +1,7 @@
 image: python:3.5
 
 before_script:
-  - apt-get install libparted-dev
+  - apt-get install libparted
   - pip install -r requirements.txt
 
 build:
