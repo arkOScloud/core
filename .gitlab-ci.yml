@@ -2,7 +2,7 @@ image: python:3.5
 
 before_script:
   - apt-get update -qy
-  - apt-get install -y libparted-dev
+  - apt-get install -y dbus libparted-dev
   - pip install -r requirements.txt
 
 build:
