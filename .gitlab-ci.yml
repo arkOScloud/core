@@ -1,4 +1,6 @@
-test:
-  script:
+before_script:
   - pip install -r requirements.txt
-  - python setup.py build
+
+build:
+  script:
+    - python setup.py build
