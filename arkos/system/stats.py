@@ -4,7 +4,7 @@ Classes and functions for interacting with system management daemons.
 arkOS Core
 (c) 2016 CitizenWeb
 Written by Jacob Cook
-Licensed under GPLv3, see LICENSE
+Licensed under GPLv3, see LICENSE.md
 """
 
 #coding: utf-8

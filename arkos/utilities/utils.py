@@ -4,18 +4,19 @@ Associated utility functions used in arkOS.
 arkOS Core
 (c) 2016 CitizenWeb
 Written by Jacob Cook
-Licensed under GPLv3, see LICENSE
+Licensed under GPLv3, see LICENSE.md
 """
 
 import bz2
 import base64
+import binascii
 import crypt
 import gzip
-import hashlib
 import os
 import random
 import requests
 import shlex
+import socket
 import string
 import subprocess
 import tarfile
@@ -40,6 +41,19 @@ def netmask_to_cidr(mask):
     for octet in mask:
         binary_str += bin(int(octet))[2:].zfill(8)
     return len(binary_str.rstrip("0"))
+
+def test_dns(host):
+    """
+    Test DNS resolution.
+
+    :param str host: hostname
+    :returns: True if resolution was successful
+    """
+    try:
+        test = socket.gethostbyname_ex("arkos.io")
+    except:
+        return False
+    return True if test else False
 
 def test_port(server, port, host=None):
     """
@@ -93,7 +107,9 @@ def get_current_entropy():
 
 def random_string():
     """Create a random alphanumeric string."""
-    return hashlib.sha1(str(random.random())).hexdigest()
+    digest = hashes.Hash(hashes.SHA1(), backend=default_backend())
+    digest.update(str(random.random()).encode('utf-8'))
+    return binascii.hexlify(digest.finalize())
 
 def api(url, post=None, method="", returns="json", headers=[], crit=False):
     """

@@ -4,11 +4,11 @@ Classes and functions for interacting with system management daemons.
 arkOS Core
 (c) 2016 CitizenWeb
 Written by Jacob Cook
-Licensed under GPLv3, see LICENSE
+Licensed under GPLv3, see LICENSE.md
 """
 
 import grp
-import ldap3
+import ldap
 
 from arkos import conns, config, signals
 from arkos.utilities import shell
@@ -16,8 +16,9 @@ from arkos.utilities import shell
 
 class Group:
     """Class for managing arkOS groups in LDAP."""
-    
-    def __init__(self, name="", gid=0, users=[], rootdn="dc=arkos-servers,dc=org"):
+
+    def __init__(self, name="", gid=0, users=[],
+                 rootdn="dc=arkos-servers,dc=org"):
         """
         Initialize the group object.
 
@@ -30,7 +31,7 @@ class Group:
         self.gid = gid or get_next_gid()
         self.users = [str(user) for user in users]
         self.rootdn = rootdn
-        
+
     @property
     def ldap_id(self):
         """Fetch LDAP ID."""
@@ -40,8 +41,10 @@ class Group:
     def add(self):
         """Add the group to LDAP."""
         try:
-            ldif = conns.LDAP.search_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn),
-                ldap.SCOPE_SUBTREE, "(objectClass=*)", None)
+            conns.LDAP. \
+                search_s("cn={0},ou=groups,{1}"
+                         .format(self.name, self.rootdn),
+                         ldap.SCOPE_SUBTREE, "(objectClass=*)", None)
             raise Exception("A group with this name already exists")
         except ldap.NO_SUCH_OBJECT:
             pass
@@ -53,28 +56,31 @@ class Group:
         }
         ldif = ldap.modlist.addModlist(ldif)
         signals.emit("groups", "pre_add", self)
-        conns.LDAP.add_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn), ldif)
+        conns.LDAP.add_s(self.ldap_id, ldif)
         signals.emit("groups", "post_add", self)
 
     def update(self):
         """Update a group object in LDAP. Change params on the object first."""
         try:
-            ldif = conns.LDAP.search_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn),
-                ldap.SCOPE_SUBTREE, "(objectClass=*)", None)
+            ldif = conns.LDAP. \
+                search_s("cn=%s,ou=groups,{0}"
+                         .format(self.name, self.rootdn),
+                         ldap.SCOPE_SUBTREE, "(objectClass=*)", None)
         except ldap.NO_SUCH_OBJECT:
             raise Exception("This group does not exist")
 
-        ldif = ldap.modlist.modifyModlist(ldif[0][1], {"memberUid": self.users},
-            ignore_oldexistent=1)
+        ldif = ldap.modlist. \
+            modifyModlist(ldif[0][1],
+                          {"memberUid": self.users},
+                          ignore_oldexistent=1)
         signals.emit("groups", "pre_update", self)
-        conns.LDAP.modify_ext_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn), ldif)
+        conns.LDAP.modify_ext_s(self.ldap_id, ldif)
         signals.emit("groups", "post_update", self)
 
     def delete(self):
         """Delete group."""
-        
         signals.emit("groups", "pre_remove", self)
-        conns.LDAP.delete_s("cn=%s,ou=groups,%s" % (self.name,self.rootdn))
+        conns.LDAP.delete_s(self.ldap_id)
         signals.emit("groups", "post_remove", self)
 
     @property
@@ -95,7 +101,7 @@ class Group:
 
 class SystemGroup:
     """Class for managing system groups."""
-    
+
     def __init__(self, name="", gid=0, users=[]):
         """
         Initialize the user object.
@@ -149,7 +155,8 @@ def get(gid=None):
         if g.gid == gid:
             return g
         r.append(g)
-    return r if not gid else Non
+    return r if not gid else None
+
 
 def get_system(gid=None):
     """
@@ -166,6 +173,7 @@ def get_system(gid=None):
             return g
         r.append(g)
     return r if not gid else None
+
 
 def get_next_gid():
     """Get the next available group ID number in sequence."""

@@ -3,7 +3,7 @@ Boilerplate daemon management class.
 
 arkOS Core
 (c) 2016 CitizenWeb
-Licensed under GPLv3, see LICENSE
+Licensed under GPLv3, see LICENSE.md
 """
 
 import sys

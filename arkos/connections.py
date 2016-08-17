@@ -4,10 +4,10 @@ Classes and functions for interacting with system management daemons.
 arkOS Core
 (c) 2016 CitizenWeb
 Written by Jacob Cook
-Licensed under GPLv3, see LICENSE
+Licensed under GPLv3, see LICENSE.md
 """
 
-import ldap3
+import ldap
 import xmlrpc.client
 
 from dbus import SystemBus, Interface
@@ -54,25 +54,23 @@ def ldap_connect(uri="", rootdn="", dn="cn=admin", config=None, passwd=""):
     :param str passwd: Password to use to validate credentials
     :returns: LDAP connection object
     """
-#     if not all([uri, rootdn, dn]) and not config:
-#         raise Exception("No configuration values passed")
-#     uri = uri or config.get("general", "ldap_uri", "ldap://localhost")
-#     rootdn = rootdn or config.get("general", "ldap_rootdn", 
-#                                   "dc=arkos-servers,dc=org")
-#     c = ldap3.ldapobject.ReconnectLDAPObject(uri, retry_max=3, retry_delay=5.0)
-#     try:
-#         c.simple_bind_s("{0},{1}".format(dn, rootdn), passwd)
-#     except ldap3.INVALID_CREDENTIALS:
-#         raise Exception("Admin LDAP authentication failed.")
-#     if dn != "cn=admin":
-#         data = c.search_s("cn=admins,ou=groups,%s" % rootdn,
-#             ldap3.SCOPE_SUBTREE, "(objectClass=*)", ["member"])[0][1]["member"]
-#         if "%s,%s" % (dn, rootdn) not in data:
-#             raise Exception("User is not an administrator")
-#     return c
-    conn = ldap3.Connection('localhost', auto_bind=True)
-    print(conn)
-    return conn
+    if not all([uri, rootdn, dn]) and not config:
+        raise Exception("No configuration values passed")
+    uri = uri or config.get("general", "ldap_uri", "ldap://localhost")
+    rootdn = rootdn or config.get("general", "ldap_rootdn",
+                                  "dc=arkos-servers,dc=org")
+    c = ldap.ldapobject.ReconnectLDAPObject(uri, retry_max=3, retry_delay=5.0)
+    try:
+        c.simple_bind_s("{0},{1}".format(dn, rootdn), passwd)
+    except ldap.INVALID_CREDENTIALS:
+        raise Exception("Admin LDAP authentication failed.")
+    if dn != "cn=admin":
+        data = c.search_s("cn=admins,ou=groups,{0}".format(rootdn),
+                          ldap.SCOPE_SUBTREE, "(objectClass=*)",
+                          ["member"])[0][1]["member"]
+        if "{0},{1}".format(dn, rootdn) not in data:
+            raise Exception("User is not an administrator")
+    return c
 
 def supervisor_connect():
     """

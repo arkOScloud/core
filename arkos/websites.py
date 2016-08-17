@@ -1,14 +1,26 @@
-import ConfigParser
+"""
+Classes and functions to manage websites installed in arkOS.
+
+arkOS Core
+(c) 2016 CitizenWeb
+Written by Jacob Cook
+Licensed under GPLv3, see LICENSE.md
+"""
+
+import configparser
 import git
 import os
 import nginx
 import re
 import shutil
+import tarfile
+import zipfile
 
-from arkos import applications, config, databases, signals, storage, tracked_services
+from arkos import applications, config, databases, signals, storage
+from arkos import tracked_services
 from arkos.languages import php
 from arkos.system import users, groups, services
-from arkos.utilities import download, shell, random_string, DefaultMessage
+from arkos.utilities import download, random_string, DefaultMessage
 
 # If no cipher preferences set, use the default ones
 # As per Mozilla recommendations, but substituting 3DES for RC4
@@ -30,10 +42,27 @@ ciphers = ":".join([
 
 
 class Site:
+    """Class representing a Website object."""
+    
     def __init__(
-            self, id="", addr="", port=80, path="", php=False, version="",
+            self, site_id="", addr="", port=80, path="", php=False, version="",
             cert=None, db=None, data_path="", block=[], enabled=False):
-        self.id = id
+        """
+        Initialize the website object.
+
+        :param str site_id: Website name
+        :param str addr: Hostname/domain
+        :param int port: Port site is served on
+        :param str path: Path to site root directory
+        :param bool php: Does this site use PHP?
+        :param str version: Version of website type used
+        :param Certificate cert: TLS certificate object (if assigned)
+        :param Database db: Database object (if one is associated)
+        :param str data_path: Path to website data storage directory
+        :param list block: List of nginx key objects to add to server block
+        :param bool enabled: Is site enabled through nginx?
+        """
+        self.id = site_id
         self.path = path.encode("utf-8")
         self.addr = addr
         self.port = port
@@ -50,7 +79,17 @@ class Site:
             self.addtoblock = block
 
     def install(self, meta, extra_vars={}, enable=True, message=DefaultMessage()):
-        message.update("info", "Preparing to install...", head="Installing website")
+        """
+        Install site, including prep and app recipes.
+
+        :param Application meta: Application metadata
+        :param dict extra_vars: Extra form variables as provided by client
+        :param bool enable: Enable the site in nginx on install?
+        :param message message: Message object to update with status
+        :returns: special message to the user from app post-install hook (opt)
+        """
+        message.update("info", "Preparing to install...", 
+                       head="Installing website")
 
         # Make sure the chosen port is indeed open
         if not tracked_services.is_open_port(self.port, self.addr):
@@ -60,9 +99,12 @@ class Site:
         specialmsg, dbpasswd = "", ""
         site_dir = config.get("websites", "site_dir")
         self.meta = meta
-        self.path = self.path.encode("utf-8") or os.path.join(site_dir, self.id).encode("utf-8")
-        self.php = extra_vars.get("php") or self.php or self.meta.php or False
-        self.version = self.meta.version.rsplit("-", 1)[0] if self.meta.website_updates else None
+        path = (self.path or os.path.join(site_dir, self.id))
+        self.path = path.encode("utf-8")
+        self.php = extra_vars.get("php") or self.php \
+            or self.meta.php or False
+        self.version = self.meta.version.rsplit("-", 1)[0] \
+            if self.meta.website_updates else None
 
         # Classify the source package type
         if not self.meta.download_url:
@@ -78,14 +120,15 @@ class Site:
         elif self.meta.download_url.endswith(".git"):
             ending = ".git"
         else:
-            raise Exception("Only GIT repos, gzip, bzip, and zip packages supported for now")
+            raise Exception("Only GIT repos, gzip, bzip, and zip " 
+                            "packages supported for now")
 
         message.update("info", "Running pre-installation...", head="Installing website")
 
         # Call website type's pre-install hook
         try:
             self.pre_install(extra_vars)
-        except Exception, e:
+        except Exception as e:
             raise Exception("Error during website config - "+str(e))
 
         # If needs DB and user didn't select an engine, choose one for them
@@ -96,12 +139,14 @@ class Site:
             self.meta.selected_dbengine = self.meta.database_engines[0]
 
         # Create DB and/or DB user as necessary
-        if hasattr(self.meta, "selected_dbengine") and self.meta.selected_dbengine:
-            message.update("info", "Creating database...", head="Installing website")
+        if getattr(self.meta, "selected_dbengine", None):
+            message.update("info", "Creating database...",
+                           head="Installing website")
             try:
                 mgr = databases.get_managers(self.meta.selected_dbengine)
                 if not mgr:
-                    raise Exception("No manager found for %s" % self.meta.selected_dbengine)
+                    estr = "No manager found for {0}"
+                    raise Exception(estr.format(self.meta.selected_dbengine))
                 # Make sure DB daemon is running if it has one
                 if not mgr.state:
                     svc = services.get(mgr.meta.database_service)
@@ -112,17 +157,13 @@ class Site:
                     dbpasswd = random_string()[0:16]
                     db_user = mgr.add_user(self.id, dbpasswd)
                     db_user.chperm("grant", self.db)
-            except Exception, e:
-                raise Exception("Database could not be created - %s" % str(e))
+            except Exception as e:
+                raise Exception("Database could not be created: {0}".format(e))
 
         # Make sure the target directory exists, but is empty
-        pkg_path = "/tmp/"+self.id+ending
+        pkg_path = os.path.join("/tmp", self.id + ending)
         if os.path.isdir(self.path):
             shutil.rmtree(self.path)
-        
-        #debug = environment in ["dev", "vagrant"]
-        #if debug: 
-        #    shell("gksu mkdir -p %s" % (self.path))
         os.makedirs(self.path)
 
         # Download and extract the source repo / package
@@ -132,32 +173,41 @@ class Site:
         elif self.meta.download_url:
             try:
                 download(self.meta.download_url, file=pkg_path, crit=True)
-            except Exception, e:
+            except Exception as e:
                 raise Exception("Couldn't download - %s" % str(e))
 
             # Format extraction command according to type
-            message.update("info", "Extracting source...", head="Installing website")
+            message.update("info", "Extracting source...",
+                           head="Installing website")
             if ending in [".tar.gz", ".tgz", ".tar.bz2"]:
-                extract_cmd = "tar "
-                extract_cmd += "xzf" if ending in [".tar.gz", ".tgz"] else "xjf"
-                extract_cmd += " /tmp/%s -C %s --strip 1" % (self.id+ending, self.path)
+                arch = tarfile.open(pkg_path, "r:gz")
+                tlgen = (x for x in arch.getnames() if re.match("^[^/]*$", x))
+                toplvl = next(tlgen, None)
+                if not toplvl:
+                    raise Exception("Malformed source archive")
+                arch.extractall(site_dir)
+                os.rename(os.path.join(site_dir, toplvl), self.path)
             else:
-                extract_cmd = "unzip -d %s /tmp/%s" % (self.path, self.id+ending)
-            status = shell(extract_cmd)
-            if status["code"] >= 1:
-                raise Exception(status["stderr"])
+                arch = zipfile.ZipFile(pkg_path)
+                tlgen = (x for x in arch.filelist() if re.match("^[^/]*/$", x))
+                toplvl = next(tlgen, None)
+                if not toplvl:
+                    raise Exception("Malformed source archive")
+                arch.extractall(site_dir)
+                os.rename(os.path.join(site_dir, toplvl.rstrip("/")),
+                          self.path)
             os.remove(pkg_path)
 
         # Set proper starting permissions on source directory
         uid, gid = users.get_system("http").uid, groups.get_system("http").gid
-        os.chmod(self.path, 0755)
+        os.chmod(self.path, 0o755)
         os.chown(self.path, uid, gid)
         for r, d, f in os.walk(self.path):
             for x in d:
-                os.chmod(os.path.join(r, x), 0755)
+                os.chmod(os.path.join(r, x), 0o755)
                 os.chown(os.path.join(r, x), uid, gid)
             for x in f:
-                os.chmod(os.path.join(r, x), 0644)
+                os.chmod(os.path.join(r, x), 0o644)
                 os.chown(os.path.join(r, x), uid, gid)
 
         # If there is a custom path for the data directory, set it up
@@ -166,7 +216,7 @@ class Site:
             self.data_path = extra_vars["datadir"]
             if not os.path.exists(self.data_path):
                 os.makedirs(self.data_path)
-            os.chmod(self.data_path, 0755)
+            os.chmod(self.data_path, 0o755)
             os.chown(self.data_path, uid, gid)
         elif hasattr(self, "website_default_data_subdir"):
             self.data_path = os.path.join(self.path, self.website_default_data_subdir)
@@ -189,11 +239,11 @@ class Site:
                 server.add(*[x for x in addtoblock])
             block.add(server)
             nginx.dumpf(block, os.path.join("/etc/nginx/sites-available", self.id))
-        except Exception, e:
+        except Exception as e:
             raise Exception("nginx serverblock couldn't be written - "+str(e))
 
         # Create arkOS metadata file
-        meta = ConfigParser.SafeConfigParser()
+        meta = configparser.SafeConfigParser()
         meta.add_section("website")
         meta.set("website", "id", self.id)
         meta.set("website", "type", self.meta.id)
@@ -213,7 +263,7 @@ class Site:
             head="Installing website")
         try:
             specialmsg = self.post_install(extra_vars, dbpasswd)
-        except Exception, e:
+        except Exception as e:
             shutil.rmtree(self.path, True)
             if self.db:
                 self.db.remove()
@@ -237,6 +287,7 @@ class Site:
             return specialmsg
 
     def ssl_enable(self):
+        """Assign a TLS certificate to this site."""
         # Get server-preferred ciphers
         if config.get("certificates", "ciphers"):
             ciphers = config.get("certificates", "ciphers")
@@ -282,7 +333,7 @@ class Site:
         nginx.dumpf(block, os.path.join("/etc/nginx/sites-available/", self.id))
 
         # Set the certificate name in the metadata file
-        meta = ConfigParser.SafeConfigParser()
+        meta = configparser.SafeConfigParser()
         meta.read(os.path.join(self.path, ".arkos"))
         meta.set("website", "ssl", self.cert.id)
         with open(os.path.join(self.path, ".arkos"), "w") as f:
@@ -292,6 +343,7 @@ class Site:
         self.enable_ssl(self.cert.cert_path, self.cert.key_path)
 
     def ssl_disable(self):
+        """Remove a TLS certificate from this site."""
         block = nginx.loadf(os.path.join("/etc/nginx/sites-available/", self.id))
 
         # If there's an 80-to-443 redirect block, get rid of it
@@ -311,7 +363,7 @@ class Site:
             listen.value = listen.value.rstrip(" ssl")
         server.remove(*[x for x in server.filter("Key") if x.name.startswith("ssl_")])
         nginx.dumpf(block, os.path.join("/etc/nginx/sites-available/", self.id))
-        meta = ConfigParser.SafeConfigParser()
+        meta = configparser.SafeConfigParser()
         meta.read(os.path.join(self.path, ".arkos"))
         meta.set("website", "ssl", "None")
         with open(os.path.join(self.path, ".arkos"), "w") as f:
@@ -321,6 +373,11 @@ class Site:
         self.disable_ssl()
 
     def nginx_enable(self, reload=True):
+        """
+        Enable this website in nginx.
+
+        :param bool reload: Reload nginx on finish?
+        """
         origin = os.path.join("/etc/nginx/sites-available", self.id)
         target = os.path.join("/etc/nginx/sites-enabled", self.id)
         if not os.path.exists(target):
@@ -331,6 +388,11 @@ class Site:
         return True
 
     def nginx_disable(self, reload=True):
+        """
+        Disable this website in nginx.
+
+        :param bool reload: Reload nginx on finish?
+        """
         try:
             os.unlink(os.path.join("/etc/nginx/sites-enabled", self.id))
         except:
@@ -341,6 +403,14 @@ class Site:
         return True
 
     def edit(self, newname=""):
+        """
+        Edit website properties and save accordingly.
+
+        To change properties, set them on the object before running. Name
+        changes must be done through the parameter here and NOT on the object.
+
+        :param str newname: Name to change the site name to
+        """
         site_dir = config.get("websites", "site_dir")
         block = nginx.loadf(os.path.join("/etc/nginx/sites-available", self.id))
 
@@ -381,7 +451,7 @@ class Site:
             self.id = newname
 
             # then update the site's arkOS metadata file with the new name
-            meta = ConfigParser.SafeConfigParser()
+            meta = configparser.SafeConfigParser()
             meta.read(os.path.join(self.path, ".arkos"))
             meta.set("website", "id", self.id)
             with open(os.path.join(self.path, ".arkos"), "w") as f:
@@ -402,6 +472,14 @@ class Site:
         nginx_reload()
 
     def update(self, message=DefaultMessage()):
+        """
+        Run an update on this website.
+
+        Pulls update data from arkOS app package and metadata, and uses it to
+        update this particular website instance to the latest version.
+
+        :param message message: Message object to update with status
+        """
         if self.version == self.meta.version.rsplit("-", 1)[0]:
             raise Exception("Website is already at the latest version")
         elif self.version in [None, "None"]:
@@ -431,14 +509,14 @@ class Site:
             pkg_path = os.path.join("/tmp", self.id+ending)
             try:
                 download(self.meta.download_url, file=pkg_path, crit=True)
-            except Exception, e:
+            except Exception as e:
                 raise Exception("Couldn't update - %s" % str(e))
 
         # Call the site type's update hook
         try:
             message.update("info", "Updating website...", head="Updating website")
             self.update_site(self.path, pkg_path, self.version)
-        except Exception, e:
+        except Exception as e:
             raise Exception("Couldn't update - %s" % str(e))
         finally:
             # Update stored version and remove temp source archive
@@ -447,6 +525,11 @@ class Site:
                 os.unlink(pkg_path)
 
     def remove(self, message=DefaultMessage()):
+        """
+        Remove website, including prep and app recipes.
+
+        :param message message: Message object to update with status
+        """
         # Call site type's pre-removal hook
         message.update("info", "Running pre-removal...", head="Removing website")
         self.pre_remove()
@@ -485,6 +568,9 @@ class Site:
 
     @property
     def as_dict(self):
+        """Return site metadata as dict."""
+        has_upd = self.meta.website_updates \
+            and self.version != self.meta.version.rsplit("-", 1)[0]
         return {
             "id": self.id,
             "path": self.path,
@@ -498,32 +584,60 @@ class Site:
             "database": self.db.id if self.db else None,
             "php": self.php,
             "enabled": self.enabled,
-            "has_actions": self.meta.website_extra_actions if hasattr(self.meta, "website_extra_actions") else None,
-            "has_update": self.meta.website_updates and self.version != self.meta.version.rsplit("-", 1)[0],
+            "has_actions": getattr(self.meta, "website_extra_actions", None),
+            "has_update": has_upd,
             "is_ready": True
         }
 
     @property
     def serialized(self):
+        """Return serializable site metadata as dict."""
         return self.as_dict
 
 
 class ReverseProxy(Site):
+    """
+    A subclass of Site for reverse proxies.
+
+    Has properties and methods particular to a reverse proxy, used to relay
+    HTTP access to certain types of arkOS apps.
+    """
+    
     def __init__(
-            self, id="", name="", path="", addr="", port=80,
-            base_path="", block=[], type="internal"):
-        self.id = id
+            self, app_id="", name="", path="", addr="", port=80,
+            base_path="", block=[], rp_type="internal"):
+        """
+        Initialize the reverse proxy website object.
+
+        :param str app_id: arkOS app ID
+        :param str name: App name
+        :param str path: Path to website root directory
+        :param str addr: Hostname/domain
+        :param int port: Port site is served on
+        :param str base_path: Path to app root directory
+        :param list block: List of nginx key objects to add to server block
+        :param str rp_type: Reverse proxy type
+        """
+        self.id = app_id
         self.name = name
         self.addr = addr
         self.path = path.encode("utf-8")
         self.port = port
         self.base_path = base_path
         self.block = block
-        self.type = type
+        self.type = rp_type
         self.cert = None
         self.installed = False
 
     def install(self, extra_vars={}, enable=True, message=None):
+        """
+        Install reverse proxy, including prep and app recipes.
+
+        :param dict extra_vars: Extra form variables as provided by app
+        :param bool enable: Enable the site in nginx on install?
+        :param message message: Message object to update with status
+        """
+        
         # Set metadata values
         site_dir = config.get("websites", "site_dir")
         self.path = self.path.encode("utf-8") or os.path.join(site_dir, self.id).encode("utf-8")
@@ -534,45 +648,51 @@ class ReverseProxy(Site):
             pass
 
         # If extra data is passed in, set up the serverblock accordingly
+        uwsgi_block = [nginx.Location(extra_vars.get("lregex", "/"),
+                       nginx.Key("{0}_pass".format(extra_vars.get("type")),
+                       extra_vars.get("pass", "")),
+                       nginx.Key("include", "{0}_params".format(
+                            extra_vars.get("type"))))]
+        default_block = [nginx.Location(extra_vars.get("lregex", "/"),
+                         nginx.Key("proxy_pass", extra_vars.get("pass", "")),
+                         nginx.Key("proxy_redirect", "off"),
+                         nginx.Key("proxy_buffering", "off"),
+                         nginx.Key("proxy_set_header", "Host $host"))]
         if extra_vars:
-			if not extra_vars.get("type") or not extra_vars.get("pass"):
-				raise Exception("Must enter ReverseProxy type and location to pass to")
-			elif extra_vars.get("type") in ["fastcgi", "uwsgi"]:
-				self.block = [nginx.Location(extra_vars.get("lregex", "/"),
-					nginx.Key("%s_pass"%extra_vars.get("type"),
-						"%s"%extra_vars.get("pass")),
-					nginx.Key("include", "%s_params"%extra_vars.get("type"))
-					)]
-			else:
-				self.block = [nginx.Location(extra_vars.get("lregex", "/"),
-					nginx.Key("proxy_pass", "%s"%extra_vars.get("pass")),
-					nginx.Key("proxy_redirect", "off"),
-					nginx.Key("proxy_buffering", "off"),
-					nginx.Key("proxy_set_header", "Host $host")
-					)]
-			if extra_vars.get("xrip"):
-				self.block[0].add(nginx.Key("proxy_set_header", "X-Real-IP $remote_addr"))
-			if extra_vars.get("xff") == "1":
-				self.block[0].add(nginx.Key("proxy_set_header", "X-Forwarded-For $proxy_add_x_forwarded_for"))
+            if not extra_vars.get("type") or not extra_vars.get("pass"):
+                raise Exception("Must enter ReverseProxy type and "
+                                "location to pass to")
+            elif extra_vars.get("type") in ["fastcgi", "uwsgi"]:
+                self.block = uwsgi_block
+            else:
+                self.block = default_block
+            if extra_vars.get("xrip"):
+                self.block[0].add(nginx.Key("proxy_set_header",
+                                            "X-Real-IP $remote_addr"))
+            if extra_vars.get("xff") == "1":
+                xff_key = "X-Forwarded-For $proxy_add_x_forwarded_for"
+                self.block[0].add(nginx.Key("proxy_set_header", xff_key))
 
         # Create the nginx serverblock and arkOS metadata files
         block = nginx.Conf()
         server = nginx.Server(
             nginx.Key("listen", self.port),
+            nginx.Key("listen", "[::]:" + str(self.port)),
             nginx.Key("server_name", self.addr),
             nginx.Key("root", self.base_path or self.path),
         )
         server.add(*[x for x in self.block])
         block.add(server)
         nginx.dumpf(block, os.path.join("/etc/nginx/sites-available", self.id))
-        meta = ConfigParser.SafeConfigParser()
+        meta = configparser.SafeConfigParser()
+        ssl = self.cert.id if getattr(self, "cert", None) else "None"
         meta.add_section("website")
         meta.set("website", "id", self.id)
         meta.set("website", "name", self.name)
         meta.set("website", "type", "ReverseProxy")
         meta.set("website", "extra", self.type)
         meta.set("website", "version", "None")
-        meta.set("website", "ssl", self.cert.id if hasattr(self, "cert") and self.cert else "None")
+        meta.set("website", "ssl", ssl)
         with open(os.path.join(self.path, ".arkos"), "w") as f:
             meta.write(f)
 
@@ -584,6 +704,11 @@ class ReverseProxy(Site):
         self.nginx_enable()
 
     def remove(self, message=None):
+        """
+        Remove reverse proxy, including prep and app recipes.
+
+        :param message message: Message object to update with status
+        """
         shutil.rmtree(self.path)
         self.nginx_disable(reload=True)
         try:
@@ -595,6 +720,7 @@ class ReverseProxy(Site):
 
     @property
     def as_dict(self):
+        """Return reverse proxy metadata as dict."""
         return {
             "id": self.id,
             "name": self.name,
@@ -614,17 +740,31 @@ class ReverseProxy(Site):
 
     @property
     def serialized(self):
+        """Return serializable reverse proxy metadata as dict."""
         return self.as_dict
 
 
-def get(id=None, type=None, verify=True):
+def get(site_id=None, site_type=None, verify=True):
+    """
+    Retrieve website data from the system.
+
+    If the cache is up and populated, websites are loaded from metadata stored
+    there. If not (or ``force`` is set), the app directory is searched, modules
+    are loaded and verified. This is used on first boot.
+
+    :param str site_id: If present, obtain one site that matches this ID
+    :param str site_type: Filter by ``website``, ``reverseproxy``, etc
+    :param bool force: Force a rescan (do not rely on cache)
+    :return: Website(s)
+    :rtype: Website or list thereof
+    """
     sites = storage.sites.get("sites")
     if not sites:
         sites = scan()
-    if id or type:
+    if site_id or site_type:
         type_list = []
         for site in sites:
-            if site.id == id:
+            if site.id == site_id:
                 return site
             elif (type and (type == "ReverseProxy" and isinstance(site, ReverseProxy))) \
             or (type and site.meta.id == type):
@@ -635,6 +775,7 @@ def get(id=None, type=None, verify=True):
     return sites
 
 def scan():
+    """Search website directories for sites, load them and store metadata."""
     from arkos import certificates
     sites = []
 
@@ -644,7 +785,7 @@ def scan():
             continue
 
         # Read metadata
-        meta = ConfigParser.SafeConfigParser()
+        meta = configparser.SafeConfigParser()
         if not meta.read(os.path.join(path, ".arkos")):
             continue
 
@@ -680,7 +821,6 @@ def scan():
 
         # Load the proper nginx serverblock and get more data
         try:
-            ssl = None
             block = nginx.loadf(os.path.join("/etc/nginx/sites-available", x))
             for y in block.servers:
                 if "ssl" in y.filter("Key", "listen")[0].value:
@@ -703,6 +843,11 @@ def scan():
     return sites
 
 def nginx_reload():
+    """
+    Reload nginx process.
+
+    :returns: True if successful.
+    """
     try:
         s = services.get("nginx")
         s.restart()
@@ -711,6 +856,7 @@ def nginx_reload():
         return False
 
 def php_reload():
+    """Reload PHP-FPM process."""
     try:
         s = services.get("php-fpm")
         s.restart()

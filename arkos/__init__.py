@@ -4,11 +4,11 @@ Initializer functions for arkOS.
 arkOS Core
 (c) 2016 CitizenWeb
 Written by Jacob Cook
-Licensed under GPLv3, see LICENSE
+Licensed under GPLv3, see LICENSE.md
 """
 
-from arkos.config import Config
-from arkos.storage import StorageControl
+from arkos.configs import Config
+from arkos.storages import StorageControl
 from arkos.utilities.errors import ConfigurationError
 from arkos.utilities.logs import LoggingControl, new_logger
 from arkos.connections import ConnectionsManager

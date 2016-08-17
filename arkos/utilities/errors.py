@@ -18,12 +18,12 @@ class ConfigurationError(Exception):
         """String format."""
         return self.text
 
-class ConnectionError(Exception):
+class ArkOSConnectionError(Exception):
     """Connection error."""
     
-    def __init__(self, id):
+    def __init__(self, conn_id):
         """Initialize class."""
-        self.id = id
+        self.id = conn_id
 
     def __str__(self):
         """String format."""

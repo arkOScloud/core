@@ -4,12 +4,12 @@ Classes and functions for managing LDAP domains.
 arkOS Core
 (c) 2016 CitizenWeb
 Written by Jacob Cook
-Licensed under GPLv3, see LICENSE
+Licensed under GPLv3, see LICENSE.md
 """
 
-import ldap3
+import ldap
 
-from arkos import conns, signals
+from arkos import config, conns, signals
 from arkos.system import users
 
 
@@ -54,7 +54,7 @@ class Domain:
         if self.name in [x.domain for x in users.get()]:
             raise Exception("A user is still using this domain")
         signals.emit("domains", "pre_remove", self)
-        #conns.LDAP.delete_s("virtualdomain=%s,ou=domains,%s" % (self.name,self.rootdn))
+        conns.LDAP.delete_s("virtualdomain=%s,ou=domains,%s" % (self.name,self.rootdn))
         signals.emit("domains", "post_remove", self)
 
     @property
@@ -77,11 +77,11 @@ def get(domain_id=None):
     :rtype: Domain or list thereof
     """
     results = []
-    #qset = conns.LDAP.search_s("ou=domains,%s" % config.get("general", "ldap_rootdn", "dc=arkos-servers,dc=org"),
-    #    ldap.SCOPE_SUBTREE, "virtualdomain=*", ["virtualdomain"])
-#     for x in qset:
-#         d = Domain(name=x[1]["virtualdomain"][0], rootdn=x[0].split("ou=domains,")[1])
-#         if d.name == id:
-#             return d
-#         results.append(d)
+    qset = conns.LDAP.search_s("ou=domains,%s" % config.get("general", "ldap_rootdn", "dc=arkos-servers,dc=org"),
+    ldap.SCOPE_SUBTREE, "virtualdomain=*", ["virtualdomain"])
+    for x in qset:
+        d = Domain(name=x[1]["virtualdomain"][0], rootdn=x[0].split("ou=domains,")[1])
+        if d.name == id:
+            return d
+        results.append(d)
     return results

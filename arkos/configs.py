@@ -11,7 +11,7 @@ import json
 import os
 
 import arkos
-from arkos.utilities import can_be_int
+from arkos.utilities import detect_architecture
 from arkos.utilities.errors import ConfigurationError
 
 
@@ -39,23 +39,32 @@ class Config:
         :param str path: Path to config file on disk.
         """
         if not os.path.exists(path):
-            dir = os.path.dirname(os.path.abspath(os.path.dirname(arkos.__file__)))
-            if os.path.exists(os.path.join(dir, self.filename)):
+            dirname = os.path.dirname(os.path.abspath(
+                os.path.dirname(arkos.__file__)))
+            if os.path.exists(os.path.join(dirname, self.filename)):
                 path = os.path.join(dir, self.filename)
             else:
-                raise ConfigurationError("%s not found" % self.filename)
+                raise ConfigurationError("{} not found".format(self.filename))
         self.path = path
         with open(path) as f:
             self.config = json.loads(f.read())
+        self._set_enviro()
+            
+    def _set_enviro(self):
+        """Private method to set environment variables in the loaded config."""
+        arch = detect_architecture()
+        self.set("enviro", "version", arkos.version)
+        self.set("enviro", "arch", arch[0])
+        self.set("enviro", "board", arch[1])
 
     def save(self):
         """Save the config in memory to disk."""
         config = self.config.copy()
-        if config.has_key("enviro"):
+        if "enviro" in config:
             del config["enviro"]
         with open(self.path, 'w') as f:
             f.write(json.dumps(self.config, sort_keys=True,
-                indent=4, separators=(',', ': ')))
+                    indent=4, separators=(',', ': ')))
 
     def get(self, section, key=None, default=None):
         """
@@ -66,9 +75,10 @@ class Config:
         :param default: Default value to return if not found
         :returns: Config section (dict) or key (str/int/dict/list)
         """
-        if self.config.has_key(section) and type(self.config.get(section)) not in [dict, list]:
+        if section in self.config \
+                and type(self.config.get(section)) not in [dict, list]:
             return self.config.get(section)
-        elif self.config.has_key(section):
+        elif section in self.config:
             value = self.config.get(section).get(key) or default
         else:
             value = None or default
@@ -94,9 +104,9 @@ class Config:
         :param key: Key name (str) OR section (dict) to set
         :param str value: If setting key, value to set
         """
-        if value == None:
+        if value is None:
             self.config[section] = key
-        elif self.config.has_key(section):
+        elif section in self.config:
             self.config[section][key] = value
         else:
             self.config[section] = {}
@@ -110,11 +120,11 @@ class Config:
         :param str key: Key name
         :param str value: Value to append to list
         """
-        if value == None:
-            if not self.config.has_key(section):
+        if value is None:
+            if section not in self.config:
                 self.config[section] = []
             self.config[section].append(key)
-        elif self.config.has_key(section):
+        elif section in self.config:
             self.config[section][key].append(value)
         else:
             self.config[section] = {}
@@ -127,9 +137,9 @@ class Config:
         :param str section: Section name
         :param str key: Key name
         """
-        if self.config.has_key(section) and len(self.config[section]) <= 1:
+        if section in self.config and len(self.config[section]) <= 1:
             del self.config[section]
-        elif self.config.has_key(section) and self.config[section].has_key(key):
+        elif section in self.config and key in self.config[section]:
             del self.config[section][key]
 
     def has_option(self, section, key):
@@ -141,14 +151,8 @@ class Config:
         :returns: True if option is present
         :rtype: bool
         """
-        if self.config.has_key(section):
-            return self.config[section].has_key(key)
+        if section in self.config:
+            return key in self.config[section]
         else:
             return False
         
-    def _set_enviro(self):
-        """Private method to set environment variables in the loaded config."""
-        arch = detect_architecture()
-        self.set("enviro", "version", arkos.version)
-        self.set("enviro", "arch", arch[0])
-        self.set("enviro", "board", arch[1])

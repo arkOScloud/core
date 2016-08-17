@@ -115,7 +115,7 @@ class LoopDevice(object):
     def is_used(self):
         """Check if device is used"""
         try:
-            status = self.get_status()
+            self.get_status()
             return True
         except:
             return False
@@ -172,7 +172,7 @@ class LoopDevice(object):
                 target_fd = os.open(path, os.O_RDONLY)
     
             try:
-                ret = fcntl.ioctl(fd, self.LOOP_SET_FD, target_fd)
+                fcntl.ioctl(fd, self.LOOP_SET_FD, target_fd)
             finally:
                 os.close(target_fd)
                 
@@ -189,7 +189,7 @@ class LoopDevice(object):
         fcntl.ioctl(fd, self.LOOP_CLR_FD)
     
     def __repr__(self):
-         """Get name."""
+        """Get name."""
         return 'LoopDevice("%s")' % self.device
     
     def _get_status64(self, fd):
@@ -197,7 +197,7 @@ class LoopDevice(object):
         
         try:
             fcntl.ioctl(fd, self.LOOP_GET_STATUS64, buf, True)
-        except IOError, e:
+        except IOError as e:
             if e.errno == 6:
                 raise LoopNotMountedError("Loop device '%s' is not mounted" % self.device)
             else:
@@ -218,8 +218,8 @@ def is_loop(filename):
                   
 def find_unused_loop_device():
     """Find first unused loop device"""
-    devs = get_loop_devices()
-    for num, dev in _loop_devices.iteritems():
+    get_loop_devices()
+    for _, dev in _loop_devices.iteritems():
         if not dev.is_used():
             return dev
         

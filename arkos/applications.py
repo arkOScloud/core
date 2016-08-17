@@ -4,7 +4,7 @@ Classes and functions for management of arkOS applications.
 arkOS Core
 (c) 2016 CitizenWeb
 Written by Jacob Cook
-Licensed under GPLv3, see LICENSE
+Licensed under GPLv3, see LICENSE.md
 """
 
 import imp

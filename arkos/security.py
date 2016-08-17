@@ -1,8 +1,10 @@
-import ConfigParser
+import configparser
 
 from arkos import storage, signals
 from arkos.system import network
 from arkos.utilities import shell, cidr_to_netmask
+
+import os
 
 jailconf = "/etc/fail2ban/jail.conf"
 filters = "/etc/fail2ban/filter.d"
@@ -78,7 +80,7 @@ def save_rules():
         f.write(shell("iptables-save")["stdout"])
 
 def get_jail_config():
-    cfg = ConfigParser.RawConfigParser()
+    cfg = configparser.RawConfigParser()
     if not cfg.read(jailconf):
         raise Exception("Fail2Ban config not found or not readable")
     return cfg
@@ -149,7 +151,7 @@ def get_defense_rules():
     lst = []
     remove = []
     cfg = get_jail_config()
-    fcfg = ConfigParser.SafeConfigParser()
+    fcfg = configparser.SafeConfigParser()
     for c in storage.apps.get("applications"):
         if hasattr(c, "f2b") and hasattr(c, "f2b_name"):
             lst.append({"id": c.f2b_name,
@@ -164,7 +166,7 @@ def get_defense_rules():
             if not "custom" in l:
                 try:
                     jail_opts = cfg.items(l["id"])
-                except ConfigParser.NoSectionError:
+                except configparser.NoSectionError:
                     remove.append(p)
                     continue
                 filter_name = cfg.get(l["id"], "filter")
@@ -178,7 +180,7 @@ def get_defense_rules():
                 l["filter_opts"] = filter_opts
             else:
                 if not os.path.exists(filters+"/"+l["filter_name"]+".conf"):
-                    fcfg = ConfigParser.SafeConfigParser()
+                    fcfg = configparser.SafeConfigParser()
                     fcfg.add_section("Definition")
                     for o in l["filter_opts"]:
                         fcfg.set("Definition", o[0], o[1])

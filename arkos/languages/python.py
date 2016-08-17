@@ -1,27 +1,54 @@
-import os
-import stat
-import shutil
+"""
+Helper functions for managing Python packages.
+
+arkOS Core
+(c) 2016 CitizenWeb
+Written by Jacob Cook
+Licensed under GPLv3, see LICENSE.md
+"""
+
 
 from arkos import logger
 from arkos.utilities import shell
 
 
 def install(*mods):
-    # Install a set of Python packages from PyPI.
-    s = shell("pip2 install %s" % " ".join(x for x in mods))
+    """
+    Install a set of Python packages from PyPI.
+
+    :param *mods: packages to install
+    """
+    mods = " ".join(x for x in mods)
+    s = shell("pip2 install {0}".format(mods))
     if s["code"] != 0:
-        logger.error("Failed to install %s via PyPI; %s"%(" ".join(x for x in mods),s["stderr"]))
-        raise Exception("Failed to install %s via PyPI, check logs for info"%" ".join(x for x in mods))
+        logmsg = "Failed to install {0} via PyPI; {1}"
+        excmsg = "Failed to install {0} via PyPI, check logs for info"
+        logger.error(logmsg.format(mods, s["stderr"]))
+        raise Exception(excmsg.format(mods))
+
 
 def remove(*mods):
-    # Removes a set of Python packages from the system.
-    s = shell("pip2 uninstall %s" % " ".join(x for x in mods))
+    """
+    Remove a set of Python packages from the system.
+
+    :param *mods: packages to remove
+    """
+    s = shell("pip2 uninstall {0}".format(mods))
     if s["code"] != 0:
-        logger.error("Failed to remove %s via PyPI; %s"%(" ".join(x for x in mods),s["stderr"]))
-        raise Exception("Failed to remove %s via PyPI, check logs for info"%" ".join(x for x in mods))
+        logmsg = "Failed to remove {0} via PyPI; {1}"
+        excmsg = "Failed to remove {0} via PyPI, check logs for info"
+        logger.error(logmsg.format(mods, s["stderr"]))
+        raise Exception(excmsg.format(mods))
+
 
 def is_installed(name):
-    # Returns a list of installed Python packages.
+    """
+    Check if a Python package is installed or not.
+
+    :param str name: Name of package
+    :returns: True if package is installed
+    :rtype: bool
+    """
     s = shell("pip2 freeze")
     for x in s["stdout"].split("\n"):
         if name.lower() in x.split("==")[0].lower():

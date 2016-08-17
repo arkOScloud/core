@@ -4,7 +4,7 @@ Classes and functions for interacting with system management daemons.
 arkOS Core
 (c) 2016 CitizenWeb
 Written by Jacob Cook
-Licensed under GPLv3, see LICENSE
+Licensed under GPLv3, see LICENSE.md
 """
 
 import configparser
@@ -59,7 +59,7 @@ class Service:
         """Add a new Supervisor service."""
         signals.emit("services", "pre_add", self)
         title = "program:%s" % self.name
-        c = ConfigParser.RawConfigParser()
+        c = configparser.RawConfigParser()
         c.add_section(title)
         for x in self.cfg:
             c.set(title, x, self.cfg[x])
@@ -300,7 +300,7 @@ def get(id=None):
     if not os.path.exists("/etc/supervisor.d"):
         os.mkdir("/etc/supervisor.d")
     for x in os.listdir("/etc/supervisor.d"):
-        c = ConfigParser.RawConfigParser()
+        c = configparser.RawConfigParser()
         c.read(os.path.join("/etc/supervisor.d", x))
         cfg = {}
         for y in c.items(c.sections()[0]):
