@@ -109,7 +109,7 @@ def flush_chain(chain):
 def save_rules():
     """Persist firewall rules to a file loadable on boot."""
     with open("/etc/iptables/iptables.rules", "w") as f:
-        f.write(shell("iptables-save")["stdout"])
+        f.write(str(shell("iptables-save")["stdout"]))
 
 
 def get_jail_config(jcfg=""):

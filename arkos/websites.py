@@ -312,7 +312,7 @@ class Site:
                             self.id))
 
         # If the site is on port 80, setup an HTTP redirect to new port 443
-        server = block.servers[0]
+        server = block.server
         listens = server.filter("Key", "listen")
         for listen in listens:
             httport = "80"
@@ -337,9 +337,8 @@ class Site:
                 listen.value = listen.value.split(" ssl")[0] + " ssl http2"
 
         # Clean up any pre-existing SSL directives that no longer apply
-        for x in server.all():
-            if type(x) == nginx.Key and x.name.startswith("ssl_"):
-                server.remove(x)
+        to_remove = [x for x in server.keys if x.name.startswith("ssl_")]
+        server.remove(*to_remove)
 
         # Add the necessary SSL directives to the serverblock and save
         server.add(
@@ -379,7 +378,7 @@ class Site:
                     break
 
         # Remove all SSL directives and save
-        server = block.servers[0]
+        server = block.server
         listens = server.filter("Key", "listen")
         for listen in listens:
             if listen.value.startswith("443"):
@@ -446,7 +445,7 @@ class Site:
 
         # If SSL is enabled and the port is changing to 443,
         # create the port 80 redirect
-        server = block.servers[0]
+        server = block.server
         if self.cert and self.port == 443:
             for x in block.servers:
                 if "443 ssl" in x.filter("Key", "listen")[0].value:
@@ -854,14 +853,14 @@ def scan():
             site.name = meta.get("website", "name")
             site.type = meta.get("website", "extra")
             site.meta = None
-        certname = meta.get("website", "ssl", "None")
+        certname = meta.get("website", "ssl", fallback="None")
         site.cert = certificates.get(certname) if certname != "None" else None
         if site.cert:
             site.cert.assigns.append({
                 "type": "website", "id": site.id,
                 "name": site.id if site.meta else site.name
             })
-        site.version = meta.get("website", "version", None)
+        site.version = meta.get("website", "version", fallback=None)
         site.enabled = os.path.exists(
             os.path.join("/etc/nginx/sites-enabled", x)
         )
@@ -876,10 +875,10 @@ def scan():
                     server = y
                     break
             else:
-                server = block.servers[0]
+                server = block.server
             port_regex = re.compile("(\\d+)\s*(.*)")
-            listen_val = server.filter("Key", "listen")[0].value.lstrip("[::]:")
-            site.port = int(re.match(port_regex, listen_val).group(1))
+            listen = server.filter("Key", "listen")[0].value.lstrip("[::]:")
+            site.port = int(re.match(port_regex, listen).group(1))
             site.addr = server.filter("Key", "server_name")[0].value
             site.path = server.filter("Key", "root")[0].value
             site.php = "php" in server.filter("Key", "index")[0].value

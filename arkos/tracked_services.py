@@ -283,10 +283,7 @@ def initialize_upnp(svcs):
     """
     upnpc = miniupnpc.UPnP()
     upnpc.discoverdelay = 3000
-    devs = upnpc.discover()
-    if devs == 0:
-        logger.error("Failed to register with uPnP IGD: no devices found")
-        return
+    upnpc.discover()
     try:
         upnpc.selectigd()
     except Exception as e:

@@ -48,4 +48,4 @@ def initial_scans():
     websites.scan()
     tracked_services.initialize()
     if config.get("general", "enable_upnp", True):
-        tracked_services.initialize_upnp()
+        tracked_services.initialize_upnp(tracked_services.get())
