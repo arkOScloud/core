@@ -17,7 +17,7 @@ import glob
 import os
 
 from arkos import config, signals, storage, websites, applications
-from arkos.system import systemtime, groups
+from arkos.system import groups
 from arkos.utilities import shell
 from arkos.utilities.logs import DefaultMessage
 
@@ -343,7 +343,23 @@ def scan_authorities():
     return certs
 
 
-def upload_certificate(id, cert, key, chain="", message=DefaultMessage()):
+def generate_dh_params(path, size=2048):
+    """
+    Create and save Diffie-Hellman parameters.
+
+    :param str path: File path to save to
+    :param int size: Key size
+    """
+    s = shell("openssl dhparam {0} -out {1}".format(size, path))
+    if s["code"] != 0:
+        raise Exception("Failed to generate Diffie-Hellman parameters")
+    os.chown(path, -1, gid)
+    os.chmod(path, 0o750)
+
+
+def upload_certificate(
+        id, cert, key, chain="", dhparams="/etc/arkos/ssl/dh_params.pem",
+        message=DefaultMessage()):
     """
     Create and save a new certificate from an external file.
 
@@ -373,13 +389,9 @@ def upload_certificate(id, cert, key, chain="", message=DefaultMessage()):
     signals.emit("certificates", "pre_add", id)
 
     # Check to see that we have DH params, if not then do that too
-    if not os.path.exists("/etc/arkos/ssl/dh_params.pem"):
+    if not os.path.exists(dhparams):
         message.update("info", "Generating Diffie-Hellman parameters...")
-        s = shell("openssl dhparam 2048 -out /etc/arkos/ssl/dh_params.pem")
-        if s["code"] != 0:
-            raise Exception("Failed to generate Diffie-Hellman parameters")
-        os.chown("/etc/arkos/ssl/dh_params.pem", -1, gid)
-        os.chmod("/etc/arkos/ssl/dh_params.pem", 0o750)
+        generate_dh_params(dhparams)
 
     # Create actual certificate object
     message.update("info", "Importing certificate...")
@@ -416,7 +428,8 @@ def upload_certificate(id, cert, key, chain="", message=DefaultMessage()):
 
 def generate_certificate(
         id, domain, country, state="", locale="", email="", keytype="RSA",
-        keylength=2048, message=DefaultMessage()):
+        keylength=2048, dhparams="/etc/arkos/ssl/dh_params.pem",
+        message=DefaultMessage()):
     """
     Generate and save a new self-signed certificate.
 
@@ -453,14 +466,10 @@ def generate_certificate(
         )
 
     # Check to see that we have DH params, if not then do that too
-    if not os.path.exists("/etc/arkos/ssl/dh_params.pem"):
+    if not os.path.exists(dhparams):
         message.update("info", "Generating Diffie-Hellman parameters. "
                        "This may take a few minutes...")
-        s = shell("openssl dhparam 2048 -out /etc/arkos/ssl/dh_params.pem")
-        if s["code"] != 0:
-            raise Exception("Failed to generate Diffie-Hellman parameters")
-        os.chown("/etc/arkos/ssl/dh_params.pem", -1, gid)
-        os.chmod("/etc/arkos/ssl/dh_params.pem", 0o750)
+        generate_dh_params(dhparams)
 
     # Generate private key and create X509 certificate, then set options
     message.update("info", "Generating certificate...")
