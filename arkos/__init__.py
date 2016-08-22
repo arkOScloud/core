@@ -12,6 +12,7 @@ from arkos.storage import StorageControl
 from arkos.utilities import test_dns
 from arkos.utilities.logs import LoggingControl, new_logger
 from arkos.connections import ConnectionsManager
+from arkos.utilities import detect_architecture
 
 version = "0.8.0"
 
@@ -31,6 +32,10 @@ def init(config_path="/etc/arkos/settings.json",
     secrets.load(secrets_path)
     policies.load(policies_path)
     conns.connect(config, secrets)
+    arch = detect_architecture()
+    config.set("enviro", "version", version)
+    config.set("enviro", "arch", arch[0])
+    config.set("enviro", "board", arch[1])
     if not test_dns("arkos.io"):
         raise Exception("DNS resolution failed. Please make sure your server"
                         " network connection is properly configured.")

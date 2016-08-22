@@ -11,7 +11,6 @@ import json
 import os
 
 import arkos
-from arkos.utilities import detect_architecture
 from arkos.utilities.errors import ConfigurationError
 
 
@@ -48,14 +47,6 @@ class Config:
         self.path = path
         with open(path) as f:
             self.config = json.loads(f.read())
-        self._set_enviro()
-
-    def _set_enviro(self):
-        """Private method to set environment variables in the loaded config."""
-        arch = detect_architecture()
-        self.set("enviro", "version", arkos.version)
-        self.set("enviro", "arch", arch[0])
-        self.set("enviro", "board", arch[1])
 
     def save(self):
         """Save the config in memory to disk."""

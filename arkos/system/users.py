@@ -39,13 +39,13 @@ class User:
         :param bool admin: Is admin user?
         :param bool sudo: Can execute with sudo?
         """
-        self.name = str(name)
-        self.first_name = str(first_name)
-        self.last_name = None if last_name is None else str(last_name)
+        self.name = name
+        self.first_name = first_name
+        self.last_name = None if last_name is None else last_name
         self.uid = uid or get_next_uid()
-        self.domain = str(domain)
-        self.rootdn = str(rootdn)
-        self.mail = [str(x) for x in mail]
+        self.domain = domain
+        self.rootdn = rootdn
+        self.mail = [x for x in mail]
         self.admin = admin
         self.sudo = sudo
 
@@ -62,8 +62,8 @@ class User:
         :param str passwd: user password to set
         """
         try:
-            ldif = conns.LDAP.search_s(self.ldap_id, ldap.SCOPE_SUBTREE,
-                                       "(objectClass=*)", None)
+            ldif = conns.LDAP.search_s(
+                self.ldap_id, ldap.SCOPE_BASE, "(objectClass=*)", None)
             raise Exception("A user with this name already exists")
         except ldap.NO_SUCH_OBJECT:
             pass
@@ -71,20 +71,18 @@ class User:
         # Create LDAP user with proper metadata
         ldif = {
             "objectClass": ["mailAccount", "inetOrgPerson", "posixAccount"],
-            "givenName": self.first_name,
-            "sn": self.last_name or "NONE",
-            "displayName": "{0} {1}".format(self.first_name, self.last_name),
-            "cn": "{0}{1}".format(
-                self.first_name, (" "+self.last_name if self.last_name else "")
-            ),
-            "uid": self.name,
-            "mail": [self.name+"@"+self.domain],
-            "maildrop": self.name,
-            "userPassword": hashpw(passwd),
-            "gidNumber": "100",
-            "uidNumber": str(self.uid),
-            "homeDirectory": "/home/%s" % self.name,
-            "loginShell": "/usr/bin/bash"
+            "givenName": [self.first_name],
+            "sn": [self.last_name] if self.last_name else ["NONE"],
+            "displayName": [self.first_name + " " + self.last_name],
+            "cn": [self.first_name + (" " + self.last_name or "")],
+            "uid": [self.name],
+            "mail": [self.name + "@" + self.domain],
+            "maildrop": [self.name],
+            "userPassword": [hashpw(passwd)],
+            "gidNumber": ["100"],
+            "uidNumber": [str(self.uid)],
+            "homeDirectory": ["/home/" + self.name],
+            "loginShell": ["/usr/bin/bash"]
             }
         ldif = ldap.modlist.addModlist(ldif)
         signals.emit("users", "pre_add", self)
@@ -105,47 +103,45 @@ class User:
                                        "(objectClass=*)", None)
         except ldap.NO_SUCH_OBJECT:
             raise Exception("This user does not exist")
-        self.first_name = str(self.first_name)
-        self.last_name = str(self.last_name)
-        self.domain = str(self.domain)
 
         ldif = ldif[0][1]
         attrs = {
             "givenName": self.first_name,
             "sn": self.last_name or "",
-            "displayName": "{0} {1}".format(self.first_name, self.last_name),
-            "cn": "{0} {1}".format(self.first_name, self.last_name),
+            "displayName": self.first_name + " " + self.last_name,
+            "cn": self.first_name + (" " + self.last_name or ""),
             "mail": self.mail
         }
         if newpasswd:
             attrs["userPassword"] = hashpw(newpasswd)
         signals.emit("users", "pre_update", self)
         nldif = ldap.modlist.modifyModlist(ldif, attrs, ignore_oldexistent=1)
-        conns.LDAP.modify_ext_s(self.ldap_id, nldif)
+        conns.LDAP.modify_s(self.ldap_id, nldif)
         self.update_adminsudo()
         signals.emit("users", "post_update", self)
 
     def update_adminsudo(self):
         """Update the user's admin and sudo group settings in LDAP."""
-        ldif = conns.LDAP.search_s("cn=admins,ou=groups,%s" % self.rootdn,
-                                   ldap.SCOPE_SUBTREE, "(objectClass=*)",
-                                   None)[0][1]
+        ldif = conns.LDAP.search_s(
+            "cn=admins,ou=groups,{0}".format(self.rootdn),
+            ldap.SCOPE_SUBTREE, "(objectClass=*)", None)[0][1]
         memlist = ldif["member"]
         ldif_vals = [(1, "member", None), (0, "member", memlist)]
 
         if self.admin and self.ldap_id not in memlist:
             memlist += [self.ldap_id]
-            conns.LDAP.modify_ext_s("cn=admins,ou=groups,{0}"
-                                    .format(self.rootdn), ldif_vals)
+            conns.LDAP.modify_s(
+                "cn=admins,ou=groups,{0}".format(self.rootdn), ldif_vals)
         elif not self.admin and self.ldap_id in memlist:
             memlist.remove(self.ldap_id)
-            conns.LDAP.modify_ext_s("cn=admins,ou=groups,{0}"
-                                    .format(self.rootdn), ldif_vals)
+            conns.LDAP.modify_s(
+                "cn=admins,ou=groups,{0}".format(self.rootdn), ldif_vals)
 
         try:
-            conns.LDAP.search_s("cn={0},ou=sudo,{1}"
-                                .format(self.name, self.rootdn),
-                                ldap.SCOPE_SUBTREE, "(objectClass=*)", None)
+            conns.LDAP.search_s(
+                "cn={0},ou=sudo,{1}".format(
+                    self.name, self.rootdn),
+                ldap.SCOPE_SUBTREE, "(objectClass=*)", None)
             is_sudo = True
         except ldap.NO_SUCH_OBJECT:
             is_sudo = False
@@ -160,11 +156,11 @@ class User:
                 "sudoOption": "authenticate"
             }
             nldif = ldap.modlist.addModlist(nldif)
-            conns.LDAP.add_s("cn={0},ou=sudo,{1}"
-                             .format(self.name, self.rootdn), nldif)
+            conns.LDAP.add_s(
+                "cn=" + self.name + ",ou=sudo," + self.rootdn, nldif)
         elif not self.sudo and is_sudo:
-            conns.LDAP.delete_s("cn={0},ou=sudo,{1}"
-                                .format(self.name, self.rootdn))
+            conns.LDAP.delete_s(
+                "cn=" + self.name + ",ou=sudo," + self.rootdn)
 
     def verify_passwd(self, passwd):
         """
@@ -175,7 +171,7 @@ class User:
         try:
             c = ldap.initialize("ldap://localhost")
             c.simple_bind_s(self.ldap_id, passwd)
-            data = c.search_s("cn=admins,ou=groups,{0}".format(self.rootdn),
+            data = c.search_s("cn=admins,ou=groups," + self.rootdn,
                               ldap.SCOPE_SUBTREE, "(objectClass=*)",
                               ["member"])[0][1]["member"]
             if self.ldap_id not in data:
@@ -286,8 +282,7 @@ def get(uid=None, name=None):
     """
     r = []
     rootdn = config.get("general", "ldap_rootdn", "dc=arkos-servers,dc=org")
-    ldap_users = conns.LDAP.search_s("ou=users,{0}".format(rootdn),
-                                     ldap.SCOPE_SUBTREE,
+    ldap_users = conns.LDAP.search_s("ou=users," + rootdn, ldap.SCOPE_SUBTREE,
                                      "(objectClass=inetOrgPerson)", None)
     for x in ldap_users:
         for y in x[1]:
@@ -297,7 +292,7 @@ def get(uid=None, name=None):
                 x[1][y] = x[1][y][0]
         u = User(x[1]["uid"], x[1]["givenName"],
                  x[1]["sn"] if x[1]["sn"] != "NONE" else None,
-                 int(x[1]["uidNumber"]), x[1]["mail"][0].split("@")[1],
+                 int(x[1]["uidNumber"][0]), x[1]["mail"][0].split("@")[1],
                  x[0].split("ou=users,")[1], x[1]["mail"])
 
         # Check if the user is a member of the admin or sudo groups
