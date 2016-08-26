@@ -8,7 +8,7 @@ Licensed under GPLv3, see LICENSE.md
 """
 
 from arkos import storage
-    
+
 
 class Listener:
     """
@@ -20,20 +20,20 @@ class Listener:
     or for making sure certain elements are established after loading a
     necessary component.
     """
-    def __init__(self, by, sig_id, sig, func):
+    def __init__(self, by, id_, sig, func):
         """
         Initialize the signal listener.
 
         :param str by: the name of the module that registered this listener
-        :param str sig_id: identifier for this listener
+        :param str id_: identifier for this listener
         :param str sig: signal ID to listen for
         :param func func: hook function to execute
         """
-        self.id = sig_id
+        self.id = id_
         self.by = by
         self.sig = sig
         self.func = func
-    
+
     def trigger(self, data, crit=True):
         """
         Trigger the hook function for this listener.
@@ -51,7 +51,7 @@ class Listener:
                 raise
 
 
-def add(by, sig_id, sig, func):
+def add(by, id_, sig, func):
     """
     Register a new listener with the system.
 
@@ -60,22 +60,24 @@ def add(by, sig_id, sig, func):
     :param str sig: signal ID to listen for
     :param func func: hook function to execute
     """
-    l = Listener(by, sig_id, sig, func)
+    l = Listener(by, id_, sig, func)
     storage.signals.add("listeners", l)
 
-def emit(sig_id, sig, data=None, crit=True):
+
+def emit(id_, sig, data=None, crit=True):
     """
     Emit a signal.
 
-    :param str id: name of the module emitting this signal
+    :param str id_: name of the module emitting this signal
     :param str sig: signal ID
     :param data: parameter to pass to hook function (if necessary)
     :param bool crit: Raise hook function exceptions?
     """
     s = storage.signals.get("listeners")
     for x in s:
-        if x.id == sig_id and x.sig == sig:
+        if x.id == id_ and x.sig == sig:
             x.trigger(data, crit)
+
 
 def remove(by):
     """

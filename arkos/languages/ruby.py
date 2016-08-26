@@ -71,4 +71,3 @@ def update_gem(*gems, **kwargs):
                 excmsg = "Gem update '{0}' failed. See logs for more info"
                 logger.error(logmsg.format(x, str(d["stderr"])))
                 raise Exception(excmsg.format(x))
-

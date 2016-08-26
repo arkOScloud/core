@@ -7,9 +7,10 @@ Written by Jacob Cook
 Licensed under GPLv3, see LICENSE.md
 """
 
+
 class ConfigurationError(Exception):
     """Configuration error."""
-    
+
     def __init__(self, text):
         """Initialize class."""
         self.text = id
@@ -18,22 +19,23 @@ class ConfigurationError(Exception):
         """String format."""
         return self.text
 
+
 class ArkOSConnectionError(Exception):
     """Connection error."""
-    
+
     def __init__(self, conn_id):
         """Initialize class."""
         self.id = conn_id
 
     def __str__(self):
         """String format."""
-        
+
         return "Failed to connect to {0} service".format(self.id)
 
 
 class SoftFail(Exception):
     """Soft failure exception."""
-    
+
     def __init__(self, msg):
         """Initialize class."""
         self.msg = msg
@@ -45,7 +47,7 @@ class SoftFail(Exception):
 
 class RequestError(Exception):
     """Request error made."""
-    
+
     def __init__(self, msg):
         """Initialize class."""
         self.msg = msg
@@ -57,7 +59,7 @@ class RequestError(Exception):
 
 class DefaultException(Exception):
     """Default exception class."""
-    
+
     def __init__(self, msg):
         """Initialize class."""
         self.msg = msg

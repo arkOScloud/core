@@ -11,6 +11,7 @@ import platform
 
 EMPTY_STRING = ""
 
+
 def detect_architecture():
     """Detect system architecture and board type."""
     btype = "Unknown"
@@ -59,6 +60,7 @@ def detect_architecture():
             else:
                 btype = "Cubietruck"
     return (arch, btype)
+
 
 def detect_platform(mapping=True):
     """Detect distro platform."""

@@ -26,7 +26,7 @@ from arkos.utilities import api, DefaultMessage
 
 class App:
     """Class representing an arkOS Application."""
-    
+
     def __init__(self, **entries):
         """
         Initialize application properties.
@@ -63,7 +63,8 @@ class App:
             # Load the application module into Python
             app_dir = config.get("apps", "app_dir")
             imp.load_module(self.id, *imp.find_module(self.id, [app_dir]))
-            # Get module and its important classes and track them on this object
+            # Get module and its important classes
+            # and track them on this object
             for module in self.modules:
                 submod = imp.load_module(
                     "{0}.{1}".format(self.id, module),
@@ -96,13 +97,14 @@ class App:
                 elif module == "ssl":
                     self.ssl = submod
                 else:
-                                        setattr(self, "_{0}".format(module), submod)
+                    setattr(self, "_{0}".format(module), submod)
             # Set up tracking of ports associated with this app
             for s in self.services:
                 if s["ports"]:
                     tracked_services.register(
-                        self.id, s["binary"], s["name"], self.icon, 
-                        s["ports"], default_policy=s.get("default_policy", 2), fw=False
+                        self.id, s["binary"], s["name"], self.icon,
+                        s["ports"], default_policy=s.get("default_policy", 2),
+                        fw=False
                     )
             signals.emit("apps", "post_load", self)
         except Exception as e:
@@ -129,7 +131,7 @@ class App:
         for dep in self.dependencies:
             if dep["type"] == "system":
                 if (dep["binary"] and not find_executable(dep["binary"])) \
-                or not pacman.is_installed(dep["package"]):
+                        or not pacman.is_installed(dep["package"]):
                     to_pacman.append(dep["package"])
                     if dep.get("internal"):
                         error = "Restart required"
@@ -170,7 +172,8 @@ class App:
         self.error = error
         return verify
 
-    def install(self, install_deps=True, load=True, force=False, message=DefaultMessage()):
+    def install(self, install_deps=True, load=True,
+                force=False, message=DefaultMessage()):
         """
         Install the arkOS application to the system.
 
@@ -213,25 +216,29 @@ class App:
         """
         signals.emit("apps", "pre_remove", self)
         message.update("info", "Uninstalling application...")
-        exclude = ["openssl", "openssh", "nginx", "python2", "git", "nodejs", "npm"]
+        exclude = ["openssl", "openssh", "nginx",
+                   "python2", "git", "nodejs", "npm"]
 
         # Make sure this app can be successfully removed, and if so also remove
         # any system-level packages that *only* this app requires
         for x in get(installed=True):
             for item in x.dependencies:
-                if item["type"] == "app" and item["package"] == self.id and not force:
-                    raise Exception("Cannot remove, %s depends on this application" % x.name)
+                if item["type"] == "app" and \
+                        item["package"] == self.id and not force:
+                    raise Exception("Cannot remove, {0} depends "
+                                    "on this application".format(x.name))
                 elif item["type"] == "system":
                     exclude.append(item["package"])
 
         # Stop any running services associated with this app
         for item in self.dependencies:
             if item["type"] == "system" and not item["package"] in exclude:
-                if item.has_key("daemon") and item["daemon"]:
-                    services.stop(item["daemon"])
-                    services.disable(item["daemon"])
-                pacman.remove([item["package"]], purge=config.get("apps", "purge", False))
-        logger.debug("Uninstalling %s" % self.name)
+                if "daemon" in item and item["daemon"]:
+                    services.get().stop(item["daemon"])
+                    services.get().disable(item["daemon"])
+                pacman.remove([item["package"]],
+                              purge=config.get("apps", "purge", False))
+        logger.debug("Uninstalling {0}".format(self.name))
 
         # Remove the app's directory and cleanup the app object
         shutil.rmtree(os.path.join(config.get("apps", "app_dir"), self.id))
@@ -315,7 +322,7 @@ class App:
         return self.as_dict
 
 
-def get(id=None, type=None, loadable=None, installed=None, verify=True):
+def get(id_=None, type_=None, loadable=None, installed=None, verify=True):
     """
     Retrieve arkOS application data from the system.
 
@@ -323,8 +330,8 @@ def get(id=None, type=None, loadable=None, installed=None, verify=True):
     metadata stored there. If not (or ``force`` is set), the app directory is
     searched, modules are loaded and verified. This is used on first boot.
 
-    :param str id: If present, obtain one app that matches this ID
-    :param str type: Filter by ``app``, ``website``, ``database``, etc
+    :param str id_: If present, obtain one app that matches this ID
+    :param str type_: Filter by ``app``, ``website``, ``database``, etc
     :param bool loadable: Filter by loadable (True) or not loadable (False)
     :param bool installed: Filter by installed (True) or uninstalled (False)
     :param bool verify: Verify app dependencies as the apps are scanned
@@ -335,19 +342,21 @@ def get(id=None, type=None, loadable=None, installed=None, verify=True):
     data = storage.apps.get("applications")
     if not data:
         data = scan(verify)
-    if id or type or loadable or installed:
+    if id_ or type_ or loadable or installed:
         type_list = []
         for x in data:
-            if x.id == id and (x.loadable or not loadable):
+            if x.id == id_ and (x.loadable or not loadable):
                 return x
-            elif str(x.installed).lower() == str(installed).lower() and (x.type or not type):
+            elif str(x.installed).lower() == str(installed).lower() \
+                    and (x.type or not type_):
                 type_list.append(x)
-            elif x.type == type and (x.loadable or not loadable):
+            elif x.type == type_ and (x.loadable or not loadable):
                 type_list.append(x)
         if type_list:
             return type_list
         return []
     return data
+
 
 def scan(verify=True):
     """
@@ -368,8 +377,9 @@ def scan(verify=True):
 
     # Get paths for installed apps, metadata for available ones
     installed_apps = [x for x in os.listdir(app_dir) if not x.startswith(".")]
-    available_apps = api("https://%s/api/v1/apps" % config.get("general", "repo_server"),
-        crit=False)
+    available_apps = api("https://{0}/api/v1/apps"
+                         .format(config.get("general", "repo_server")),
+                         crit=False)
     if available_apps:
         available_apps = available_apps["applications"]
     else:
@@ -381,10 +391,13 @@ def scan(verify=True):
             with open(os.path.join(app_dir, x, "manifest.json"), "r") as f:
                 data = json.loads(f.read())
         except ValueError:
-            logger.warn("Failed to load %s due to a JSON parsing error" % x)
+            logger.warn("Failed to load {0} due to a JSON parsing error"
+                        .format(x))
             continue
         except IOError:
-            logger.warn("Failed to load %s: manifest file inaccessible or not present" % x)
+            logger.warn("Failed to load {0}: "
+                        "manifest file inaccessible or not present"
+                        .format(x))
             continue
         logger.debug(" *** Loading %s" % data["id"])
         app = App(**data)
@@ -411,6 +424,7 @@ def scan(verify=True):
         verify_app_dependencies()
     signals.emit("apps", "post_scan")
     return storage.apps.get("applications")
+
 
 def verify_app_dependencies():
     """
@@ -455,7 +469,8 @@ def verify_app_dependencies():
                                     " because {1} failed to load"
                         z.error = error_str.format(x.name, dep["name"])
 
-def get_dependent(id, op):
+
+def get_dependent(id_, op):
     """
     Return list of all apps to install or remove based on specified operation.
 
@@ -471,29 +486,31 @@ def get_dependent(id, op):
     if op == "remove":
         for app in apps:
             for dep in app.dependencies:
-                if dep["type"] == "app" and dep["package"] == id:
+                if dep["type"] == "app" and dep["package"] == id_:
                     metoo.append(app)
                     metoo += get_dependent(app.id, "remove")
     # If I need any other apps to install, flag them to be installed also
     elif op == "install":
-        app = next(x for x in apps if x.id == id)
+        app = next(x for x in apps if x.id == id_)
         for dep in app.dependencies:
             if dep["type"] == "app" and dep["package"] not in installed:
                 metoo.append(dep["package"])
                 metoo += get_dependent(dep["package"], "install")
     return metoo
 
-def _install(id, load=True):
+
+def _install(id_, load=True):
     """
     Utility function to download and install arkOS app packages.
 
-    :param str id: ID of arkOS app to install
+    :param str id_: ID of arkOS app to install
     :param bool load: Load the app after install?
     """
     app_dir = config.get("apps", "app_dir")
     # Download and extract the app source package
-    data = api("https://%s/api/v1/apps/%s" % (config.get("general", "repo_server"), id),
-        returns="raw", crit=True)
+    data = api("https://{0}/api/v1/apps/{1}"
+               .format((config.get("general", "repo_server"), id_)),
+               returns="raw", crit=True)
     with open(os.path.join(app_dir, "%s.tar.gz" % id), "wb") as f:
         f.write(data)
     with tarfile.open(os.path.join(app_dir, "%s.tar.gz" % id), "r:gz") as t:

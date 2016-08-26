@@ -19,7 +19,7 @@ class Database:
     app, and an instance created for each database found to be using that
     database engine.
     """
-    
+
     def __init__(self, db_id="", manager=None):
         """
         Initialize the database object.
@@ -92,7 +92,7 @@ class DatabaseUser:
     users. This class is to be reimplemented by each database app, and an
     instance created for each database found to be using that database engine.
     """
-    
+
     def __init__(self, user_id="", passwd="", manager=None):
         """
         Initialize the database user object.
@@ -166,7 +166,7 @@ class DatabaseManager:
     including the instantiation of arkOS database and database user objects,
     as well as ensuring engine API connection and other things.
     """
-    
+
     def __init__(self, dbm_id="", name="", meta=None):
         """
         Initialize the database manager.
@@ -250,6 +250,7 @@ def get(db_id=None, db_type=None):
         return None
     return data
 
+
 def scan():
     """
     Retrieve a list of all databases registered with arkOS.
@@ -265,6 +266,7 @@ def scan():
             continue
     storage.dbs.set("databases", dbs)
     return dbs
+
 
 def get_user(user_id=None, user_type=None):
     """
@@ -288,6 +290,7 @@ def get_user(user_id=None, user_type=None):
         return None
     return data
 
+
 def scan_users():
     """
     Retrieve a list of all database users registered with arkOS.
@@ -304,23 +307,26 @@ def scan_users():
     storage.dbs.set("users", users)
     return users
 
-def get_managers(dbm_id=None):
+
+def get_managers(id_=None):
     """
     Retrieve a list of all database managers registered with arkOS.
 
-    :param str dbm_id: If present, obtain one database manager that matches this ID
+    :param str id_: If present, obtain one
+                    database manager that matches this ID
     :return: DatabaseManager(s)
     :rtype: DatabaseManager or list thereof
     """
     data = storage.dbs.get("managers")
     if not data:
         data = scan_managers()
-    if dbm_id:
+    if id_:
         for x in data:
-            if x.id == dbm_id:
+            if x.id == id_:
                 return x
         return None
     return data
+
 
 def scan_managers():
     """

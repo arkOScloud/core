@@ -21,7 +21,7 @@ class Daemon:
     """
 
     def __init__(self, pidfile, stdin='/dev/null',
-                    stdout='/dev/null', stderr='/dev/null'):
+                 stdout='/dev/null', stderr='/dev/null'):
         """Initialize class."""
         self.stdin = stdin
         self.stdout = stdout
@@ -42,7 +42,8 @@ class Daemon:
                 # exit first parent
                 sys.exit(0)
         except OSError as e:
-            sys.stderr.write("fork #1 failed: %d (%s)\n" % (e.errno, e.strerror))
+            sys.stderr.write("fork #1 failed: {0} ({1})\n"
+                             .format(e.errno, e.strerror))
             sys.exit(1)
 
         # decouple from parent environment
@@ -75,7 +76,7 @@ class Daemon:
         atexit.register(self.delpid)
         pid = str(os.getpid())
         try:
-            open(self.pidfile,'w+').write("%s\n" % pid)
+            open(self.pidfile, 'w+').write("{0}\n".format(pid))
         except:
             pass
 
@@ -87,7 +88,7 @@ class Daemon:
         """Start the daemon"""
         # Check for a pidfile to see if the daemon already runs
         try:
-            pf = open(self.pidfile,'r')
+            pf = open(self.pidfile, 'r')
             pid = int(pf.read().strip())
             pf.close()
         except IOError:
@@ -106,7 +107,7 @@ class Daemon:
         """Stop the daemon"""
         # Get the pid from the pidfile
         try:
-            pf = open(self.pidfile,'r')
+            pf = open(self.pidfile, 'r')
             pid = int(pf.read().strip())
             pf.close()
         except IOError:
@@ -114,8 +115,8 @@ class Daemon:
 
         if not pid:
             message = "pidfile {0} does not exist. Daemon not running?\n"
-            sys.stderr.write(message % self.pidfile)
-            return # not an error in a restart
+            sys.stderr.write(message + "{0}".format(self.pidfile))
+            return  # not an error in a restart
 
         # Try killing the daemon process
         try:
@@ -139,7 +140,7 @@ class Daemon:
     def run(self):
         """
         You should override this method when you subclass Daemon.
-        
+
         It will be called after the process has been
         daemonized by start() or restart().
         """

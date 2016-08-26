@@ -39,4 +39,3 @@ setup(
         ('/etc/arkos', ['defaults/policies.json']),
     ]
 )
-

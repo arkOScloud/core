@@ -71,14 +71,14 @@ class Share:
         """Add a file share."""
         signals.emit("shares", "pre_add", self)
         self.add_share()
-        storage.shares.add("shares", self)
+        storage.files.add("shares", self)
         signals.emit("shares", "post_add", self)
 
     def remove(self, *args, **kwargs):
         """Remove a file share."""
         signals.emit("shares", "pre_remove", self)
         self.remove_share()
-        storage.shares.add("shares", self)
+        storage.files.add("shares", self)
         signals.emit("shares", "post_remove", self)
 
     @property
@@ -123,14 +123,14 @@ class Mount:
         """Mount a file share."""
         signals.emit("shares", "pre_mount", self)
         self.mount()
-        storage.shares.add("mounts", self)
+        storage.files.add("mounts", self)
         signals.emit("shares", "post_mount", self)
 
     def remove(self, *args, **kwargs):
         """Unmount a file share."""
         signals.emit("shares", "pre_umount", self)
         self.umount()
-        storage.shares.add("mounts", self)
+        storage.files.add("mounts", self)
         signals.emit("shares", "post_umount", self)
 
     @property
@@ -187,7 +187,7 @@ def scan_shares():
             shares += x.get_shares()
         except:
             continue
-    storage.shares.set("shares", shares)
+    storage.files.set("shares", shares)
     return shares
 
 
@@ -227,7 +227,7 @@ def scan_mounts():
             mounts += x.get_mounts()
         except:
             continue
-    storage.shares.set("mounts", mounts)
+    storage.files.set("mounts", mounts)
     return mounts
 
 
@@ -239,7 +239,7 @@ def get_sharers(share_id=None):
     :return: Sharer(s)
     :rtype: Sharer or list thereof
     """
-    data = storage.shares.get("sharers")
+    data = storage.files.get("sharers")
     if not data:
         data = scan_sharers()
     if share_id:
@@ -261,5 +261,5 @@ def scan_sharers():
     for x in applications.get(type="fileshare"):
         if x.installed and hasattr(x, "_share_mgr"):
             mgrs.append(x._share_mgr(id=x.id, name=x.name, meta=x))
-    storage.shares.set("sharers", mgrs)
+    storage.files.set("sharers", mgrs)
     return mgrs

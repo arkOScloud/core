@@ -28,7 +28,7 @@ from pycryptsetup import CryptSetup
 
 from ...utilities import get_current_entropy
 
-MIN_CREATE_ENTROPY = 256 # bits
+MIN_CREATE_ENTROPY = 256  # bits
 
 # Keep the character set size a power of two to make sure all characters are
 # equally likely
@@ -39,19 +39,18 @@ GENERATED_PASSPHRASE_CHARSET = ("0123456789"
 # 20 chars * 6 bits per char = 120 "bits of security"
 GENERATED_PASSPHRASE_LENGTH = 20
 
+
 def generateBackupPassphrase():
     """Generate a backup passphrase."""
-    raw = [random.choice(GENERATED_PASSPHRASE_CHARSET) for _ in range(GENERATED_PASSPHRASE_LENGTH)]
+    raw = [random.choice(GENERATED_PASSPHRASE_CHARSET)
+           for _ in range(GENERATED_PASSPHRASE_LENGTH)]
 
     # Insert a '-' after every five char chunk for easier reading
     parts = []
     for i in range(0, GENERATED_PASSPHRASE_LENGTH, 5):
-        parts.append(''.join(raw[i : i + 5]))
+        parts.append(''.join(raw[i: i + 5]))
     return "-".join(parts)
 
-yesDialog = lambda q: True
-logFunc = lambda p, t: None
-passwordDialog = lambda t: None
 
 def yesDialog(q):
     """Create yes dialog."""

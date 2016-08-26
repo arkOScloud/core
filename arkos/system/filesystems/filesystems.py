@@ -8,7 +8,6 @@ Licensed under GPLv3, see LICENSE.md
 """
 
 import ctypes
-import ctypes.util
 import glob
 import os
 import parted
@@ -25,14 +24,13 @@ libc = ctypes.CDLL(ctypes.util.find_library("libc"), use_errno=True)
 class DiskPartition:
     """Class for managing physical disk partitions."""
 
-    
     def __init__(
-            self, id="", path="", mountpoint=None, size=0, fstype="",
-            enabled=False, crypt=False):
+                 self, id_="", path="", mountpoint=None, size=0, fstype="",
+                 enabled=False, crypt=False):
         """
         Initialize disk partition object.
 
-        :param str id: partition name
+        :param str id_: partition name
         :param str path: device identifier
         :param str mountpoint: path to mointpoint (if mounted)
         :param int size: disk size in bytes
@@ -40,7 +38,7 @@ class DiskPartition:
         :param bool enabled: True if partition is mounted on boot
         :param bool crypt: True if partition is LUKS encrypted
         """
-        self.id = id
+        self.id = id_
         self.path = path
         self.mountpoint = mountpoint
         self.size = size
@@ -159,13 +157,14 @@ class DiskPartition:
 
 
 class VirtualDisk:
+
     def __init__(
-            self, id="", path="", mountpoint=None, size=0, fstype="ext4",
+            self, id_="", path="", mountpoint=None, size=0, fstype="ext4",
             enabled=False, crypt=False):
         """
         Initialize virtual disk object.
 
-        :param str id: partition name
+        :param str id_: partition name
         :param str path: device identifier
         :param str mountpoint: path to mointpoint (if mounted)
         :param int size: disk size in bytes
@@ -173,7 +172,7 @@ class VirtualDisk:
         :param bool enabled: True if image is mounted on boot
         :param bool crypt: True if image is LUKS encrypted
         """
-        self.id = id
+        self.id = id_
         self.path = path
         self.mountpoint = mountpoint
         self.size = size
@@ -188,7 +187,8 @@ class VirtualDisk:
         :param bool mount: Mount after creation?
         """
         vdisk_dir = config.get("filesystems", "vdisk_dir")
-        if not os.path.exists(os.path.join(config.get("filesystems", "vdisk_dir"))):
+        if not os.path.exists(os.path.join
+                              (config.get("filesystems", "vdisk_dir"))):
             os.mkdir(os.path.join(config.get("filesystems", "vdisk_dir")))
         self.path = str(os.path.join(vdisk_dir, self.id+".img"))
         if os.path.exists(self.path):
@@ -197,7 +197,7 @@ class VirtualDisk:
         # Create an empty file matching disk size
         with open(self.path, "wb") as f:
             written = 0
-            with file("/dev/zero", "r") as zero:
+            with open("/dev/zero", "r") as zero:
                 while self.size > written:
                     written += 1024
                     f.write(zero.read(1024))
@@ -225,7 +225,9 @@ class VirtualDisk:
         signals.emit("filesystems", "pre_mount", self)
         if not os.path.isdir(os.path.join("/media", self.id)):
             os.makedirs(os.path.join("/media", self.id))
-        mount_point = self.mountpoint if self.mountpoint else os.path.join("/media", self.id)
+        mount_point = self.mountpoint if self.mountpoint\
+            else os.path.join("/media", self.id)
+        luks_point = os.path.join("/dev/mapper", self.id)
         # Find a free loopback device and mount
         loop = losetup.find_unused_loop_device()
         loop.mount(str(self.path), offset=1048576)
@@ -345,7 +347,7 @@ class VirtualDisk:
         self.crypt = True
         if mount:
             self.mount(passwd)
-            
+
     def remove(self):
         """Delete virtual disk image."""
         self.umount()
@@ -383,17 +385,17 @@ class PointOfInterest:
     or mounted filesystems. They allow easy browsing in the file manager or
     selection for other tasks that require specification of a path.
     """
-    
-    def __init__(self, id="", path="", stype="", icon=""):
+
+    def __init__(self, id_="", path="", stype="", icon=""):
         """
         Initialize point of interest object.
 
-        :param str id: point of interest name (site/app ID)
+        :param str id_: point of interest name (site/app ID)
         :param str path: path to point
         :param str stype: point type (app, site, etc)
         :param str icon: FontAwesome icon class
         """
-        self.id = id
+        self.id = id_
         self.path = path
         self.stype = stype
         self.icon = icon
@@ -414,11 +416,11 @@ class PointOfInterest:
         return self.as_dict
 
 
-def get(id=None):
+def get(id_=None):
     """
     Get all physical disks and virtual disk images present on the system.
 
-    :params str id: Return only the disk/image that matches this ID.
+    :params str id_: Return only the disk/image that matches this ID.
     :returns: DiskPartition(s) and/or VirtualDisk(s)
     :rtype: DiskPartition, VirtualDisk or a list thereof
     """
@@ -451,7 +453,7 @@ def get(id=None):
                                     size=int(p.getSize("B")), fstype=fstype,
                                     enabled=p.path in fstab,
                                     crypt=crypto.is_luks(p.path) == 0)
-                if id == dev.id:
+                if id_ == dev.id:
                     return dev
                 devs.append(dev)
             except:
@@ -476,18 +478,19 @@ def get(id=None):
         dev = VirtualDisk(id=dname, path=x, size=os.path.getsize(x),
                           mountpoint=mps.get(x) or mps.get(luks_point) or None,
                           enabled=x in fstab, crypt=x.endswith(".crypt"))
-        if id == dev.id:
+        if id_ == dev.id:
             return dev
         devs.append(dev)
-    return devs if not id else None
+    return devs if not id_ else None
 
-def get_points(id=None, path=None):
+
+def get_points(id_=None, path=None):
     """
     Retrieve points of interest from the system.
 
     Points of interest are obtained at scan from websites and mounted disks.
 
-    :param str id: If present, filter by point ID
+    :param str id_: If present, filter by point ID
     :param str path: Filter by filesystem path
     :return: Point(s)OfInterest
     :rtype: PointOfInterest or list thereof
@@ -526,7 +529,7 @@ def get_points(id=None, path=None):
 
 class FstabEntry:
     """Class to manage entries in '/etc/fstab'."""
-    
+
     def __init__(self):
         """Initialize fstab entry."""
         self.src = ""
@@ -566,6 +569,7 @@ def get_fstab():
         r[e.src] = e
     return r
 
+
 def save_fstab_entry(e, remove=False):
     """Format and save fstab entry."""
     lines = []
@@ -582,9 +586,11 @@ def save_fstab_entry(e, remove=False):
     with open("/etc/fstab", "w") as f:
         f.writelines(lines)
 
+
 def get_partition_uuid_by_name(p):
     """Get a partition's UUID from its device name."""
     return shell("blkid -o value -s UUID " + p)["stdout"].split("\n")[0]
+
 
 def get_partition_name_by_uuid(u):
     """Get a partition's device name from its UUID."""

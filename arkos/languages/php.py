@@ -33,12 +33,14 @@ def install_composer():
     os.chmod("/usr/local/bin/composer", 0o755)
     open_basedir("add", "/usr/local/bin")
 
+
 def verify_composer():
     """Verify Composer installation status."""
     if not find_executable("composer"):
         install_composer()
     if not find_executable("composer"):
         raise Exception("Composer was not installed successfully.")
+
 
 def composer_install(path):
     """
@@ -55,6 +57,7 @@ def composer_install(path):
     if s["code"] != 0:
         excmsg = "Composer failed to install this app's bundle. Error: {0}"
         raise Exception(excmsg.format(str(s["stderr"])))
+
 
 def change_setting(name, value, config_file="/etc/php/php.ini"):
     """
@@ -76,6 +79,7 @@ def change_setting(name, value, config_file="/etc/php/php.ini"):
         if not matched:
             f.write(name+" = "+value+"\n")
 
+
 def enable_mod(*args, **kwargs):
     """
     Enable a PHP extension in php.ini.
@@ -95,7 +99,8 @@ def enable_mod(*args, **kwargs):
                 if ";zend_extension={0}.so".format(x) in line:
                     line = "zend_extension={0}.so\n".format(x)
             f.write(line)
-            
+
+
 def disable_mod(*mod, **kwargs):
     """
     Disable a PHP extension in php.ini.
@@ -114,6 +119,7 @@ def disable_mod(*mod, **kwargs):
                 if "extension={0}.so".format(x) in line and not sw:
                     line = ";extension={0}.so\n".format(x)
             f.write(line)
+
 
 def open_basedir(op, path):
     """
@@ -144,6 +150,7 @@ def open_basedir(op, path):
                 oc.append(l)
     with open("/etc/php/php.ini", "w") as f:
         f.writelines(oc)
+
 
 def upload_size(size):
     """

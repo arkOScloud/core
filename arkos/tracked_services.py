@@ -26,24 +26,25 @@ class SecurityPolicy:
     are used to compute the proper values to put into the arkOS firewall
     (iptables) on regeneration or app update.
     """
-    
-    def __init__(self, app_type="", app_id="", name="", icon="", ports=[], policy=2, addr=None):
+
+    def __init__(self, type_="", id_="", name="", icon="",
+                 ports=[], policy=2, addr=None):
         """
         Initialize the policy object.
 
         To create a new policy or to see more info about these parameters,
         see ``tracked_services.register()`` below.
 
-        :param str app_type: Policy type ('website', 'app', etc)
-        :param str app_id: Website or app ID
+        :param str type_: Policy type ('website', 'app', etc)
+        :param str id_: Website or app ID
         :param str name: Display name to use in Security settings pane
         :param str icon: FontAwesome icon class name
         :param list ports: List of port tuples to allow/restrict
         :param int policy: Policy identifier
         :param str addr: Address and port (for websites)
         """
-        self.type = app_type
-        self.id = app_id
+        self.type = type_
+        self.id = id_
         self.name = name
         self.icon = icon
         self.ports = ports
@@ -96,7 +97,7 @@ class SecurityPolicy:
         return self.as_dict
 
 
-def get(app_id=None, app_type=None):
+def get(id_=None, type_=None):
     """
     Get all security policies from cache storage.
 
@@ -104,19 +105,21 @@ def get(app_id=None, app_type=None):
     :param str type: Filter by type ('website', 'app', etc)
     """
     data = storage.policies.get("policies")
-    if app_id or app_type:
+    if id_ or type_:
         tlist = []
         for x in data:
-            if x.id == app_id:
+            if x.id == id_:
                 return x
-            elif x.type == app_type:
+            elif x.type == type_:
                 tlist.append(x)
         if tlist:
             return tlist
         return []
     return data
 
-def register(app_type, app_id, name, icon, ports, addr=None, policy=0, default_policy=2, fw=True):
+
+def register(type_, id_, name, icon, ports, addr=None,
+             policy=0, default_policy=2, fw=True):
     """
     Register a new security policy with the system.
 
@@ -133,8 +136,8 @@ def register(app_type, app_id, name, icon, ports, addr=None, policy=0, default_p
     Addresses should be provided for websites, because multiple websites can
     be served from the same port (SNI) as long as the address is different.
 
-    :param str type: Policy type ('website', 'app', etc)
-    :param str id: Website or app ID
+    :param str type_: Policy type ('website', 'app', etc)
+    :param str id_: Website or app ID
     :param str name: Display name to use in Security settings pane
     :param str icon: FontAwesome icon class name
     :param list ports: List of port tuples to allow/restrict
@@ -144,16 +147,17 @@ def register(app_type, app_id, name, icon, ports, addr=None, policy=0, default_p
     :param bool fw: Regenerate the firewall after save?
     """
     if not policy:
-        policy = policies.get(app_type, app_id, default_policy)
-    pget = get(app_type=app_type)
+        policy = policies.get(type_, id_, default_policy)
+    pget = get(type_=type_)
     if pget:
         for x in pget:
-            if x.id == app_id:
+            if x.id == id_:
                 storage.policies.remove("policies", x)
-    svc = SecurityPolicy(app_type, app_id, name, icon, ports, policy, addr)
+    svc = SecurityPolicy(type_, id_, name, icon, ports, policy, addr)
     svc.save(fw)
 
-def deregister(app_type, app_id="", fw=True):
+
+def deregister(type_, id_="", fw=True):
     """
     Deregister a security policy.
 
@@ -170,6 +174,7 @@ def deregister(app_type, app_id="", fw=True):
     if config.get("general", "firewall", True) and fw:
         security.regenerate_firewall(get())
 
+
 def refresh_policies():
     """Recreate security policies based on what is stored in config."""
     svcs = get()
@@ -179,13 +184,14 @@ def refresh_policies():
             newpolicies["custom"] = policies.get_all("custom")
         for y in svcs:
             if x == y.type:
-                if not x in newpolicies:
+                if x not in newpolicies:
                     newpolicies[x] = {}
                 for s in policies.get_all(x):
                     if s == y.id:
                         newpolicies[x][s] = policies.get(x, s)
     policies.config = newpolicies
     policies.save()
+
 
 def is_open_port(port, addr=None, ignore_common=False):
     """
@@ -207,8 +213,10 @@ def is_open_port(port, addr=None, ignore_common=False):
             continue
         for y in x.ports:
             ports.append(int(y[1]))
-    if not ignore_common: ports = ports + COMMON_PORTS
+    if not ignore_common:
+        ports = ports + COMMON_PORTS
     return port not in ports
+
 
 def open_upnp(port):
     """
@@ -358,6 +366,7 @@ def close_all_upnp(ports):
             except:
                 pass
 
+
 def get_open_port(ignore_common=False):
     """
     Get a random TCP port not currently in use by a tracked service.
@@ -371,22 +380,29 @@ def get_open_port(ignore_common=False):
     for x in data:
         for y in x.ports:
             ports.append(int(y[1]))
-    if not ignore_common: ports = ports + COMMON_PORTS
+    if not ignore_common:
+        ports = ports + COMMON_PORTS
     r = random.randint(8001, 65534)
-    return r if not r in ports else get_open_port()
-
+    return r if r not in ports else get_open_port()
 
 
 def initialize():
     """Initialize security policy tracking."""
-    
+
     policy = policies.get("arkos", "arkos", 2)
-    storage.policies.add("policies", SecurityPolicy("arkos", "arkos",
-        "System Management (Genesis/APIs)", "fa fa-desktop",
-        [("tcp", int(config.get("genesis", "port")))], policy))
+    storage.policies.add("policies",
+                         SecurityPolicy("arkos", "arkos",
+                                        "System Management (Genesis/APIs)",
+                                        "fa fa-desktop",
+                                        [("tcp",
+                                          int(config.get("genesis", "port")))],
+                                        policy))
     for x in policies.get_all("custom"):
-        storage.policies.add("policies", SecurityPolicy("custom", x["id"],
-            x["name"], x["icon"], x["ports"], x["policy"]))
+        storage.policies.add("policies",
+                             SecurityPolicy("custom", x["id"],
+                                            x["name"], x["icon"],
+                                            x["ports"], x["policy"]))
+
 
 def register_website(site):
     """Convenience function to register a website as tracked service."""
@@ -394,10 +410,12 @@ def register_website(site):
              site.meta.icon if site.meta else "fa fa-globe",
              [("tcp", site.port)], site.addr)
 
+
 def deregister_website(site):
     """Convenience function to deregister a website as tracked service."""
     deregister("website", site.id)
-    
+
+
 def open_upnp_site(site):
     """Convenience function to register a website with uPnP."""
     if config.get("general", "enable_upnp", True):

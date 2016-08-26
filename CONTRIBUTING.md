@@ -21,7 +21,6 @@ Once setup you can contribute in the following order:
 Window -> Preferences -> PyDev -> Python Interpreter -> Builtins -> New
 
 ### List
-ssl
 grp
 fcntl
 
@@ -33,14 +32,14 @@ if one would want to help develop on the ArkOS Project.
 ## Python Package Index (PyPI) site-packages
 
 ### Instructions
-pip install -r ../kraken/requirements.txt
+sudo pip install -r requirements.txt && sudo pip install pep8
 
 ## Other site-packages
 
 ### Instructions
-sudo pip install git+https://<path>/<of>/<site>/<package_name>.git
+sudo pip install git+<url>
 
-### List
+### List Urls
 https://gitlab.com/cryptsetup/cryptsetup.git
 
 ## PKGBUILDS

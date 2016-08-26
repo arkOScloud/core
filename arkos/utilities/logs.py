@@ -16,7 +16,7 @@ from .errors import DefaultException
 
 class DefaultMessage:
     """The default engine for providing status messages for long tasks."""
-    
+
     PRINT = False
 
     def __init__(self, cls="", msg="", head=""):
@@ -49,8 +49,7 @@ class DefaultMessage:
 
 class LoggingControl:
     """Control process logging."""
-    
-    
+
     def __init__(self, logger=None):
         """Initialize object."""
         self.logger = logger
@@ -74,7 +73,7 @@ class LoggingControl:
 
 class ConsoleHandler(logging.StreamHandler):
     """Console stream handler."""
-    
+
     def __init__(self, stream, debug, tstamp=True):
         """Initialize object."""
         self.tstamp = tstamp
@@ -91,7 +90,7 @@ class ConsoleHandler(logging.StreamHandler):
             d = datetime.datetime.fromtimestamp(record.created)
             s += d.strftime("\033[37m%d.%m.%Y %H:%M \033[0m")
         if self.debug:
-            s += ("%s:%s"%(record.filename,record.lineno)).ljust(30)
+            s += ("{0}:{1}".format(record.filename, record.lineno)).ljust(30)
         l = ""
         if record.levelname == "DEBUG":
             l = "\033[37mDEBUG\033[0m "
@@ -112,7 +111,8 @@ def new_logger(log_level=logging.INFO, debug=False):
     logger = logging.getLogger("arkos")
     stdout = ConsoleHandler(sys.stdout, debug, False)
     stdout.setLevel(logging.DEBUG if debug else log_level)
-    dformatter = logging.Formatter("%(asctime)s [%(levelname)s] %(module)s: %(message)s")
+    dformatter = logging.Formatter("%(asctime)s [%(levelname)s] "
+                                   "%(module)s: %(message)s")
     stdout.setFormatter(dformatter)
     logger.addHandler(stdout)
     return logger

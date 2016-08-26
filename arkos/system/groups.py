@@ -8,7 +8,7 @@ Licensed under GPLv3, see LICENSE.md
 """
 
 import grp
-import ldap
+import ldap.modlist
 
 from arkos import conns, config, signals
 from arkos.utilities import shell

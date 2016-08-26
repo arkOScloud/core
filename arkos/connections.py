@@ -11,11 +11,12 @@ import ldap
 import xmlrpc.client
 
 from dbus import SystemBus, Interface
+from supervisor.rpcinterface import SupervisorNamespaceRPCInterface
 
 
 class ConnectionsManager:
     """Manages arkOS connections to system-level processes via their APIs."""
-    
+
     def connect(self, config, secrets):
         """
         Initialize the connections.
@@ -72,6 +73,7 @@ def ldap_connect(uri="", rootdn="", dn="cn=admin", config=None, passwd=""):
             raise Exception("User is not an administrator")
     return c
 
+
 def supervisor_connect():
     """
     Initialize a connection to Supervisor via XML-RPC API.
@@ -79,4 +81,5 @@ def supervisor_connect():
     :returns: XML-RPC connection object
     """
     s = xmlrpc.client.Server("http://localhost:9001/RPC2")
-    return s.supervisor
+    supervisor = SupervisorNamespaceRPCInterface(s.supervisor)
+    return supervisor

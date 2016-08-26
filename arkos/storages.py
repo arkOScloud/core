@@ -7,9 +7,10 @@ Written by Jacob Cook
 Licensed under GPLv3, see LICENSE.md
 """
 
+
 class StorageControl:
     """The primary controller for all Storage classes."""
-    
+
     def __init__(self):
         """Initialize arkOS storage."""
         self.apps = Storage(["applications"])
@@ -25,7 +26,7 @@ class StorageControl:
 
 class Storage:
     """Represents memory storage for different types of arkOS objects."""
-    
+
     def __init__(self, types=[]):
         """
         Initialize memory storage object.

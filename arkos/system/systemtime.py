@@ -20,7 +20,7 @@ ntp = ntplib.NTPClient()
 
 class timespec(ctypes.Structure):
     """C struct for timespec."""
-    
+
     _fields_ = [("tv_sec", ctypes.c_long), ("tv_nsec", ctypes.c_long)]
 
 
@@ -35,12 +35,14 @@ def verify_time(update=True, crit=True):
         os = get_offset()
     except Exception as e:
         if crit:
-            raise Exception("System time could not be retrieved. Error: %s" % str(e))
+            raise Exception("System time could not be retrieved. Error: {0}"
+                            .format(str(e)))
         else:
             return "UNKNOWN"
     if (os < -3600 or os > 3600) and update:
         set_datetime()
     return os
+
 
 def get_offset():
     """
@@ -52,6 +54,7 @@ def get_offset():
     resp = ntp.request(config.get("general", "ntp_server"), version=3)
     return resp.offset
 
+
 def get_date():
     """
     Get current date.
@@ -61,6 +64,7 @@ def get_date():
     """
     return time.strftime(config.get("general", "date_format", "%d %b %Y"))
 
+
 def get_time():
     """
     Get current time.
@@ -69,6 +73,7 @@ def get_time():
     :rtype: str
     """
     return time.strftime(config.get("general", "time_format", "%H:%M"))
+
 
 def get_unix_time(ts=None, fmt="%Y-%m-%dT%H:%M:%S"):
     """
@@ -84,6 +89,7 @@ def get_unix_time(ts=None, fmt="%Y-%m-%dT%H:%M:%S"):
     else:
         return int(time.time())
 
+
 def set_datetime(ut=0):
     """
     Set system time from provided Unix timestamp (or current time via NTP).
@@ -96,8 +102,10 @@ def set_datetime(ut=0):
     ts.tv_sec, ts.tv_nsec = ut, 0
     res = librt.clock_settime(0, ctypes.byref(ts))
     if res == -1:
-        raise Exception("Could not set time: %s" % os.strerror(ctypes.get_errno()))
+        raise Exception("Could not set time: {0}"
+                        .format(os.strerror(ctypes.get_errno())))
     signals.emit("config", "time_changed", ut)
+
 
 def get_datetime():
     """
@@ -107,7 +115,6 @@ def get_datetime():
     :rtype: float
     """
     return get_date() + " " + get_time()
-
 
 
 def get_idatetime():
@@ -120,6 +127,7 @@ def get_idatetime():
     resp = ntp.request(config.get("general", "ntp_server"), version=3)
     return resp.tx_time
 
+
 def get_serial_time():
     """
     Get current time in serial format (e.g. 20150420213000).
@@ -128,6 +136,7 @@ def get_serial_time():
     :rtype: str
     """
     return time.strftime("%Y%m%d%H%M%S")
+
 
 def get_iso_time(ts=None, fmt="%Y%m%d%H%M%S"):
     """
@@ -146,6 +155,7 @@ def get_iso_time(ts=None, fmt="%Y%m%d%H%M%S"):
         return datetime.datetime.strptime(ts, fmt).isoformat()+tz
     else:
         return datetime.datetime.now().isoformat()+tz
+
 
 def ts_to_datetime(ts, fmt="%Y%m%d%H%M%S"):
     """

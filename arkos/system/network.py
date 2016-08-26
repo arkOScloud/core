@@ -20,17 +20,17 @@ from arkos.utilities import shell, netmask_to_cidr
 
 class Connection:
     """Class to represent a network connection."""
-    
-    def __init__(self, netconn_id="", connected=False, enabled=False, config={}):
+
+    def __init__(self, id_="", connected=False, enabled=False, config={}):
         """
         Initialize the network connection object.
 
-        :param str netconn_id: network name
+        :param str id_: network name
         :param bool connected: Is network connected?
         :param bool enabled: Should network connect on boot?
         :param dict config: Netctl config lines as dict
         """
-        self.id = id
+        self.id = id_
         self.connected = connected
         self.enabled = enabled
         self.config = config
@@ -46,17 +46,22 @@ class Connection:
                 f.write("Description=\"" + self.config["description"] + "\"\n")
             if self.config.get("interface"):
                 f.write("Interface=\"" + self.config["interface"] + "\"\n")
-            if self.config.get("security") and self.config.get("connection") == "wireless":
+            if self.config.get("security") and \
+                    self.config.get("connection") == "wireless":
                 f.write("Security=\"" + self.config["security"] + "\"\n")
-            if self.config.get("essid") and self.config.get("connection") == "wireless":
+            if self.config.get("essid") and \
+                    self.config.get("connection") == "wireless":
                 f.write("ESSID=\"" + self.config["essid"] + "\"\n")
             if self.config.get("addressing"):
                 f.write("IP=\"" + self.config["addressing"] + "\"\n")
-            if self.config.get("address") and self.config.get("addressing") == "static":
+            if self.config.get("address") and \
+                    self.config.get("addressing") == "static":
                 f.write("Address=(\"" + self.config["address"] + "\")\n")
-            if self.config.get("gateway") and self.config.get("addressing") == "static":
+            if self.config.get("gateway") and \
+                    self.config.get("addressing") == "static":
                 f.write("Gateway=\"" + self.config["gateway"] + "\"\n")
-            if self.config.get("key") and self.config.get("connection") == "wireless":
+            if self.config.get("key") and \
+                    self.config.get("connection") == "wireless":
                 f.write("Key=\"" + self.config["key"] + "\"\n")
         signals.emit("networks", "post_add", self)
 
@@ -140,7 +145,7 @@ class Connection:
 
 class Interface:
     """Class to represent a network connection."""
-    
+
     def __init__(self, netiface_id="", itype="", up=False, ip=[], rx=0, tx=0):
         """
         Initialize the network interface object.
@@ -193,11 +198,11 @@ class Interface:
         return self.as_dict
 
 
-def get_connections(netconn_id=None, iface=None):
+def get_connections(id_=None, iface=None):
     """
     Get list of network connections.
 
-    :param str netconn_id: Filter by network connection name
+    :param str id_: Filter by network connection name
     :param str iface: Filter by network interface name
     :returns: Connection(s)
     :rtype: Connection or list thereof
@@ -207,8 +212,11 @@ def get_connections(netconn_id=None, iface=None):
     for line in netctl["stdout"].split("\n"):
         if not line.split():
             continue
-        enabled = os.path.exists("/etc/systemd/system/multi-user.target.wants/netctl@%s.service" % line[2:])
-        c = Connection(id=line[2:], connected=line.startswith("*"), enabled=enabled)
+        enabled = os.path.exists("/etc/systemd/system/"
+                                 "multi-user.target.wants"
+                                 "/netctl@{0}.service".format(line[2:]))
+        c = Connection(id=line[2:], connected=line.startswith("*"),
+                       enabled=enabled)
         with open(os.path.join("/etc/netctl", c.id), "r") as f:
             data = f.readlines()
         for x in data:
@@ -216,13 +224,14 @@ def get_connections(netconn_id=None, iface=None):
                 continue
             parse = x.split("=")
             c.config[parse[0].lower()] = parse[1].translate(None, "()\"\"\n")
-        if id == c.id:
+        if id_ == c.id:
             return c
         if not iface or c.config.get("interface") == iface:
             conns.append(c)
-    return conns if not id else None
+    return conns if not id_ else None
 
-def get_interfaces(netiface_id=None):
+
+def get_interfaces(id_=None):
     """
     Get list of network interfaces.
 
@@ -266,10 +275,11 @@ def get_interfaces(netiface_id=None):
         up = flags & 1
         s.close()
         i.up = up == 1
-        if id == i.id:
+        if id_ == i.id:
             return i
         ifaces.append(i)
     return ifaces if not id else None
+
 
 def get_active_ranges():
     """

@@ -27,12 +27,14 @@ import zipfile
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 
+
 def cidr_to_netmask(cidr):
     """Convert a CIDR prefix to an IP subnet mask."""
     mask = [0, 0, 0, 0]
     for i in range(cidr):
         mask[i/8] = mask[i/8] + (1 << (7 - i % 8))
     return ".".join(map(str, mask))
+
 
 def netmask_to_cidr(mask):
     """Convert an IP subnet mask to CIDR prefix."""
@@ -41,6 +43,7 @@ def netmask_to_cidr(mask):
     for octet in mask:
         binary_str += bin(int(octet))[2:].zfill(8)
     return len(binary_str.rstrip("0"))
+
 
 def test_dns(host):
     """
@@ -54,6 +57,7 @@ def test_dns(host):
     except:
         return False
     return True if test else False
+
 
 def test_port(server, port, host=None):
     """
@@ -81,6 +85,7 @@ def test_port(server, port, host=None):
         p.kill()
     return True if p.returncode == 0 else False
 
+
 def download(url, file=None, crit=False):
     """
     Download a file from the specified address, optionally saving to file.
@@ -100,16 +105,19 @@ def download(url, file=None, crit=False):
         if crit:
             raise("Download exception: {0}".format(e))
 
+
 def get_current_entropy():
     """Get the current amount of available entropy from the kernel."""
     with open("/proc/sys/kernel/random/entropy_avail", "r") as f:
         return int(f.readline())
+
 
 def random_string():
     """Create a random alphanumeric string."""
     digest = hashes.Hash(hashes.SHA1(), backend=default_backend())
     digest.update(str(random.random()).encode('utf-8'))
     return binascii.hexlify(digest.finalize())
+
 
 def api(url, post=None, method="", returns="json", headers=[], crit=False):
     """
@@ -141,7 +149,8 @@ def api(url, post=None, method="", returns="json", headers=[], crit=False):
         req.raise_for_status()
     except requests.exceptions.HTTPError as e:
         if crit:
-            raise Exception((err_str + "HTTP Error {2}").format(method.upper(), url, req.code))
+            raise Exception((err_str + "HTTP Error {2}")
+                            .format(method.upper(), url, req.code))
     except requests.exceptions.RequestException as e:
         if crit:
             raise Exception((err_str + "Server not found or URL malformed."
@@ -150,6 +159,7 @@ def api(url, post=None, method="", returns="json", headers=[], crit=False):
     except Exception as e:
         if crit:
             raise Exception((err_str + "{2}").format(method.upper(), url, e))
+
 
 def shell(c, stdin=None, env={}):
     """
@@ -165,20 +175,22 @@ def shell(c, stdin=None, env={}):
     environ["LC_ALL"] = "C"
     for x in env:
         environ[x] = env[x]
-    if not "HOME" in environ:
+    if "HOME" not in environ:
         environ["HOME"] = "/root"
     p = subprocess.Popen(shlex.split(c), stderr=subprocess.PIPE,
                          stdout=subprocess.PIPE, stdin=subprocess.PIPE,
-                        env=environ)
+                         env=environ)
     data = p.communicate(stdin)
     return {"code": p.returncode, "stdout": data[0],
             "stderr": data[1]}
+
 
 def hashpw(passw, scheme="sha512_crypt"):
     """Create a password hash."""
     rnd = "".join(random.sample(string.ascii_uppercase+string.digits, 8))
     salt = "$6$" + rnd + "$"
     return "{CRYPT}" + crypt.crypt(passw, salt)
+
 
 def can_be_int(data):
     """Return True if the input can be an integer."""
@@ -187,6 +199,7 @@ def can_be_int(data):
         return True
     except ValueError:
         return False
+
 
 def str_fsize(sz):
     """Format a size int/float to the most appropriate string."""
@@ -201,26 +214,30 @@ def str_fsize(sz):
     sz /= 1024.0
     return "%.1f Gb" % sz
 
+
 def str_fperms(mode):
     """Produce a Unix-style permissions string (rwxrwxrwx)."""
     return ("r" if mode & 256 else "-") + \
-       ("w" if mode & 128 else "-") + \
-       ("x" if mode & 64 else "-") + \
-       ("r" if mode & 32 else "-") + \
-       ("w" if mode & 16 else "-") + \
-       ("x" if mode & 8 else "-") + \
-       ("r" if mode & 4 else "-") + \
-       ("w" if mode & 2 else "-") + \
-       ("x" if mode & 1 else "-")
+           ("w" if mode & 128 else "-") + \
+           ("x" if mode & 64 else "-") + \
+           ("r" if mode & 32 else "-") + \
+           ("w" if mode & 16 else "-") + \
+           ("x" if mode & 8 else "-") + \
+           ("r" if mode & 4 else "-") + \
+           ("w" if mode & 2 else "-") + \
+           ("x" if mode & 1 else "-")
+
 
 def path_to_b64(path):
     """Convert a filesystem path to a safe base64-encoded string."""
-    path = path.replace("//","/")
+    path = path.replace("//", "/")
     return base64.b64encode(path, altchars="+-").replace("=", "*")
+
 
 def b64_to_path(b64):
     """Convert a base64-encoded string to regular one (filesystem path)."""
     return base64.b64decode(str(b64).replace("*", "="), altchars="+-")
+
 
 def compress(pin, pout="", fileformat="tgz"):
     """
@@ -236,7 +253,9 @@ def compress(pin, pout="", fileformat="tgz"):
         if os.path.isdir(pin):
             for r, _, f in os.walk(pin):
                 for x in f:
-                    a.add(os.path.join(r, x), os.path.join(r, x).split(os.path.split(pin)[0]+"/")[1])
+                    a.add(os.path.join(r, x),
+                          os.path.join(r, x)
+                          .split(os.path.split(pin)[0]+"/")[1])
         else:
             a.add(x)
         a.close()
@@ -246,11 +265,14 @@ def compress(pin, pout="", fileformat="tgz"):
         if os.path.isdir(pin):
             for r, _, f in os.walk(pin):
                 for x in f:
-                    a.write(os.path.join(r, x), os.path.join(r, x).split(os.path.split(pin)[0]+"/")[1])
+                    a.write(os.path.join(r, x),
+                            os.path.join(r, x)
+                            .split(os.path.split(pin)[0]+"/")[1])
         else:
             a.write(x)
         a.close()
     return pout
+
 
 def extract(pin, pout, delete=False):
     """

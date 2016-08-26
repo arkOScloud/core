@@ -78,7 +78,8 @@ class BackupController:
         :rtype: dict
         """
         if not backup_location:
-            backup_location = config.get("backups", "location", "/var/lib/arkos/backups")
+            backup_location = config.get("backups", "location",
+                                         "/var/lib/arkos/backups")
         if self.ctype == "site":
             self.version = self.site.meta.version
         signals.emit("backups", "pre_backup", self)
@@ -101,7 +102,8 @@ class BackupController:
         data = self._get_data() if data else []
         timestamp = systemtime.get_serial_time()
         isotime = systemtime.get_iso_time(timestamp)
-        path = os.path.join(backup_dir, "%s-%s.tar.gz" % (self.id,timestamp))
+        path = os.path.join(backup_dir, "{0}-{1}.tar.gz"
+                            .format(self.id, timestamp))
         # Zip up the gathered file paths
         with tarfile.open(path, "w:gz") as t:
             for f in myconfig+data:
@@ -109,15 +111,16 @@ class BackupController:
                     t.add(x)
             if self.ctype == "site" and self.site.db:
                 dbsql = io.StringIO.StringIO(self.site.db.dump())
-                dinfo = tarfile.TarInfo(name="/%s.sql"%self.site.id)
+                dinfo = tarfile.TarInfo(name="/{0}.sql".format(self.site.id))
                 dinfo.size = len(dbsql.buf)
                 t.addfile(tarinfo=dinfo, fileobj=dbsql)
         # Create a metadata file to track information
         info = {"pid": self.id, "type": self.ctype, "icon": self.icon,
-            "version": self.version, "time": isotime}
+                "version": self.version, "time": isotime}
         if self.site:
             info["site_type"] = self.site.meta.id
-        with open(os.path.join(backup_dir, "%s-%s.meta" % (self.id,timestamp)), "w") as f:
+        with open(os.path.join(backup_dir, "{0}-{1}.meta"
+                               .format(self.id, timestamp)), "w") as f:
             f.write(json.dumps(info))
 
         # Trigger post-backup hook for the app/site
@@ -164,14 +167,14 @@ class BackupController:
             meta.read(os.path.join(self.site.path, ".arkos"))
             sql_path = "/{0}.sql".format(sitename)
             if meta.get("website", "dbengine", None) \
-                and os.path.exists(sql_path):
+                    and os.path.exists(sql_path):
                 dbmgr = databases.get_managers(meta.get("website", "dbengine"))
                 if databases.get(sitename):
                     databases.get(sitename).remove()
                 db = dbmgr.add_db(sitename)
-                with open("/%s.sql"%sitename, "r") as f:
+                with open("/{0}.sql".format(sitename), "r") as f:
                     db.execute(f.read())
-                os.unlink("/%s.sql"%sitename)
+                os.unlink("/{0}.sql".format(sitename))
                 if dbmgr.meta.database_multiuser:
                     dbpasswd = random_string()[0:16]
                     if databases.get_user(sitename):
@@ -230,7 +233,7 @@ class BackupController:
 
 class arkOSBackupCfg(BackupController):
     """BackupController implementation for arkOS core configuration."""
-    
+
     def get_config(self):
         """Reimplement."""
         return ["/etc/arkos", "/tmp/ldap.ldif"]
@@ -243,7 +246,8 @@ class arkOSBackupCfg(BackupController):
         """Reimplement."""
         s = shell("slapcat -n 1")
         if s["code"] != 0:
-            raise Exception("Could not backup LDAP database. Please check logs for errors.")
+            raise Exception("Could not backup LDAP database. "
+                            "Please check logs for errors.")
         with open("/tmp/ldap.ldif", "w") as f:
             f.write(s["stdout"])
 
@@ -255,15 +259,18 @@ class arkOSBackupCfg(BackupController):
     def post_restore(self):
         """Reimplement."""
         if not os.path.exists("/tmp/ldap.ldif"):
-            raise Exception("Could not restore LDAP database. Please check logs for errors.")
+            raise Exception("Could not restore LDAP database. "
+                            "Please check logs for errors.")
         with open("/tmp/ldap.ldif", "r") as f:
             ldif = f.read()
-        s = shell('ldapadd -D "cn=admin,dc=arkos-servers,dc=org" -w %s' % secrets.get("ldap"),
-            stdin=ldif)
+        s = shell('ldapadd -D "cn=admin,dc=arkos-servers,dc=org" -w {0}'
+                  .format(secrets.get("ldap")),
+                  stdin=ldif)
         if os.path.exists("/tmp/ldap.ldif"):
             os.unlink("/tmp/ldap.ldif")
         if s["code"] != 0:
-            raise Exception("Could not restore LDAP database. Please check logs for errors.")
+            raise Exception("Could not restore LDAP database. "
+                            "Please check logs for errors.")
 
 
 def get(backup_location=""):
@@ -291,7 +298,7 @@ def get(backup_location=""):
     """
     backups = []
     if not backup_location:
-        backup_location = config.get("backups", "location", 
+        backup_location = config.get("backups", "location",
                                      "/var/lib/arkos/backups")
     if not os.path.exists(backup_location):
         os.makedirs(backup_location)
@@ -318,6 +325,7 @@ def get(backup_location=""):
             backups.append()
     return backups
 
+
 def get_able():
     """
     Obtain a list of arkOS application instances that support backups.
@@ -337,35 +345,38 @@ def get_able():
     for x in get():
         if not x["pid"] in [y["id"] for y in able]:
             able.append({"type": x["type"], "icon": x["icon"], "id": x["pid"]})
-    if not "arkOS" in [x["id"] for x in able]:
+    if "arkOS" not in [x["id"] for x in able]:
         able.append({"type": "app", "icon": "fa fa-cog", "id": "arkOS"})
     return able
 
-def create(app_id, data=True):
+
+def create(id_, data=True):
     """
     Convenience function to create a backup.
 
-    :param str app_id: ID of associated app (or website) to backup
+    :param str id_: ID of associated app (or website) to backup
     :param bool data: Backup app data also?
     :returns: Backup info
     :rtype: Backup
     """
     controller = None
-    if app_id == "arkOS":
-        controller = arkOSBackupCfg(app_id="arkOS", icon="fa fa-cog", version=arkos_version)
+    if id_ == "arkOS":
+        controller = arkOSBackupCfg(id_="arkOS", icon="fa fa-cog",
+                                    version=arkos_version)
         return controller.backup()
-    app = applications.get(app_id)
+    app = applications.get(id_)
     if app and app.type != "website" and hasattr(app, "_backup"):
         controller = app._backup(app.id, app.icon, version=app.version)
     else:
         sites = websites.get()
         for x in sites:
-            if x.id == app_id:
+            if x.id == id_:
                 controller = x.backup
                 break
     if not controller:
         raise Exception("No backup controller found")
     return controller.backup(data=data)
+
 
 def restore(backup, data=True):
     """
@@ -394,7 +405,8 @@ def restore(backup, data=True):
     b = controller.restore(backup)
     return b
 
-def remove(app_id, time, backup_location=""):
+
+def remove(id_, time, backup_location=""):
     """
     Remove a backup.
 
@@ -403,15 +415,17 @@ def remove(app_id, time, backup_location=""):
     :param str backup_location: Location (instead of arkOS default)
     """
     if not backup_location:
-        backup_location = config.get("backups", "location", "/var/lib/arkos/backups")
+        backup_location = config.get("backups", "location",
+                                     "/var/lib/arkos/backups")
     backups = get()
     for x in backups:
-        if x["id"] == app_id+"/"+time:
+        if x["id"] == id_+"/"+time:
             os.unlink(x["path"])
             try:
                 os.unlink(x["path"].split(".")[1]+".meta")
             except:
                 pass
+
 
 def site_load(site):
     """
@@ -421,7 +435,8 @@ def site_load(site):
     """
     if site.__class__.__name__ != "ReverseProxy":
         controller = site.meta.get_module("backup") or BackupController
-        site.backup = controller(site.id, site.meta.icon, site, site.meta.version)
+        site.backup = controller(site.id, site.meta.icon,
+                                 site, site.meta.version)
     else:
         site.backup = None
 

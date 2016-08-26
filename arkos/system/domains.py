@@ -15,7 +15,7 @@ from arkos.system import users
 
 class Domain:
     """Class for managing arkOS domains in LDAP."""
-    
+
     def __init__(self, name, rootdn="dc=arkos-servers,dc=org"):
         """
         Initialize the domain object.
@@ -29,7 +29,7 @@ class Domain:
     def __str__(self):
         """Domain name."""
         return self.name
-    
+
     @property
     def ldap_id(self):
         """Fetch LDAP ID."""
@@ -43,7 +43,7 @@ class Domain:
             raise Exception("This domain is already present here")
         except:
             pass
-        ldif = {"virtualdomain": self.name, 
+        ldif = {"virtualdomain": self.name,
                 "objectClass": ["mailDomain", "top"]}
         signals.emit("domains", "pre_add", self)
         conns.LDAP.add(self.ldap_id, None, ldif, None)
@@ -54,7 +54,8 @@ class Domain:
         if self.name in [x.domain for x in users.get()]:
             raise Exception("A user is still using this domain")
         signals.emit("domains", "pre_remove", self)
-        conns.LDAP.delete_s("virtualdomain=%s,ou=domains,%s" % (self.name,self.rootdn))
+        conns.LDAP.delete_s("virtualdomain={0},ou=domains,{1}"
+                            .format(self.name, self.rootdn))
         signals.emit("domains", "post_remove", self)
 
     @property
@@ -77,10 +78,15 @@ def get(domain_id=None):
     :rtype: Domain or list thereof
     """
     results = []
-    qset = conns.LDAP.search_s("ou=domains,%s" % config.get("general", "ldap_rootdn", "dc=arkos-servers,dc=org"),
-    ldap.SCOPE_SUBTREE, "virtualdomain=*", ["virtualdomain"])
+    qset = conns.LDAP.search_s("ou=domains,{0}"
+                               .format(config
+                                       .get("general", "ldap_rootdn",
+                                            "dc=arkos-servers,dc=org")),
+                               ldap.SCOPE_SUBTREE, "virtualdomain=*",
+                               ["virtualdomain"])
     for x in qset:
-        d = Domain(name=x[1]["virtualdomain"][0], rootdn=x[0].split("ou=domains,")[1])
+        d = Domain(name=x[1]["virtualdomain"][0],
+                   rootdn=x[0].split("ou=domains,")[1])
         if d.name == id:
             return d
         results.append(d)

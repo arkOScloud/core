@@ -22,7 +22,8 @@ def initialize_firewall():
     shell("iptables -A INPUT -j arkos-apps")
 
     # Allow ICMP (ping)
-    shell("iptables -A INPUT -p icmp -m icmp --icmp-type echo-request -j ACCEPT")
+    shell("iptables -A INPUT -p icmp -m icmp "
+          "--icmp-type echo-request -j ACCEPT")
 
     # Accept established/related connections
     shell("iptables -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT")
@@ -33,30 +34,33 @@ def initialize_firewall():
     save_rules()
     signals.emit("security", "post_fw_init")
 
-def regenerate_firewall(data, range=[]):
+
+def regenerate_firewall(data, range_=[]):
     # Regenerate our chain.
     # If local ranges are not provided, get them.
     signals.emit("security", "pre_fw_regen")
     flush_chain("arkos-apps")
-    default_range = range or network.get_active_ranges()
+    default_range = range_ or network.get_active_ranges()
     # For each policy in the system, add a rule
     for x in data:
-        range = getattr(x, "allowed_ranges", default_range)
+        allowed_ranges = getattr(x, "allowed_ranges", default_range)
         for port in x.ports:
             if x.policy == 2:
                 add_rule("ACCEPT", port[0], port[1], ["anywhere"])
             elif x.policy == 1:
-                add_rule("ACCEPT", port[0], port[1], range)
+                add_rule("ACCEPT", port[0], port[1], allowed_ranges)
             else:
                 add_rule("REJECT", port[0], port[1])
     shell("iptables -A arkos-apps -j RETURN")
     save_rules()
     signals.emit("security", "post_fw_regen")
 
+
 def add_rule(opt, protocol, port, ranges=[]):
     # Add rule for this port
     # If range is not provided, assume "0.0.0.0"
-    cmd = "iptables -I arkos-apps {src} -p {ptc} -m {ptc} --dport {prt} -j {opt}"
+    cmd = "iptables -I arkos-apps {src} -p {ptc}"\
+          " -m {ptc} --dport {prt} -j {opt}"
     src = ""
     for x in [r for r in ranges if r not in ["", "anywhere", "0.0.0.0"]]:
         src = "-s " if not src else (src + ",")
@@ -69,15 +73,18 @@ def add_rule(opt, protocol, port, ranges=[]):
         shell("iptables -N arkos-apps")
         shell(cmd.format(src=src, ptc=protocol, prt=port, opt=opt))
 
+
 def flush_chain(chain):
     # Flush out our chain
     signals.emit("security", "fw_flush")
     shell("iptables -F {0}".format(chain))
 
+
 def save_rules():
     # Save rules to file loaded on boot
     with open("/etc/iptables/iptables.rules", "w") as f:
         f.write(shell("iptables-save")["stdout"])
+
 
 def get_jail_config():
     cfg = configparser.RawConfigParser()
@@ -85,17 +92,20 @@ def get_jail_config():
         raise Exception("Fail2Ban config not found or not readable")
     return cfg
 
+
 def enable_jail_def(jailname):
     cfg = get_jail_config()
     cfg.set(jailname, "enabled", "true")
     with open(jailconf, "w") as f:
         cfg.write(f)
 
+
 def disable_jail_def(jailname):
     cfg = get_jail_config()
     cfg.set(jailname, "enabled", "false")
     with open(jailconf, "w") as f:
         cfg.write(f)
+
 
 def enable_all_def(obj):
     cfg = get_jail_config()
@@ -104,12 +114,14 @@ def enable_all_def(obj):
     with open(jailconf, "w") as f:
         cfg.write(f)
 
+
 def disable_all_def(obj):
     cfg = get_jail_config()
     for jail in obj["f2b"]:
         cfg.set(jail["id"], "enabled", "false")
     with open(jailconf, "w") as f:
         cfg.write(f)
+
 
 def bantime_def(bantime=""):
     cfg = get_jail_config()
@@ -120,6 +132,7 @@ def bantime_def(bantime=""):
         with open(jailconf, "w") as f:
             cfg.write(f)
 
+
 def findtime_def(findtime=""):
     cfg = get_jail_config()
     if findtime == "":
@@ -128,6 +141,7 @@ def findtime_def(findtime=""):
         cfg.set("DEFAULT", "findtime", findtime)
         with open(jailconf, "w") as f:
             cfg.write(f)
+
 
 def maxretry_def(maxretry=""):
     cfg = get_jail_config()
@@ -138,6 +152,7 @@ def maxretry_def(maxretry=""):
         with open(jailconf, "w") as f:
             cfg.write(f)
 
+
 def ignoreip_def(ranges):
     ranges.insert(0, "127.0.0.1/8")
     s = " ".join(ranges)
@@ -147,6 +162,7 @@ def ignoreip_def(ranges):
         with open(jailconf, "w") as f:
             cfg.write(f)
 
+
 def get_defense_rules():
     lst = []
     remove = []
@@ -155,15 +171,15 @@ def get_defense_rules():
     for c in storage.apps.get("applications"):
         if hasattr(c, "f2b") and hasattr(c, "f2b_name"):
             lst.append({"id": c.f2b_name,
-                "icon": c.f2b_icon,
-                "f2b": c.f2b})
+                        "icon": c.f2b_icon,
+                        "f2b": c.f2b})
         elif hasattr(c, "f2b"):
             lst.append({"id": c.id,
-                "icon": c.icon,
-                "f2b": c.f2b})
+                        "icon": c.icon,
+                        "f2b": c.f2b})
     for p in lst:
         for l in p["f2b"]:
-            if not "custom" in l:
+            if "custom" not in l:
                 try:
                     jail_opts = cfg.items(l["id"])
                 except configparser.NoSectionError:
@@ -173,7 +189,7 @@ def get_defense_rules():
                 if "%(__name__)s" in filter_name:
                     filter_name = filter_name.replace("%(__name__)s", l["id"])
                 c = fcfg.read([filters+"/common.conf",
-                    filters+"/"+filter_name+".conf"])
+                               filters+"/"+filter_name+".conf"])
                 filter_opts = fcfg.items("Definition")
                 l["jail_opts"] = jail_opts
                 l["filter_name"] = filter_name
@@ -196,7 +212,7 @@ def get_defense_rules():
                     jail_opts = cfg.items(l["id"])
                     filter_name = cfg.get(l["id"], "filter")
                     fcfg.read([filters+"/common.conf",
-                        filters+"/"+filter_name+".conf"])
+                               filters+"/"+filter_name+".conf"])
                     filter_opts = fcfg.items("Definition")
                     l["jail_opts"] = jail_opts
                     l["filter_name"] = filter_name

@@ -22,7 +22,8 @@ storage = StorageControl()
 conns = ConnectionsManager()
 logger = LoggingControl()
 
-def init(config_path="/etc/arkos/settings.json", 
+
+def init(config_path="/etc/arkos/settings.json",
          secrets_path="/etc/arkos/secrets.json",
          policies_path="/etc/arkos/policies.json", log=None):
     """Initialize and load arkOS config data."""
@@ -32,6 +33,7 @@ def init(config_path="/etc/arkos/settings.json",
     conns.connect(config, secrets)
     logger.logger = log or new_logger(20, debug=True)
     return config
+
 
 def initial_scans():
     """Setup initial scans for all arkOS objects."""

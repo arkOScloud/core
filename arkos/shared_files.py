@@ -21,16 +21,16 @@ class Share:
     information on the shared files in the object cache. Actual serving of
     shared files is done through Kraken.
     """
-    
-    def __init__(self, file_id, path, expires=0):
+
+    def __init__(self, id_, path, expires=0):
         """
         Initialize the shared file.
 
-        :param str file_id: shared file ID
+        :param str id_: shared file ID
         :param str path: path to file on disk
         :param int expires: Unix timestamp for expiry date/time; 0 for never
         """
-        self.id = file_id
+        self.id = id_
         self.path = path
         self.expires = expires
         self.fetch_count = 0
@@ -49,11 +49,11 @@ class Share:
 
         :param nexpiry: datetime representing expiry date/time; 0 for never
         """
-        if nexpiry == False:
+        if not nexpiry:
             self.expires = 0
         else:
             self.expires = systemtime.get_unix_time(nexpiry)
-            
+
     @property
     def is_expired(self):
         """Return True if the object is already expired."""
@@ -77,7 +77,8 @@ class Share:
     def serialized(self):
         """Return serializable shared file metadata as dict."""
         data = self.as_dict
-        data["expires_at"] = systemtime.get_iso_time(self.expires, "unix") if self.expires != 0 else "",
+        data["expires_at"] = systemtime\
+            .get_iso_time(self.expires, "unix") if self.expires != 0 else "",
         return data
 
 

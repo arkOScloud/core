@@ -22,7 +22,7 @@ class Config:
     This class can be used for managing any type of arkOS JSON-based config
     file, including ``settings.json`` and ``secrets.json``.
     """
-    
+
     def __init__(self, filename):
         """
         Initialize the Config object.
@@ -49,7 +49,7 @@ class Config:
         with open(path) as f:
             self.config = json.loads(f.read())
         self._set_enviro()
-            
+
     def _set_enviro(self):
         """Private method to set environment variables in the loaded config."""
         arch = detect_architecture()
@@ -155,4 +155,3 @@ class Config:
             return key in self.config[section]
         else:
             return False
-        

@@ -31,7 +31,7 @@ def check_updates():
         with open("/tmp/%s.sig" % x["id"], "w") as f:
             f.write(sig)
         v = gpg.verify_data("/tmp/{0}.sig".format(x["id"]), ustr)
-        if v.trust_level == None:
+        if v.trust_level is None:
             err_str = "Update {0} signature verification failed"
             logger.error(err_str.format(x["id"]))
             break
@@ -41,6 +41,7 @@ def check_updates():
             updates.append(data)
     storage.updates.set("updates", updates)
     return updates
+
 
 def install_updates(message=DefaultMessage()):
     """
@@ -77,7 +78,8 @@ def install_updates(message=DefaultMessage()):
             config.set("updates", "current_update", z[1]["id"])
             config.save()
             continue
-        message.complete("error", "Installation of update %s failed. See logs for details." % str(z[1]["id"]))
+        message.complete("error", "Installation of update %s "
+                         "failed. See logs for details." % str(z[1]["id"]))
         logger.error(responses)
         break
     else:

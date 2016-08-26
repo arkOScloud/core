@@ -46,12 +46,13 @@ class Certificate:
          "sid": "example.com", "name": "Chat Server (example.com)"}
     """
     def __init__(
-            self, cert_id="", domain="", cert_path="", key_path="", keytype="", keylength=0,
+            self, id_="", domain="", cert_path="",
+            key_path="", keytype="", keylength=0,
             assigns=[], expiry=None, sha1="", md5=""):
         """
         Initialize the Certificate object.
 
-        :param str cert_id: Certificate name
+        :param str id_: Certificate name
         :param str domain: Domain the certificate is associated to
         :param str cert_path: Path to the certificate file on disk
         :param str key_path: Path to the certificate's key file on disk
@@ -62,7 +63,7 @@ class Certificate:
         :param str sha1: SHA-1 hash
         :param str md5: MD5 hash
         """
-        self.id = cert_id
+        self.id = id_
         self.domain = domain
         self.cert_path = cert_path
         self.key_path = key_path
@@ -209,7 +210,7 @@ class CertificateAuthority:
         return data
 
 
-def get(cert_id=None):
+def get(id_=None):
     """
     Retrieve arkOS certificate data from the system.
 
@@ -226,12 +227,13 @@ def get(cert_id=None):
     data = storage.certs.get("certificates")
     if not data:
         data = scan()
-    if id:
+    if id_:
         for x in data:
-            if x.id == cert_id:
+            if x.id == id_:
                 return x
         return None
     return data
+
 
 def scan():
     """
@@ -242,15 +244,20 @@ def scan():
     """
     certs, assigns = [], {}
     if config.get("genesis", "ssl"):
-        ssl = os.path.splitext(os.path.basename(config.get("genesis", "cert_file", "")))[0]
-        if ssl and assigns.has_key(ssl):
-            assigns[ssl].append({"type": "genesis", "id": "genesis", "name": "arkOS Genesis/API"})
+        ssl = os.path\
+            .splitext(os.path
+                      .basename(config.get("genesis",
+                                           "cert_file", "")))[0]
+        if ssl and ssl in assigns:
+            assigns[ssl].append({"type": "genesis", "id": "genesis",
+                                 "name": "arkOS Genesis/API"})
         elif ssl:
-            assigns[ssl] = [{"type": "genesis", "id": "genesis", "name": "arkOS Genesis/API"}]
+            assigns[ssl] = [{"type": "genesis", "id": "genesis",
+                             "name": "arkOS Genesis/API"}]
     for x in applications.get(installed=True):
         if hasattr(x, "ssl"):
             for ssl, data in x.ssl.get_ssl_assigned():
-                if assigns.has_key(ssl):
+                if ssl in assigns:
                     assigns[ssl] += data
                 else:
                     assigns[ssl] = []
@@ -261,11 +268,11 @@ def scan():
         os.makedirs(config.get("certificates", "key_dir"))
     cert_glob = os.path.join(config.get("certificates", "cert_dir"), "*.crt")
     for x in glob.glob(cert_glob):
-        cert_id = os.path.splitext(os.path.basename(x))[0]
+        id_ = os.path.splitext(os.path.basename(x))[0]
         with open(x, "rb") as f:
             crt = x509.load_pem_x509_certificate(f.read(), default_backend())
         key_path = os.path.join(config.get("certificates", "key_dir"),
-                                "{0}.key".format(cert_id))
+                                "{0}.key".format(id_))
         with open(key_path, "rb") as f:
             key = serialization.load_pem_private_key(
                 f.read(),
@@ -276,17 +283,18 @@ def scan():
         md5 = crt.fingerprint(hashes.MD5())
         kt = "RSA" if isinstance(key.public_key(), rsa.RSAPublicKey) else "DSA"
         common_name = crt.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
-        c = Certificate(id=id, cert_path=x, key_path=key_path,
+        c = Certificate(id_=id_, cert_path=x, key_path=key_path,
                         keytype=kt, keylength=key.key_size,
                         domain=common_name,
-                        assigns=assigns.get(id, []),
+                        assigns=assigns.get(id_, []),
                         expiry=crt.not_valid_after,
                         sha1=sha1, md5=md5)
         certs.append(c)
     storage.certs.set("certificates", certs)
     return certs
 
-def get_authorities(cert_id=None):
+
+def get_authorities(id_=None):
     """
     Retrieve arkOS certificate authority data from the system.
 
@@ -303,12 +311,13 @@ def get_authorities(cert_id=None):
     data = storage.certs.get("authorities")
     if not data:
         data = scan_authorities()
-    if cert_id:
+    if id_:
         for x in data:
-            if x.id == cert_id:
+            if x.id == id_:
                 return x
         return None
     return data
+
 
 def scan_authorities():
     """
@@ -334,11 +343,12 @@ def scan_authorities():
     storage.certs.set("authorities", certs)
     return certs
 
-def upload_certificate(cert_id, cert, key, chain="", message=DefaultMessage()):
+
+def upload_certificate(id_, cert, key, chain="", message=DefaultMessage()):
     """
     Create and save a new certificate from an external file.
 
-    :param str cert_id: Name to assign certificate
+    :param str id_: Name to assign certificate
     :param str cert: Certificate as string (PEM format)
     :param str key: Key as string (PEM format)
     :param str chain: Chain as string (PEM format)
@@ -361,7 +371,7 @@ def upload_certificate(cert_id, cert, key, chain="", message=DefaultMessage()):
     except Exception as e:
         raise Exception("Could not read private keyfile. "
                         "Please make sure you've selected the proper file.", e)
-    signals.emit("certificates", "pre_add", id)
+    signals.emit("certificates", "pre_add", id_)
 
     # Check to see that we have DH params, if not then do that too
     if not os.path.exists("/etc/arkos/ssl/dh_params.pem"):
@@ -380,9 +390,9 @@ def upload_certificate(cert_id, cert, key, chain="", message=DefaultMessage()):
     md5 = crt.fingerprint(hashes.MD5())
     kt = "RSA" if isinstance(ky.public_key(), rsa.RSAPublicKey) else "DSA"
     common_name = crt.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
-    c = Certificate(id=id,
-                    cert_path=os.path.join(cert_dir, "{0}.crt".format(id)),
-                    key_path=os.path.join(key_dir, "{0}.key".format(id)),
+    c = Certificate(id_=id_,
+                    cert_path=os.path.join(cert_dir, "{0}.crt".format(id_)),
+                    key_path=os.path.join(key_dir, "{0}.key".format(id_)),
                     keytype=kt, keylength=ky.key_size,
                     domain=common_name, expiry=crt.not_valid_after,
                     sha1=sha1, md5=md5)
@@ -404,8 +414,9 @@ def upload_certificate(cert_id, cert, key, chain="", message=DefaultMessage()):
     signals.emit("certificates", "post_add", c)
     return c
 
+
 def generate_certificate(
-        cert_id, domain, country, state="", locale="", email="", keytype="RSA",
+        id_, domain, country, state="", locale="", email="", keytype="RSA",
         keylength=2048, message=DefaultMessage()):
     """
     Generate and save a new self-signed certificate.
@@ -413,7 +424,7 @@ def generate_certificate(
     If this domain has no prior self-signed certificates, a new
     CertificateAuthority is also generated to sign this certificate.
 
-    :param str cert_id: Name to assign certificate
+    :param str id_: Name to assign certificate
     :param str domain: Domain name to associate with (subject CN)
     :param str country: Two-letter country code (e.g. 'US' or 'CA')
     :param str state: State or province
@@ -425,7 +436,7 @@ def generate_certificate(
     :returns: Certificate that was generated
     :rtype: Certificate
     """
-    signals.emit("certificates", "pre_add", cert_id)
+    signals.emit("certificates", "pre_add", id_)
 
     # Check to see that we have a CA ready; if not, generate one
     basehost = ".".join(domain.split(".")[-2:])
@@ -455,9 +466,9 @@ def generate_certificate(
     # Generate private key and create X509 certificate, then set options
     message.update("info", "Generating certificate...")
     cert_path = os.path.join(config.get("certificates", "cert_dir"),
-                             "{0}.crt".format(id))
+                             "{0}.crt".format(id_))
     key_path = os.path.join(config.get("certificates", "key_dir"),
-                            "{0}.key".format(id))
+                            "{0}.key".format(id_))
     kt = dsa if keytype == "DSA" else rsa
 
     key = kt.generate_private_key(
@@ -503,6 +514,7 @@ def generate_certificate(
     storage.certs.add("certificates", c)
     signals.emit("certificates", "post_add", c)
     return c
+
 
 def generate_authority(domain):
     """
