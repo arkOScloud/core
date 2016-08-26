@@ -24,27 +24,27 @@ class DefaultMessage:
         if cls == "error" and msg:
             raise DefaultException(str(msg))
         elif self.PRINT and cls == "warning" and msg:
-            print("\033[33m%s\033[0m" % msg)
+            print("\033[33m{0}\033[0m".format(msg))
         elif self.PRINT and msg:
-            print("\033[32m%s\033[0m" % msg)
+            print("\033[32m{0}\033[0m".format(msg))
 
     def update(self, cls, msg, head=""):
         """Send message update."""
         if cls == "error":
             raise DefaultException(str(msg))
         elif self.PRINT and cls == "warning":
-            print("\033[33m%s\033[0m" % msg)
+            print("\033[33m%{0}\033[0m".format(msg))
         elif self.PRINT:
-            print("\033[32m%s\033[0m" % msg)
+            print("\033[32m{0}\033[0m".format(msg))
 
     def complete(self, cls, msg, head=""):
         """Send message completion."""
         if cls == "error":
             raise DefaultException(str(msg))
         elif self.PRINT and cls == "warning":
-            print("\033[33m%s\033[0m" % msg)
+            print("\033[33m{0}\033[0m".format(msg))
         elif self.PRINT:
-            print("\033[32m%s\033[0m" % msg)
+            print("\033[32m{0}\033[0m".format(msg))
 
 
 class LoggingControl:

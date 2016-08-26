@@ -13,7 +13,7 @@ class ConfigurationError(Exception):
 
     def __init__(self, text):
         """Initialize class."""
-        self.text = id
+        self.text = self.id
 
     def __str__(self):
         """String format."""
@@ -23,9 +23,9 @@ class ConfigurationError(Exception):
 class ArkOSConnectionError(Exception):
     """Connection error."""
 
-    def __init__(self, conn_id):
+    def __init__(self, id_):
         """Initialize class."""
-        self.id = conn_id
+        self.id = id_
 
     def __str__(self):
         """String format."""

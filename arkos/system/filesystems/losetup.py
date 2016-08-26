@@ -193,7 +193,7 @@ class LoopDevice(object):
 
     def __repr__(self):
         """Get name."""
-        return 'LoopDevice("%s")' % self.device
+        return 'LoopDevice("{0}")'.format(self.device)
 
     def _get_status64(self, fd):
         buf = array.array('B', [0] * Status64.size)

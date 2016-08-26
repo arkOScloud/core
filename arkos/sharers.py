@@ -103,10 +103,10 @@ class Share:
 class Mount:
     """Represents a file share mount object."""
 
-    def __init__(self, mount_id="", path="", network_path="", readonly=False,
+    def __init__(self, id_="", path="", network_path="", readonly=False,
                  is_mounted=False, manager=None):
         """Initialize."""
-        self.id = mount_id
+        self.id = id_
         self.path = path
         self.network_path = network_path
         self.readonly = readonly
@@ -191,20 +191,20 @@ def scan_shares():
     return shares
 
 
-def get_mounts(mount_id=None, mount_type=None):
+def get_mounts(id_=None, mount_type=None):
     """
     Retrieve a list of all file share mounts registered with arkOS.
 
-    :param str mount_id: If present, obtain one mount that matches this ID
+    :param str id_: If present, obtain one mount that matches this ID
     :param str type: Filter by ``fs-samba``, ``fs-afp``, etc
     :return: Mount(s)
     :rtype: Mount or list thereof
     """
     data = scan_mounts()
-    if mount_id or mount_type:
+    if id_ or mount_type:
         tlist = []
         for x in data:
-            if x.id == mount_id:
+            if x.id == id_:
                 return x
             elif x.manager.id == mount_type:
                 tlist.append(x)

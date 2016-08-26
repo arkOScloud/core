@@ -45,12 +45,12 @@ class Site:
     """Class representing a Website object."""
 
     def __init__(
-            self, site_id="", addr="", port=80, path="", php=False, version="",
+            self, id_="", addr="", port=80, path="", php=False, version="",
             cert=None, db=None, data_path="", block=[], enabled=False):
         """
         Initialize the website object.
 
-        :param str site_id: Website name
+        :param str id_: Website name
         :param str addr: Hostname/domain
         :param int port: Port site is served on
         :param str path: Path to site root directory
@@ -62,7 +62,7 @@ class Site:
         :param list block: List of nginx key objects to add to server block
         :param bool enabled: Is site enabled through nginx?
         """
-        self.id = site_id
+        self.id = id_
         self.path = path.encode("utf-8")
         self.addr = addr
         self.port = port
@@ -180,7 +180,7 @@ class Site:
             try:
                 download(self.meta.download_url, file=pkg_path, crit=True)
             except Exception as e:
-                raise Exception("Couldn't download - %s" % str(e))
+                raise Exception("Couldn't download - {0}".format(str(e)))
 
             # Format extraction command according to type
             message.update("info", "Extracting source...",
@@ -318,7 +318,8 @@ class Site:
             block.add(nginx.Server(
                 nginx.Key("listen", "80"),
                 nginx.Key("server_name", self.addr),
-                nginx.Key("return", "301 https://%s$request_uri" % self.addr)
+                nginx.Key("return", "301 https://{0}$request_uri"
+                          .format(self.addr))
             ))
             for x in block.servers:
                 if x.filter("Key", "listen")[0].value == "443 ssl":
@@ -632,12 +633,12 @@ class ReverseProxy(Site):
     """
 
     def __init__(
-            self, app_id="", name="", path="", addr="", port=80,
+            self, id_="", name="", path="", addr="", port=80,
             base_path="", block=[], rp_type="internal"):
         """
         Initialize the reverse proxy website object.
 
-        :param str app_id: arkOS app ID
+        :param str id_: arkOS app ID
         :param str name: App name
         :param str path: Path to website root directory
         :param str addr: Hostname/domain
@@ -646,7 +647,7 @@ class ReverseProxy(Site):
         :param list block: List of nginx key objects to add to server block
         :param str rp_type: Reverse proxy type
         """
-        self.id = app_id
+        self.id = id_
         self.name = name
         self.addr = addr
         self.path = path.encode("utf-8")
@@ -773,7 +774,7 @@ class ReverseProxy(Site):
         return self.as_dict
 
 
-def get(site_id=None, site_type=None, verify=True):
+def get(id_=None, site_type=None, verify=True):
     """
     Retrieve website data from the system.
 
@@ -781,7 +782,7 @@ def get(site_id=None, site_type=None, verify=True):
     there. If not (or ``force`` is set), the app directory is searched, modules
     are loaded and verified. This is used on first boot.
 
-    :param str site_id: If present, obtain one site that matches this ID
+    :param str id_: If present, obtain one site that matches this ID
     :param str site_type: Filter by ``website``, ``reverseproxy``, etc
     :param bool force: Force a rescan (do not rely on cache)
     :return: Website(s)
@@ -790,10 +791,10 @@ def get(site_id=None, site_type=None, verify=True):
     sites = storage.sites.get("sites")
     if not sites:
         sites = scan()
-    if site_id or site_type:
+    if id_ or site_type:
         type_list = []
         for site in sites:
-            if site.id == site_id:
+            if site.id == id_:
                 return site
             elif (type and (type == "ReverseProxy" and
                             isinstance(site, ReverseProxy))) or \

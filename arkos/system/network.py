@@ -86,7 +86,7 @@ class Connection:
         signals.emit("networks", "pre_connect", self)
         for x in get_connections(iface=self.config.get("interface")):
             x.disconnect()
-        s = shell("netctl start %s" % self.id)
+        s = shell("netctl start {0}".format(self.id))
         if s["code"] == 0:
             self.connected = True
             signals.emit("networks", "post_connect", self)
@@ -96,7 +96,7 @@ class Connection:
     def disconnect(self):
         """Disconnect from network."""
         signals.emit("networks", "pre_disconnect", self)
-        s = shell("netctl stop %s" % self.id)
+        s = shell("netctl stop {0}".format(self.id))
         if s["code"] == 0:
             self.connected = False
             signals.emit("networks", "post_disconnect", self)
@@ -112,7 +112,7 @@ class Connection:
 
     def enable(self):
         """Enable connection on boot."""
-        s = shell("netctl enable %s" % self.id)
+        s = shell("netctl enable {0}".format(self.id))
         if s["code"] == 0:
             self.enabled = True
         else:
@@ -120,7 +120,7 @@ class Connection:
 
     def disable(self):
         """Disable connection on boot."""
-        s = shell("netctl disable %s" % self.id)
+        s = shell("netctl disable {0}".format(self.id))
         if s["code"] == 0:
             self.enabled = False
         else:
@@ -146,11 +146,11 @@ class Connection:
 class Interface:
     """Class to represent a network connection."""
 
-    def __init__(self, netiface_id="", itype="", up=False, ip=[], rx=0, tx=0):
+    def __init__(self, id_="", itype="", up=False, ip=[], rx=0, tx=0):
         """
         Initialize the network interface object.
 
-        :param str netiface_id: network interface name
+        :param str id_: network interface name
         :param str itype: interface type ("ethernet", "wireless", etc)
         :param bool up: Is interface up?
         :param list ip: list of IP addresses assigned to this interface
@@ -166,19 +166,19 @@ class Interface:
 
     def bring_up(self):
         """Bring interface up."""
-        shell("ip link set dev %s up" % self.id)
+        shell("ip link set dev {0} up".format(self.id))
 
     def bring_down(self):
         """Bring interface down."""
-        shell("ip link set dev %s down" % self.id)
+        shell("ip link set dev {0} down".format(self.id))
 
     def enable(self):
         """Bring interface up on boot."""
-        shell("systemctl enable netctl-auto@%s.service" % self.id)
+        shell("systemctl enable netctl-auto@{0}.service".format(self.id))
 
     def disable(self):
         """Don't bring interface up on boot."""
-        shell("systemctl disable netctl-auto@%s.service" % self.id)
+        shell("systemctl disable netctl-auto@{0}.service".format(self.id))
 
     @property
     def as_dict(self):

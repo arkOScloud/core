@@ -32,11 +32,11 @@ class BackupController:
 
     See ``backup.get()`` for definition of ``Backup`` dict.
     """
-    def __init__(self, app_id, icon, site=None, version=None):
+    def __init__(self, id_, icon, site=None, version=None):
         """
         Initialize the BackupController.
 
-        :param str app_id: Application or website ID
+        :param str id_: Application or website ID
         :param str icon: FontAwesome icon ID
         :param Website site: Website object for this controller (if any)
         :param str version: Version of the app/website at the time of backup
@@ -62,7 +62,7 @@ class BackupController:
         data = []
         if self.ctype == "site":
             data += self.get_data(self.site)
-            data.append("/etc/nginx/sites-available/%s" % self.site.id)
+            data.append("/etc/nginx/sites-available/{0}".format(self.site.id))
             data.append(self.site.path)
         else:
             data += self.get_data()
@@ -410,7 +410,7 @@ def remove(id_, time, backup_location=""):
     """
     Remove a backup.
 
-    :param str app_id: arkOS app/site ID
+    :param str id_: arkOS app/site ID
     :param str time: Backup timestamp
     :param str backup_location: Location (instead of arkOS default)
     """

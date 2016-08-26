@@ -82,7 +82,7 @@ class Share:
         return data
 
 
-def get(file_id=None):
+def get(id_=None):
     """List all shared file objects present in cache storage."""
     data = storage.files.get("shares")
     to_purge = []
@@ -91,9 +91,9 @@ def get(file_id=None):
             to_purge.append(x)
     for x in to_purge:
         x.delete()
-    if file_id:
+    if id_:
         for x in data:
-            if x.id == file_id:
+            if x.id == id_:
                 return x
         return None
     return data

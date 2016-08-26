@@ -172,16 +172,16 @@ class CertificateAuthority:
     Certificate authorities are created for self-signed certificates
     generated in arkOS, allowing client trust for the root domain in question.
     """
-    def __init__(self, cert_id="", cert_path="", key_path="", expiry=None):
+    def __init__(self, id_="", cert_path="", key_path="", expiry=None):
         """
         Initialize the certificate authority object.
 
-        :param str cert_id: Authority (and domain) name
+        :param str id_: Authority (and domain) name
         :param str cert_path: Path to the certificate file on disk
         :param str key_path: Path to the certificate's key file on disk
         :param str expiry: ISO-8601 timestamp of certificate expiry
         """
-        self.id = cert_id
+        self.id = id_
         self.cert_path = cert_path
         self.key_path = key_path
         self.expiry = expiry
@@ -334,10 +334,10 @@ def scan_authorities():
     if not os.path.exists(ca_key_dir):
         os.makedirs(ca_key_dir)
     for x in glob.glob(os.path.join(ca_cert_dir, "*.pem")):
-        cert_id = os.path.splitext(os.path.split(x)[1])[0]
+        id_ = os.path.splitext(os.path.split(x)[1])[0]
         with open(x, "rb") as f:
             cert = x509.load_pem_x509_certificate(f.read(), default_backend())
-        key_path = os.path.join(ca_key_dir, "{0}.key".format(cert_id))
+        key_path = os.path.join(ca_key_dir, "{0}.key".format(id_))
         ca = CertificateAuthority(id, x, key_path, cert.not_valid_after())
         certs.append(ca)
     storage.certs.set("authorities", certs)

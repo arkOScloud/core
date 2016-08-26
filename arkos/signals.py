@@ -56,7 +56,7 @@ def add(by, id_, sig, func):
     Register a new listener with the system.
 
     :param str by: the name of the module that registered this listener
-    :param str sig_id: identifier for this listener
+    :param str id_: identifier for this listener
     :param str sig: signal ID to listen for
     :param func func: hook function to execute
     """

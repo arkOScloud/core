@@ -167,7 +167,7 @@ class DatabaseManager:
     as well as ensuring engine API connection and other things.
     """
 
-    def __init__(self, dbm_id="", name="", meta=None):
+    def __init__(self, id_="", name="", meta=None):
         """
         Initialize the database manager.
 
@@ -175,7 +175,7 @@ class DatabaseManager:
         :param str name: Pretty database name (``MariaDB``)
         :param Application meta: Application metadata object
         """
-        self.id = dbm_id
+        self.id = id_
         self.name = name
         self.meta = meta
         self.state = True
@@ -338,6 +338,6 @@ def scan_managers():
     mgrs = []
     for x in applications.get(type="database"):
         if x.installed and hasattr(x, "_database_mgr"):
-            mgrs.append(x._database_mgr(dbm_id=x.id, name=x.name, meta=x))
+            mgrs.append(x._database_mgr(id_=x.id, name=x.name, meta=x))
     storage.dbs.set("managers", mgrs)
     return mgrs

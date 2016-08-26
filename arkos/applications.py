@@ -399,7 +399,7 @@ def scan(verify=True):
                         "manifest file inaccessible or not present"
                         .format(x))
             continue
-        logger.debug(" *** Loading %s" % data["id"])
+        logger.debug(" *** Loading {0}".format(data["id"]))
         app = App(**data)
         app.installed = True
         for y in enumerate(available_apps):
@@ -511,11 +511,13 @@ def _install(id_, load=True):
     data = api("https://{0}/api/v1/apps/{1}"
                .format((config.get("general", "repo_server"), id_)),
                returns="raw", crit=True)
-    with open(os.path.join(app_dir, "%s.tar.gz" % id), "wb") as f:
+    with open(os.path.join(app_dir, "{0}.tar.gz".format(id)), "wb") as f:
         f.write(data)
-    with tarfile.open(os.path.join(app_dir, "%s.tar.gz" % id), "r:gz") as t:
+    with tarfile.open(os.path.join(app_dir,
+                                   "{0}.tar.gz".format(id)),
+                      "r:gz") as t:
         t.extractall(app_dir)
-    os.unlink(os.path.join(app_dir, "%s.tar.gz" % id))
+    os.unlink(os.path.join(app_dir, "{0}.tar.gz".format(id)))
     # Read the app's metadata and create an object
     with open(os.path.join(app_dir, id, "manifest.json")) as f:
         data = json.loads(f.read())

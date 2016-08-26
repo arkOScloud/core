@@ -63,7 +63,7 @@ class Group:
         """Update a group object in LDAP. Change params on the object first."""
         try:
             ldif = conns.LDAP. \
-                search_s("cn=%s,ou=groups,{0}"
+                search_s("cn={0},ou=groups,{1}"
                          .format(self.name, self.rootdn),
                          ldap.SCOPE_SUBTREE, "(objectClass=*)", None)
         except ldap.NO_SUCH_OBJECT:

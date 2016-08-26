@@ -69,11 +69,11 @@ class Domain:
         return self.as_dict
 
 
-def get(domain_id=None):
+def get(id_=None):
     """
     Get all domains.
 
-    :param str domain_id: domain name to fetch
+    :param str id_: domain name to fetch
     :returns: Domain(s)
     :rtype: Domain or list thereof
     """
