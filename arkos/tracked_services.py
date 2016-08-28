@@ -162,13 +162,13 @@ def deregister(type_, id_="", fw=True):
     Deregister a security policy.
 
     :param str type: Policy type ('website', 'app', etc)
-    :param str id: Website or app ID
+    :param str id_: Website or app ID
     :param bool fw: Regenerate the firewall after save?
     """
     for x in get(type=type):
-        if not id:
+        if not id_:
             x.remove(fw=False)
-        elif x.id == id:
+        elif x.id == id_:
             x.remove(fw=False)
             break
     if config.get("general", "firewall", True) and fw:

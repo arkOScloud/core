@@ -18,15 +18,15 @@ class Sharer:
     network, or instead to be a sync client for devices on the Internet.
     """
 
-    def __init__(self, service_id="", name="", icon=""):
+    def __init__(self, id_="", name="", icon=""):
         """
         Initialize the sharer object.
 
-        :param str service_id: File sharing service ID
+        :param str id_: File sharing service ID
         :param str name: File sharing service display name
         :param str icon: FontAwesome icon class
         """
-        self.id = id
+        self.id = id_
         self.name = name
         self.icon = icon
 
@@ -151,22 +151,22 @@ class Mount:
         return self.as_dict
 
 
-def get_shares(share_id=None, share_type=None):
+def get_shares(id_=None, type_=None):
     """
     Retrieve a list of all file shares registered with arkOS.
 
-    :param str share_id: If present, obtain one share that matches this ID
-    :param str share_type: Filter by ``fs-samba``, ``fs-afp``, etc
+    :param str id_: If present, obtain one share that matches this ID
+    :param str type_: Filter by ``fs-samba``, ``fs-afp``, etc
     :return: Share(s)
     :rtype: Share or list thereof
     """
     data = scan_shares()
-    if share_id or share_type:
+    if id_ or type_:
         tlist = []
         for x in data:
-            if x.id == share_id:
+            if x.id == id_:
                 return x
-            elif x.manager.id == share_type:
+            elif x.manager.id == type_:
                 tlist.append(x)
         if tlist:
             return tlist
@@ -191,22 +191,22 @@ def scan_shares():
     return shares
 
 
-def get_mounts(id_=None, mount_type=None):
+def get_mounts(id_=None, type_=None):
     """
     Retrieve a list of all file share mounts registered with arkOS.
 
     :param str id_: If present, obtain one mount that matches this ID
-    :param str type: Filter by ``fs-samba``, ``fs-afp``, etc
+    :param str type_: Filter by ``fs-samba``, ``fs-afp``, etc
     :return: Mount(s)
     :rtype: Mount or list thereof
     """
     data = scan_mounts()
-    if id_ or mount_type:
+    if id_ or type_:
         tlist = []
         for x in data:
             if x.id == id_:
                 return x
-            elif x.manager.id == mount_type:
+            elif x.manager.id == type_:
                 tlist.append(x)
         if tlist:
             return tlist
@@ -231,7 +231,7 @@ def scan_mounts():
     return mounts
 
 
-def get_sharers(share_id=None):
+def get_sharers(id_=None):
     """
     Retrieve a list of all file share systems registered with arkOS.
 
@@ -242,9 +242,9 @@ def get_sharers(share_id=None):
     data = storage.files.get("sharers")
     if not data:
         data = scan_sharers()
-    if share_id:
+    if id_:
         for x in data:
-            if x.id == share_id:
+            if x.id == id_:
                 return x
         return None
     return data
@@ -260,6 +260,6 @@ def scan_sharers():
     mgrs = []
     for x in applications.get(type="fileshare"):
         if x.installed and hasattr(x, "_share_mgr"):
-            mgrs.append(x._share_mgr(id=x.id, name=x.name, meta=x))
+            mgrs.append(x._share_mgr(id_=x.id, name=x.name, meta=x))
     storage.files.set("sharers", mgrs)
     return mgrs

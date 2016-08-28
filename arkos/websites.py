@@ -634,7 +634,7 @@ class ReverseProxy(Site):
 
     def __init__(
             self, id_="", name="", path="", addr="", port=80,
-            base_path="", block=[], rp_type="internal"):
+            base_path="", block=[], type_="internal"):
         """
         Initialize the reverse proxy website object.
 
@@ -645,7 +645,7 @@ class ReverseProxy(Site):
         :param int port: Port site is served on
         :param str base_path: Path to app root directory
         :param list block: List of nginx key objects to add to server block
-        :param str rp_type: Reverse proxy type
+        :param str type_: Reverse proxy type
         """
         self.id = id_
         self.name = name
@@ -654,7 +654,7 @@ class ReverseProxy(Site):
         self.port = port
         self.base_path = base_path
         self.block = block
-        self.type = rp_type
+        self.type = type_
         self.cert = None
         self.installed = False
 
@@ -774,7 +774,7 @@ class ReverseProxy(Site):
         return self.as_dict
 
 
-def get(id_=None, site_type=None, verify=True):
+def get(id_=None, type_=None, verify=True):
     """
     Retrieve website data from the system.
 
@@ -783,7 +783,7 @@ def get(id_=None, site_type=None, verify=True):
     are loaded and verified. This is used on first boot.
 
     :param str id_: If present, obtain one site that matches this ID
-    :param str site_type: Filter by ``website``, ``reverseproxy``, etc
+    :param str type_: Filter by ``website``, ``reverseproxy``, etc
     :param bool force: Force a rescan (do not rely on cache)
     :return: Website(s)
     :rtype: Website or list thereof
@@ -791,14 +791,14 @@ def get(id_=None, site_type=None, verify=True):
     sites = storage.sites.get("sites")
     if not sites:
         sites = scan()
-    if id_ or site_type:
+    if id_ or type_:
         type_list = []
         for site in sites:
             if site.id == id_:
                 return site
             elif (type and (type == "ReverseProxy" and
                             isinstance(site, ReverseProxy))) or \
-                    (type and site.meta.id == type):
+                    (type and site.meta.id == type_):
                 type_list.append(site)
         if type_list:
             return type_list
@@ -822,10 +822,10 @@ def scan():
             continue
 
         # Create the proper type of website object
-        site_type = meta.get("website", "type")
-        if site_type != "ReverseProxy":
+        type_ = meta.get("website", "type")
+        if type_ != "ReverseProxy":
             # If it's a regular website, initialize its class, metadata, etc
-            app = applications.get(site_type)
+            app = applications.get(type_)
             if not app or not app.loadable or not app.installed:
                 continue
             site = app._website(id=meta.get("website", "id"))

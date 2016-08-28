@@ -39,15 +39,15 @@ class App:
         self.installed = False
         self.error = ""
 
-    def get_module(self, mod_type):
+    def get_module(self, type_):
         """
         Helper function to get linked auxillary modules.
 
-        :param mod_type: Type of module to return (``backup``, ``ssl``, etc)
+        :param type_: Type of module to return (``backup``, ``ssl``, etc)
         :returns: Auxillary module (Backup, SSL, etc)
         :rtype: module
         """
-        return getattr(self, "_{0}".format(mod_type), None)
+        return getattr(self, "_{0}".format(type_), None)
 
     def load(self, verify=True):
         """

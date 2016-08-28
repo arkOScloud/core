@@ -157,7 +157,7 @@ class Interface:
         :param int rx: Number of bytes received
         :param int tx: Number of bytes sent
         """
-        self.id = id
+        self.id = id_
         self.itype = itype
         self.up = up
         self.ip = ip
@@ -235,7 +235,7 @@ def get_interfaces(id_=None):
     """
     Get list of network interfaces.
 
-    :param str netiface_id: Filter by network interface name
+    :param str id_: Filter by network interface name
     :returns: Interface(s)
     :rtype: Interface or list thereof
     """

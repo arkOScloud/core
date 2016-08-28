@@ -516,7 +516,7 @@ def get_points(id_=None, path=None):
         points.append(p)
     if id:
         for x in points:
-            if x.id == id:
+            if x.id == id_:
                 return x
         return None
     elif path:

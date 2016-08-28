@@ -41,7 +41,7 @@ class BackupController:
         :param Website site: Website object for this controller (if any)
         :param str version: Version of the app/website at the time of backup
         """
-        self.id = id
+        self.id = id_
         self.icon = icon
         self.ctype = "site" if site else "app"
         self.site = site

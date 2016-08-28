@@ -34,7 +34,7 @@ def install(*mods, **kwargs):
                         for k, v in kwargs["opts"].items())
     npm_command = _get_npm_command("install", kwargs.get("as_global", False),
                                    kwargs.get("install_path"))
-    s = shell("{0}{1}{2}".format(npm_command, mods, ))
+    s = shell("{0}{1}".format(npm_command, mods))
     os.chdir(cwd)
     if s["code"] != 0:
         logmsg = "NPM install of {0} failed; log output follows:\n{1}"
