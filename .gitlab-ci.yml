@@ -1,4 +1,7 @@
 image: python:3.5
+stages:
+  - build
+  - test
 
 before_script:
   - apt-get update -qy
@@ -8,4 +11,9 @@ before_script:
 build:
   script:
     - python setup.py build
+  when: on_success
+
+test:
+  script:
+    - python setup.py test
   when: on_success

@@ -6,6 +6,7 @@ netifaces==0.10.4
 GitPython==2.0.1
 python-pacman==0.3
 https://github.com/rhinstaller/pyparted/archive/v3.10.7.zip
+https://git.coderouge.co/arkOS/mockldap/repository/archive.zip?ref=v0.2.9
 dbus-python==1.2.4
 pyldap==2.4.25
 psutil==4.1.0

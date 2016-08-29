@@ -287,8 +287,7 @@ def initialize_upnp(svcs):
     try:
         upnpc.selectigd()
     except Exception as e:
-        logger.error("Failed to register with uPnP IGD: {0}"
-                     .format(str(e)))
+        logger.warn("Failed to register with uPnP IGD: {0}".format(str(e)))
         return
 
     for svc in svcs:

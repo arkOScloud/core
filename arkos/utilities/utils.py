@@ -186,7 +186,7 @@ def shell(c, stdin=None, env={}):
 
 def hashpw(passw):
     """Create a password hash."""
-    rnd = "".join(random.sample(string.ascii_uppercase+string.digits, 8))
+    rnd = "".join(random.sample(string.ascii_uppercase + string.digits, 16))
     salt = "$6$" + rnd + "$"
     return "{CRYPT}" + crypt.crypt(passw, salt)
 

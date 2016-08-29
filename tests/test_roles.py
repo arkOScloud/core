@@ -1,20 +1,18 @@
 import unittest
-import ldap
 
-import arkos
 from arkos import conns
 from arkos.system import users, groups, domains
 from mockldap import MockLdap
 
+from . import init_testing
 
-# "userPassword": ["{CRYPT}$6$17VM8C6R$bi/W3Z8ipQNAusSyyx.NEAKUFcMzsgiSq.mp18IGrhyiQe5LJ2WI20l6rfhoZYO390zLrP6xGzrBQzIBVG06f1"]
 
 class RolesTestCase(unittest.TestCase):
     directory = {
         "cn=admin,dc=arkos-servers,dc=org": {
             "objectClass": ["simpleSecurityObject", "organizationalRole"],
             "cn": ["admin"],
-            "userPassword": ["{CRYPT}wBjjHJTV0PAnY"]
+            "userPassword": ["{CRYPT}$6$DB6HMRCYVNXIW1S0$0niONOx5XS7c0MdUzAoJ1q8jmut4Bwmg14y3CAjo81dPJlX0NBwQB3XqknJh9JjTV44rOEesOV0/1/yZ6N4Qu/"]
         },
         "ou=users,dc=arkos-servers,dc=org": {
             "objectClass": ["organizationalUnit", "top"],
@@ -54,6 +52,7 @@ class RolesTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.mockldap = MockLdap(cls.directory)
+        cls.config, cls.secrets, cls.policies = init_testing()
 
     @classmethod
     def tearDownClass(cls):
@@ -62,8 +61,7 @@ class RolesTestCase(unittest.TestCase):
     def setUp(self):
         self.mockldap.start()
         self.ldapobj = self.mockldap['ldap://localhost/']
-        arkos.init(config_path="/root/core/defaults/settings_test.json",
-                   secrets_path="/root/core/defaults/secrets_test.json")
+        conns.connect(self.config, self.secrets)
 
     def tearDown(self):
         self.mockldap.stop()

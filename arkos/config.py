@@ -48,8 +48,22 @@ class Config:
         with open(path) as f:
             self.config = json.loads(f.read())
 
+    def load_object(self, obj, path=""):
+        """
+        Load the config from a dictionary object.
+
+        If `path` is empty, config will not be saved.
+
+        :param dict obj: dictionary to load as config
+        :param str path: Path to save to on disk
+        """
+        self.config = obj
+        self.path = path
+
     def save(self):
         """Save the config in memory to disk."""
+        if not self.path:
+            return
         config = self.config.copy()
         if "enviro" in config:
             del config["enviro"]
