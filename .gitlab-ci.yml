@@ -5,7 +5,7 @@ stages:
 
 before_script:
   - apt-get update -qy
-  - apt-get install -y libsasl2-dev libldap2-dev libssl-dev libdbus-1-dev libdbus-glib-1-dev libparted-dev
+  - apt-get install -y python3.5 libsasl2-dev libldap2-dev libssl-dev libdbus-1-dev libdbus-glib-1-dev libparted-dev
   - wget https://pkg.arkos.io/resources/python-cryptsetup_1.7.2_amd64.deb
   - dpkg -i python-cryptsetup_1.7.2_amd64.deb
   - pip install -r requirements.txt
