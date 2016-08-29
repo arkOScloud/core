@@ -1,6 +1,6 @@
 import unittest
 
-from arkos import conns
+from arkos import conns, connections
 from arkos.system import users, groups, domains
 from mockldap import MockLdap
 
@@ -61,7 +61,8 @@ class RolesTestCase(unittest.TestCase):
     def setUp(self):
         self.mockldap.start()
         self.ldapobj = self.mockldap['ldap://localhost/']
-        conns.connect(self.config, self.secrets)
+        conns.LDAP = connections.ldap_connect(
+            config=self.config, passwd=self.secrets.get("ldap"))
 
     def tearDown(self):
         self.mockldap.stop()
