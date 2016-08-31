@@ -21,6 +21,7 @@ class DefaultMessage:
 
     def __init__(self, cls="", msg="", head=""):
         """Initialize message object."""
+        self.head = head
         if cls == "error" and msg:
             raise DefaultException(str(msg))
         elif self.PRINT and cls == "warning" and msg:

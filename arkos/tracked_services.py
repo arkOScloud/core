@@ -10,7 +10,7 @@ Licensed under GPLv3, see LICENSE.md
 import miniupnpc
 import random
 
-from arkos import config, policies, logger, signals, storage, security
+from arkos import config, errors, policies, logger, signals, storage, security
 from arkos.utilities import test_port
 from arkos.utilities.errors import SoftFail
 
@@ -95,6 +95,18 @@ class SecurityPolicy:
     def serialized(self):
         """Return serializable policy metadata as dict."""
         return self.as_dict
+
+
+class PortConflictError(errors.Error):
+    """Raised when an address and port requested are not available."""
+
+    def __init__(self, port, addr):
+        self.port = port
+        self.addr = addr
+
+    def __str__(self):
+        return ("This port is taken by another site or service, "
+                "please choose another")
 
 
 def get(id=None, type=None):
