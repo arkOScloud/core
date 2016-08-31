@@ -23,8 +23,13 @@ class Error(Exception):
 class ConnectionError(Error):
     """Raised in chain when a system API connection fails."""
 
+    def __init__(self, service, info=""):
+        self.service = service
+        self.info = info
+
     def __str__(self):
-        return "Failed to connect to {0} service".format(self.msg)
+        return "Failed to connect to {0} service{1}".format(
+            self.service, self.info)
 
 
 class OperationFailedError(Error):
