@@ -94,7 +94,7 @@ def add_rule(opt, protocol, port, ranges=[]):
         mask = cidr_to_netmask(int(cidr))
         src += ip + "/" + mask
     s = shell(cmd.format(src=src, ptc=protocol, prt=port, opt=opt))
-    if s["code"] != 0 and "No chain/target/match by that name" in s["stderr"]:
+    if s["code"] != 0 and b"No chain/target/match by that name" in s["stderr"]:
         # Create chain if not exists
         shell("iptables -N arkos-apps")
         shell(cmd.format(src=src, ptc=protocol, prt=port, opt=opt))

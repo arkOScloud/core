@@ -31,7 +31,7 @@ def cidr_to_netmask(cidr):
     """Convert a CIDR prefix to an IP subnet mask."""
     mask = [0, 0, 0, 0]
     for i in range(cidr):
-        mask[i/8] = mask[i/8] + (1 << (7 - i % 8))
+        mask[int(i/8)] = mask[int(i/8)] + (1 << (7 - i % 8))
     return ".".join(map(str, mask))
 
 
@@ -96,8 +96,8 @@ def download(url, file=None, crit=False):
     try:
         data = requests.get(url)
         if file:
-            with open(file, "w") as f:
-                f.write(data.text)
+            with open(file, "wb") as f:
+                f.write(data.content)
         else:
             return data.text
     except Exception:
@@ -111,11 +111,11 @@ def get_current_entropy():
         return int(f.readline())
 
 
-def random_string():
+def random_string(length=40):
     """Create a random alphanumeric string."""
     digest = hashes.Hash(hashes.SHA1(), backend=default_backend())
     digest.update(str(random.random()).encode('utf-8'))
-    return binascii.hexlify(digest.finalize()).decode()
+    return binascii.hexlify(digest.finalize()).decode()[:length]
 
 
 def api(url, post=None, method="get", returns="json", headers=[], crit=False):

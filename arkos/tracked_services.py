@@ -229,24 +229,31 @@ def is_open_port(port, addr=None, ignore_common=False):
     return port not in ports
 
 
+def _upnp_igd_connect():
+    upnpc = miniupnpc.UPnP()
+    upnpc.discoverdelay = 3000
+    devs = upnpc.discover()
+    if devs == 0:
+        msg = "Failed to connect to uPnP IGD: no devices found"
+        logger.warning("TrackedSvcs", msg)
+        return
+    try:
+        upnpc.selectigd()
+    except Exception as e:
+        msg = "Failed to connect to uPnP IGD: {0}"
+        logger.error("TrackedSvcs", msg.format(str(e)))
+    return upnpc
+
+
 def open_upnp(port):
     """
     Open and forward a port with the local uPnP IGD.
 
     :param tuple port: Port protocol and number
     """
-    upnpc = miniupnpc.UPnP()
-    upnpc.discoverdelay = 3000
-    devs = upnpc.discover()
-    if devs == 0:
-        logger.error("Failed to register {0} with uPnP IGD: no devices found"
-                     .format(port))
+    upnpc = _upnp_igd_connect()
+    if not upnpc:
         return
-    try:
-        upnpc.selectigd()
-    except Exception as e:
-        logger.error("Failed to register {0} with uPnP IGD: {1}"
-                     .format(port, str(e)))
     if upnpc.getspecificportmapping(port[1], port[0].upper()):
         try:
             upnpc.deleteportmapping(port[1], port[0].upper())
@@ -257,8 +264,8 @@ def open_upnp(port):
         upnpc.addportmapping(port[1], port[0].upper(), upnpc.lanaddr, port[1],
                              pf.format(port[1]), '')
     except Exception as e:
-        logger.error("Failed to register {0} with uPnP IGD: {1}"
-                     .format(port, str(e)))
+        msg = "Failed to register {0} with uPnP IGD: {1}"
+        logger.error("TrackedSvcs", msg.format(port, str(e)))
 
 
 def close_upnp(port):
@@ -267,18 +274,9 @@ def close_upnp(port):
 
     :param tuple port: Port protocol and number
     """
-    upnpc = miniupnpc.UPnP()
-    upnpc.discoverdelay = 3000
-    devs = upnpc.discover()
-    if devs == 0:
-        logger.error("Failed to register {0} with uPnP IGD: no devices found"
-                     .format(port))
+    upnpc = _upnp_igd_connect()
+    if not upnpc:
         return
-    try:
-        upnpc.selectigd()
-    except Exception as e:
-        logger.error("Failed to register {0} with uPnP IGD: {1}"
-                     .format(port, str(e)))
     if upnpc.getspecificportmapping(port[1], port[0].upper()):
         try:
             upnpc.deleteportmapping(port[1], port[0].upper())
@@ -292,16 +290,9 @@ def initialize_upnp(svcs):
 
     :param SecurityPolicy svcs: SecurityPolicies to open
     """
-    upnpc = miniupnpc.UPnP()
-    upnpc.discoverdelay = 3000
-    upnpc.discover()
-    try:
-        upnpc.selectigd()
-    except Exception as e:
-        msg = "Failed to register with uPnP IGD: {0}".format(str(e))
-        logger.warning("TrackedSvcs", msg)
+    upnpc = _upnp_igd_connect()
+    if not upnpc:
         return
-
     for svc in svcs:
         if svc.policy != 2:
             continue
@@ -316,8 +307,8 @@ def initialize_upnp(svcs):
                 upnpc.addportmapping(port, protocol.upper(), upnpc.lanaddr,
                                      port, pf.format(port), '')
             except Exception as e:
-                logger.error("Failed to register {0} with uPnP IGD: {1}"
-                             .format(port, str(e)))
+                msg = "Failed to register {0} with uPnP IGD: {1}"
+                logger.error("TrackedSvcs", msg.format(port, str(e)))
 
 
 def open_all_upnp(ports):
@@ -326,17 +317,9 @@ def open_all_upnp(ports):
 
     :param list ports: List of port objects to open
     """
-    upnpc = miniupnpc.UPnP()
-    upnpc.discoverdelay = 3000
-    devs = upnpc.discover()
-    if devs == 0:
-        logger.error("Failed to register with uPnP IGD: no devices found")
+    upnpc = _upnp_igd_connect()
+    if not upnpc:
         return
-    try:
-        upnpc.selectigd()
-    except Exception as e:
-        logger.error("Failed to register with uPnP IGD: {0}"
-                     .format(str(e)))
     for port in [x for x in ports]:
         if upnpc.getspecificportmapping(port[1], port[0].upper()):
             try:
@@ -348,8 +331,8 @@ def open_all_upnp(ports):
             upnpc.addportmapping(port[1], port[0].upper(), upnpc.lanaddr,
                                  port[1], pf.format(port[1]), '')
         except Exception as e:
-            logger.error("Failed to register {0} with uPnP IGD: {1}"
-                         .format(port, str(e)))
+            msg = "Failed to register {0} with uPnP IGD: {1}"
+            logger.error("TrackedSvcs", msg.format(port, str(e)))
 
 
 def close_all_upnp(ports):
@@ -358,17 +341,9 @@ def close_all_upnp(ports):
 
     :param list ports: List of port objects to close
     """
-    upnpc = miniupnpc.UPnP()
-    upnpc.discoverdelay = 3000
-    devs = upnpc.discover()
-    if devs == 0:
-        logger.error("Failed to register with uPnP IGD: no devices found")
+    upnpc = _upnp_igd_connect()
+    if not upnpc:
         return
-    try:
-        upnpc.selectigd()
-    except Exception as e:
-        logger.error("Failed to register with uPnP IGD: {0}"
-                     .format(str(e)))
     for port in [x for x in ports]:
         if upnpc.getspecificportmapping(port[1], port[0].upper()):
             try:

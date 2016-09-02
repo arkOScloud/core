@@ -65,7 +65,7 @@ class Site:
         :param bool enabled: Is site enabled through nginx?
         """
         self.id = id
-        self.path = path.encode("utf-8")
+        self.path = path
         self.addr = addr
         self.port = port
         self.php = php
@@ -99,6 +99,7 @@ class Site:
                 errors.OperationFailedError
             )
             if not isinstance(e, weberrors):
+                self.clean_up()
                 raise errors.OperationFailedError(
                     "({0})".format(meta.id), message) from e
             else:
@@ -118,7 +119,7 @@ class Site:
         site_dir = config.get("websites", "site_dir")
         self.meta = meta
         path = (self.path or os.path.join(site_dir, self.id))
-        self.path = path.encode("utf-8")
+        self.path = path
         self.php = extra_vars.get("php") or self.php \
             or self.meta.uses_php or False
         self.version = self.meta.version.rsplit("-", 1)[0] \
@@ -305,7 +306,6 @@ class Site:
         try:
             specialmsg = self.post_install(extra_vars, dbpasswd)
         except Exception as e:
-            self.clean_up()
             raise errors.OperationFailedError(
                 "({0} {1})".format(meta.id, stage), message) from e
 
@@ -319,7 +319,7 @@ class Site:
         if enable and self.php:
             php.open_basedir("add", "/srv/http/")
             php_reload()
-        msg = "{0} site installed successfully".format(meta.name)
+        msg = "{0} site installed successfully".format(self.meta.name)
         message.success("Websites", msg, complete=True)
         if specialmsg:
             return specialmsg
@@ -562,7 +562,7 @@ class Site:
                 self.path = os.path.join(site_dir, newname, "htdocs")
             else:
                 self.path = os.path.join(site_dir, newname)
-            self.path = self.path.encode("utf-8")
+            self.path = self.path
             if os.path.exists(self.path):
                 shutil.rmtree(self.path)
             self.nginx_disable(reload=False)
@@ -787,7 +787,7 @@ class ReverseProxy(Site):
         self.id = id
         self.name = name
         self.addr = addr
-        self.path = path.encode("utf-8")
+        self.path = path
         self.port = port
         self.base_path = base_path
         self.block = block
@@ -820,7 +820,7 @@ class ReverseProxy(Site):
         # Set metadata values
         site_dir = config.get("websites", "site_dir")
         path = (self.path or os.path.join(site_dir, self.id))
-        self.path = path.encode("utf-8")
+        self.path = path
 
         try:
             os.makedirs(self.path)
