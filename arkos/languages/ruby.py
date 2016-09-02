@@ -40,15 +40,13 @@ def install_gem(*gems, **kwargs):
     :param *gems: gems to install
     """
     verify_path()
-    gemlist = shell("gem list")["stdout"].split("\n")
+    gemlist = shell("gem list")["stdout"].split(b"\n")
     for x in gems:
         if not any(x == s for s in gemlist) or kwargs.get('force'):
             d = shell("gem install -N --no-user-install {0}".format(x))
             if d["code"] != 0:
-                logmsg = "Gem install '{0}' failed: {1}"
-                excmsg = "Gem install '{0}' failed. See logs for more info"
-                logger.error(logmsg.format(x, str(d["stderr"])))
-                raise Exception(excmsg.format(x))
+                excmsg = "Gem install '{0}' failed: {1}"
+                raise Exception(excmsg.format(x, d["stderr"]))
 
 
 def update_gem(*gems, **kwargs):

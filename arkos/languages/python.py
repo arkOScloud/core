@@ -7,8 +7,7 @@ Written by Jacob Cook
 Licensed under GPLv3, see LICENSE.md
 """
 
-from arkos import logger
-from arkos.utilities import shell
+from arkos.utilities import errors, shell
 
 
 def install(*mods):
@@ -18,12 +17,9 @@ def install(*mods):
     :param *mods: packages to install
     """
     mods = " ".join(x for x in mods)
-    s = shell("pip2 install {0}".format(mods))
+    s = shell("pip install {0}".format(mods))
     if s["code"] != 0:
-        logmsg = "Failed to install {0} via PyPI; {1}"
-        excmsg = "Failed to install {0} via PyPI, check logs for info"
-        logger.error(logmsg.format(mods, s["stderr"]))
-        raise Exception(excmsg.format(mods))
+        raise errors.OperationFailedError(mods) from Exception(s["stderr"])
 
 
 def remove(*mods):
@@ -32,12 +28,9 @@ def remove(*mods):
 
     :param *mods: packages to remove
     """
-    s = shell("pip2 uninstall {0}".format(mods))
+    s = shell("pip uninstall {0}".format(mods))
     if s["code"] != 0:
-        logmsg = "Failed to remove {0} via PyPI; {1}"
-        excmsg = "Failed to remove {0} via PyPI, check logs for info"
-        logger.error(logmsg.format(mods, s["stderr"]))
-        raise Exception(excmsg.format(mods))
+        raise errors.OperationFailedError(mods) from Exception(s["stderr"])
 
 
 def is_installed(name):
@@ -48,7 +41,7 @@ def is_installed(name):
     :returns: True if package is installed
     :rtype: bool
     """
-    s = shell("pip2 freeze")
+    s = shell("pip freeze")
     for x in s["stdout"].split("\n"):
         if name.lower() in x.split("==")[0].lower():
             return True
