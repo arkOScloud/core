@@ -14,7 +14,12 @@ from .utils import random_string
 
 class StreamFormatter(logging.Formatter):
     def format(self, record):
-        data = record.msg
+        if type(record.msg) in [str, bytes]:
+            data = {"id": id or random_string(16), "title": None,
+                    "message": record.msg, "component": "Unknown",
+                    "class": "runtime", "persist": False}
+        else:
+            data = record.msg
         record.msg = data["message"]
         if record.levelname == "DEBUG":
             record.levelname = "\033[37mDEBUG\033[0m  "
@@ -60,6 +65,7 @@ class LoggingControl:
         """Create a new stream logger."""
         self.logger.handlers = []
         stdout = logging.StreamHandler()
+        self.logger.setLevel(logging.DEBUG)
         stdout.setLevel(logging.DEBUG if debug else logging.INFO)
         st = "%(asctime)s [%(cls)s] [%(levelname)s] %(component)s: %(message)s"
         dformatter = StreamFormatter(st)
@@ -70,7 +76,7 @@ class LoggingControl:
              cls="runtime", persist=False):
         """Send a message with log level INFO."""
         self.logger.info(
-            {"id": id or random_string()[0:10], "title": title, "message": msg,
+            {"id": id or random_string(16), "title": title, "message": msg,
              "component": comp, "class": cls, "persist": persist}
         )
 
@@ -79,7 +85,7 @@ class LoggingControl:
         """Send a message with log level SUCCESS."""
         self.logger.log(
             25,
-            {"id": id or random_string()[0:10], "title": title, "message": msg,
+            {"id": id or random_string(16), "title": title, "message": msg,
              "component": comp, "class": cls, "persist": persist}
         )
 
@@ -87,7 +93,7 @@ class LoggingControl:
                 cls="runtime", persist=False):
         """Send a message with log level WARNING."""
         self.logger.warning(
-            {"id": id or random_string()[0:10], "title": title, "message": msg,
+            {"id": id or random_string(16), "title": title, "message": msg,
              "component": comp, "class": cls, "persist": persist}
         )
 
@@ -95,7 +101,7 @@ class LoggingControl:
               cls="runtime", persist=False):
         """Send a message with log level ERROR."""
         self.logger.error(
-            {"id": id or random_string()[0:10], "title": title, "message": msg,
+            {"id": id or random_string(16), "title": title, "message": msg,
              "component": comp, "class": cls, "persist": persist},
             exc_info=True
         )
@@ -104,6 +110,6 @@ class LoggingControl:
               cls="runtime", persist=False):
         """Send a message with log level DEBUG."""
         self.logger.debug(
-            {"id": id or random_string()[0:10], "title": title, "message": msg,
+            {"id": id or random_string(16), "title": title, "message": msg,
              "component": comp, "class": cls, "persist": persist}
         )

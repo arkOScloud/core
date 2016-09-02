@@ -12,7 +12,7 @@ class RolesTestCase(unittest.TestCase):
         "cn=admin,dc=arkos-servers,dc=org": {
             "objectClass": ["simpleSecurityObject", "organizationalRole"],
             "cn": ["admin"],
-            "userPassword": ["{CRYPT}$6$DB6HMRCYVNXIW1S0$0niONOx5XS7c0MdUzAoJ1q8jmut4Bwmg14y3CAjo81dPJlX0NBwQB3XqknJh9JjTV44rOEesOV0/1/yZ6N4Qu/"]
+            "userPassword": [b"{CRYPT}$6$DB6HMRCYVNXIW1S0$0niONOx5XS7c0MdUzAoJ1q8jmut4Bwmg14y3CAjo81dPJlX0NBwQB3XqknJh9JjTV44rOEesOV0/1/yZ6N4Qu/"]
         },
         "ou=users,dc=arkos-servers,dc=org": {
             "objectClass": ["organizationalUnit", "top"],

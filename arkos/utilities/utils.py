@@ -27,6 +27,11 @@ import time
 import zipfile
 
 
+def b(text):
+    """Less-ugly way of converting unicode to bytestring."""
+    return text.encode("utf-8")
+
+
 def cidr_to_netmask(cidr):
     """Convert a CIDR prefix to an IP subnet mask."""
     mask = [0, 0, 0, 0]

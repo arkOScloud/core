@@ -27,7 +27,8 @@ notify = LoggingControl("notify")
 
 def init(config_path="/etc/arkos/settings.json",
          secrets_path="/etc/arkos/secrets.json",
-         policies_path="/etc/arkos/policies.json", log=None):
+         policies_path="/etc/arkos/policies.json",
+         debug=False, log=None):
     """Initialize and load arkOS config data."""
     config.load(config_path)
     secrets.load(secrets_path)
@@ -42,7 +43,7 @@ def init(config_path="/etc/arkos/settings.json",
                         " network connection is properly configured.")
     if log:
         logger.logger = log
-    logger.add_stream_logger()
+    logger.add_stream_logger(debug or config.get("general", "debug", False))
     return config
 
 
