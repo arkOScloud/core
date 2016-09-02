@@ -106,14 +106,14 @@ class User:
 
         ldif = ldif[0][1]
         attrs = {
-            "givenName": self.first_name,
-            "sn": self.last_name or "",
-            "displayName": self.first_name + " " + self.last_name,
-            "cn": self.first_name + (" " + self.last_name or ""),
+            "givenName": [self.first_name],
+            "sn": [self.last_name or ""],
+            "displayName": [self.first_name + " " + self.last_name],
+            "cn": [self.first_name + (" " + self.last_name or "")],
             "mail": self.mail
         }
         if newpasswd:
-            attrs["userPassword"] = hashpw(newpasswd)
+            attrs["userPassword"] = [hashpw(newpasswd)]
         signals.emit("users", "pre_update", self)
         nldif = ldap.modlist.modifyModlist(ldif, attrs, ignore_oldexistent=1)
         conns.LDAP.modify_s(self.ldap_id, nldif)
@@ -149,10 +149,10 @@ class User:
         if self.sudo and not is_sudo:
             nldif = {
                 "objectClass": ["sudoRole", "top"],
-                "cn": self.name,
+                "cn": [self.name],
                 "sudoHost": "ALL",
                 "sudoCommand": "ALL",
-                "sudoUser": self.name,
+                "sudoUser": [self.name],
                 "sudoOption": "authenticate"
             }
             nldif = ldap.modlist.addModlist(nldif)

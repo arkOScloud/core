@@ -45,7 +45,7 @@ class Domain:
             raise Exception("This domain is already present here")
         except ldap.NO_SUCH_OBJECT:
             pass
-        ldif = {"virtualdomain": self.name,
+        ldif = {"virtualdomain": [self.name],
                 "objectClass": ["mailDomain", "top"]}
         signals.emit("domains", "pre_add", self)
         conns.LDAP.add_s(self.ldap_id, ldap.modlist.addModlist(ldif))
@@ -81,10 +81,10 @@ def get(id=None):
     results = []
     qset = conns.LDAP.search_s("ou=domains,{0}".format(
         config.get("general", "ldap_rootdn", "dc=arkos-servers,dc=org")),
-        ldap.SCOPE_SUBTREE, "virtualdomain=*", ["virtualdomain"])
+        ldap.SCOPE_SUBTREE, "(virtualdomain=*)", ["virtualdomain"])
     for x in qset:
         d = Domain(x[1]["virtualdomain"][0], x[0].split("ou=domains,")[1])
         if d.name == id:
             return d
         results.append(d)
-    return results
+    return results if id is None else None

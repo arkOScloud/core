@@ -49,7 +49,7 @@ class Group:
             pass
         ldif = {
             "objectClass": ["posixGroup", "top"],
-            "cn": self.name,
+            "cn": [self.name],
             "gidNumber": str(self.gid),
             "memberUid": self.users
         }
@@ -70,7 +70,7 @@ class Group:
                                           {"memberUid": self.users},
                                           ignore_oldexistent=1)
         signals.emit("groups", "pre_update", self)
-        conns.LDAP.modify_ext_s(self.ldap_id, ldif)
+        conns.LDAP.modify_s(self.ldap_id, ldif)
         signals.emit("groups", "post_update", self)
 
     def delete(self):
@@ -128,7 +128,7 @@ class SystemGroup:
         shell("groupdel {0}".format(self.name))
 
 
-def get(gid=None):
+def get(gid=None, name=None):
     """
     Get all LDAP groups.
 
@@ -146,12 +146,14 @@ def get(gid=None):
             if type(x[1][y]) == list and len(x[1][y]) == 1 \
                     and y != "memberUid":
                 x[1][y] = x[1][y][0]
-        g = Group(x[1]["cn"], int(x[1]["gidNumber"]),
+        g = Group(x[1]["cn"], int(x[1]["gidNumber"][0]),
                   x[1].get("memberUid", []), x[0].split("ou=groups,")[1])
         if g.gid == gid:
             return g
+        elif name and g.name == name:
+            return g
         r.append(g)
-    return r if not gid else None
+    return r if gid is None and name is None else None
 
 
 def get_system(gid=None):

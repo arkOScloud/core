@@ -10,9 +10,8 @@ Licensed under GPLv3, see LICENSE.md
 import json
 import os
 
-from arkos import config, secrets, policies, logger, version
+from arkos import config, secrets, policies, version
 from arkos.utilities import test_dns
-from arkos.utilities.logs import new_logger
 from arkos.utilities import detect_architecture
 
 
@@ -34,5 +33,4 @@ def init_testing(log=None):
     if not test_dns("arkos.io"):
         raise Exception("DNS resolution failed. Please make sure your server"
                         " network connection is properly configured.")
-    logger.logger = log or new_logger(20, debug=True)
     return (config, secrets, policies)

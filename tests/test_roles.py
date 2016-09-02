@@ -84,7 +84,7 @@ class RolesTestCase(unittest.TestCase):
         u = users.get(name="testuser")
         u.first_name = "Notatest"
         u.last_name = ""
-        u.update(passwd="mypass")
+        u.update(newpasswd="mypass")
         u = users.get(name="testuser")
         self.assertEqual(u.first_name, "Notatest")
         self.assertEqual(u.last_name, "")
@@ -104,12 +104,12 @@ class RolesTestCase(unittest.TestCase):
     def test_auth_fail(self):
         _add_test_user("testuser")
         u = users.get(name="testuser")
-        self.assertFalse(u.verify_passwd("testpass"))
+        self.assertFalse(u.verify_passwd("falsepass"))
 
     def test_add_group(self):
         _add_test_user("testuser1")
         g = groups.Group(
-            name="testgroup", members=["testuser1"]
+            name="testgroup", users=["testuser1"]
         )
         g.add()
 
@@ -117,17 +117,17 @@ class RolesTestCase(unittest.TestCase):
         _add_test_user("testuser1")
         _add_test_user("testuser2")
         g = groups.Group(
-            name="testgroup", members=["testuser1"]
+            name="testgroup", users=["testuser1"]
         )
         g.add()
         g = groups.get(name="testgroup")
-        g.members = ["testuser2"]
+        g.users = ["testuser2"]
         g.update()
         g = groups.get(name="testgroup")
-        self.assertEqual(g.members, ["testuser2"])
+        self.assertEqual(g.users, ["testuser2"])
 
     def test_del_group(self):
-        g = groups.Group(name="testgroup", members=[])
+        g = groups.Group(name="testgroup", users=[])
         g.add()
         g = groups.get(name="testgroup")
         g.delete()
