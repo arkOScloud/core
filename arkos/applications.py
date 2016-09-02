@@ -17,10 +17,11 @@ import tarfile
 
 from distutils.spawn import find_executable
 
-from arkos import config, errors, storage, signals, logger, tracked_services
+from arkos import config, storage, signals, logger, tracked_services
+from arkos.messages import MessageContext
 from arkos.system import services
 from arkos.languages import python
-from arkos.utilities import api, DefaultMessage
+from arkos.utilities import api, errors
 
 
 class App:
@@ -108,7 +109,7 @@ class App:
             raise errors.OperationFailedError(
                 "({0})".format(self.name)) from e
 
-    def verify_dependencies(self):
+    def verify_dependencies(self, cry):
         """
         Verify that the associated dependencies are all properly installed.
 
@@ -146,7 +147,8 @@ class App:
                     except:
                         error = "Couldn't install {0}".format(to_pip)
                         verify = False
-                        raise AppDependencyError(to_pip, "python")
+                        if cry:
+                            raise AppDependencyError(to_pip, "python")
                     finally:
                         if dep.get("internal"):
                             error = "Restart required"
@@ -160,13 +162,14 @@ class App:
             except:
                 error = "Couldn't install {0}".format(x)
                 verify = False
-                raise AppDependencyError(x, "system")
+                if cry:
+                    raise AppDependencyError(x, "system")
         self.loadable = verify
         self.error = error
         return verify
 
     def install(self, install_deps=True, load=True, force=False,
-                cry=False, message=DefaultMessage()):
+                cry=False, message=MessageContext("Apps")):
         """
         Install the arkOS application to the system.
 
@@ -177,7 +180,7 @@ class App:
         :param message message: Message object to update with status
         """
         try:
-            self._install(install_deps, load, force, message)
+            self._install(install_deps, load, force, cry, message)
         except Exception as e:
             weberrors = (
                 errors.InvalidConfigError,
@@ -198,10 +201,10 @@ class App:
         if install_deps and deps:
             for x in deps:
                 msg_str = "Installing dependencies for {0}... ({1})"
-                message.update("info", msg_str.format(self.name, x))
+                message.info("Apps", msg_str.format(self.name, x))
                 _install(x, load=load, cry=cry)
         # Install this app
-        message.update("info", "Installing {0}...".format(self.name))
+        message.info("Apps", "Installing {0}...".format(self.name))
         _install(self.id, load=load, cry=cry)
         ports = []
         for s in self.services:
@@ -211,10 +214,10 @@ class App:
             tracked_services.open_all_upnp(ports)
         verify_app_dependencies()
         smsg = "{0} installed successfully.".format(self.name)
-        message.complete("success", smsg)
+        message.success("Apps", smsg, complete=True)
         signals.emit("apps", "post_install", self)
 
-    def uninstall(self, force=False, message=DefaultMessage()):
+    def uninstall(self, force=False, message=MessageContext("Apps")):
         """
         Uninstall the arkOS application from the system.
 
@@ -222,7 +225,7 @@ class App:
         :param message message: Message object to update with status
         """
         signals.emit("apps", "pre_remove", self)
-        message.update("info", "Uninstalling application...")
+        message.info("Apps", "Uninstalling application...")
         exclude = ["openssl", "openssh", "nginx", "python2", "git",
                    "nodejs", "npm"]
 
@@ -265,7 +268,7 @@ class App:
         if ports and config.get("general", "enable_upnp", True):
             tracked_services.close_all_upnp(ports)
         smsg = "{0} uninstalled successfully".format(self.name)
-        message.complete("success", smsg)
+        message.success("Apps", smsg, complete=True)
         signals.emit("apps", "post_remove", self)
 
     def ssl_enable(self, cert, sid=""):
@@ -414,14 +417,14 @@ def scan(verify=True, cry=True):
                 data = json.loads(f.read())
         except ValueError:
             warn_str = "Failed to load {0} due to a JSON parsing error"
-            logger.warn(warn_str.format(x))
+            logger.warning("Apps", warn_str.format(x))
             continue
         except IOError:
             warn_str = "Failed to load {0}: manifest file inaccessible "\
                        "or not present"
-            logger.warn(warn_str.format(x))
+            logger.warning("Apps", warn_str.format(x))
             continue
-        logger.debug(" *** Loading {0}".format(data["id"]))
+        logger.debug("Apps", " *** Loading {0}".format(data["id"]))
         app = App(**data)
         app.installed = True
         for y in enumerate(available_apps):
@@ -466,7 +469,7 @@ def verify_app_dependencies():
                               .format(dep["name"])
                     error_str = "*** Verify failed for {0} -- dependent on "\
                                 "{1} which is not installed"
-                    logger.debug(error_str.format(x.name, dep["name"]))
+                    logger.debug("Apps", error_str.format(x.name, dep["name"]))
                     # Cascade this fail message to all apps in dependency chain
                     for z in get_dependent(x.id, "remove"):
                         z = storage.apps.get("applications", z)
@@ -482,7 +485,7 @@ def verify_app_dependencies():
                               .format(dep["name"])
                     error_str = "*** Verify failed for {0} -- dependent on "\
                                 "{1} which failed to load"
-                    logger.debug(error_str.format(x.name, dep["name"]))
+                    logger.debug("Apps", error_str.format(x.name, dep["name"]))
                     # Cascade this fail message to all apps in dependency chain
                     for z in get_dependent(x.id, "remove"):
                         z = storage.apps.get("applications", z)

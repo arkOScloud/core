@@ -17,9 +17,9 @@ import glob
 import os
 
 from arkos import config, signals, storage, websites, applications
+from arkos.messages import MessageContext
 from arkos.system import groups
 from arkos.utilities import shell
-from arkos.utilities.logs import DefaultMessage
 
 
 if not groups.get_system("ssl-cert"):
@@ -359,7 +359,7 @@ def generate_dh_params(path, size=2048):
 
 def upload_certificate(
         id, cert, key, chain="", dhparams="/etc/arkos/ssl/dh_params.pem",
-        message=DefaultMessage()):
+        message=MessageContext("Certificates")):
     """
     Create and save a new certificate from an external file.
 
@@ -390,11 +390,11 @@ def upload_certificate(
 
     # Check to see that we have DH params, if not then do that too
     if not os.path.exists(dhparams):
-        message.update("info", "Generating Diffie-Hellman parameters...")
+        message.info("Certificates", "Generating Diffie-Hellman parameters...")
         generate_dh_params(dhparams)
 
     # Create actual certificate object
-    message.update("info", "Importing certificate...")
+    message.info("Certificates", "Importing certificate...")
     cert_dir = config.get("certificates", "cert_dir")
     key_dir = config.get("certificates", "key_dir")
     sha1 = crt.fingerprint(hashes.SHA1())
@@ -423,13 +423,15 @@ def upload_certificate(
     os.chmod(c.key_path, 0o660)
     storage.certs.add("certificates", c)
     signals.emit("certificates", "post_add", c)
+    msg = "Certificate imported successfully"
+    message.success("Certificates", msg, complete=True)
     return c
 
 
 def generate_certificate(
         id, domain, country, state="", locale="", email="", keytype="RSA",
         keylength=2048, dhparams="/etc/arkos/ssl/dh_params.pem",
-        message=DefaultMessage()):
+        message=MessageContext("Certificates")):
     """
     Generate and save a new self-signed certificate.
 
@@ -454,7 +456,7 @@ def generate_certificate(
     basehost = ".".join(domain.split(".")[-2:])
     ca = get_authorities(id=basehost)
     if not ca:
-        message.update("info", "Generating certificate authority...")
+        message.info("Certificates", "Generating certificate authority...")
         ca = generate_authority(basehost)
     with open(ca.cert_path, "rb") as f:
         ca_cert = x509.load_pem_x509_certificate(f.read(), default_backend())
@@ -467,12 +469,12 @@ def generate_certificate(
 
     # Check to see that we have DH params, if not then do that too
     if not os.path.exists(dhparams):
-        message.update("info", "Generating Diffie-Hellman parameters. "
-                       "This may take a few minutes...")
+        message.info("Websites", "Generating Diffie-Hellman parameters. "
+                     "This may take a few minutes...")
         generate_dh_params(dhparams)
 
     # Generate private key and create X509 certificate, then set options
-    message.update("info", "Generating certificate...")
+    message.info("Certificates", "Generating certificate...")
     cert_path = os.path.join(config.get("certificates", "cert_dir"),
                              "{0}.crt".format(id))
     key_path = os.path.join(config.get("certificates", "key_dir"),
@@ -521,6 +523,8 @@ def generate_certificate(
                     [], cert.not_valid_after, sha1, md5)
     storage.certs.add("certificates", c)
     signals.emit("certificates", "post_add", c)
+    msg = "Certificate generated successfully"
+    message.success("Certificates", msg, complete=True)
     return c
 
 

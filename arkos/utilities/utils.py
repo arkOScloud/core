@@ -115,7 +115,7 @@ def random_string():
     """Create a random alphanumeric string."""
     digest = hashes.Hash(hashes.SHA1(), backend=default_backend())
     digest.update(str(random.random()).encode('utf-8'))
-    return binascii.hexlify(digest.finalize())
+    return binascii.hexlify(digest.finalize()).decode()
 
 
 def api(url, post=None, method="get", returns="json", headers=[], crit=False):
@@ -143,8 +143,10 @@ def api(url, post=None, method="get", returns="json", headers=[], crit=False):
             req = action(url, headers=headers, json=post)
         if returns == "json":
             return req.json()
-        else:
+        elif returns == "str":
             return req.text
+        else:
+            return req.content
         req.raise_for_status()
     except requests.exceptions.HTTPError as e:
         if crit:

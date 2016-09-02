@@ -43,7 +43,7 @@ class Config:
             if os.path.exists(os.path.join(dir, self.filename)):
                 path = os.path.join(dir, self.filename)
             else:
-                raise ConfigurationError("{} not found".format(self.filename))
+                raise ConfigurationError("{0} not found".format(self.filename))
         self.path = path
         with open(path) as f:
             self.config = json.loads(f.read())

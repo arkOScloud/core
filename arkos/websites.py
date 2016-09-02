@@ -16,11 +16,12 @@ import shutil
 import tarfile
 import zipfile
 
-from arkos import applications, config, databases, errors, signals, storage
+from arkos import applications, config, databases, signals, storage
 from arkos import tracked_services
+from arkos.messages import MessageContext
 from arkos.languages import php
 from arkos.system import users, groups, services
-from arkos.utilities import download, random_string, DefaultMessage
+from arkos.utilities import download, errors, random_string
 
 
 # If no cipher preferences set, use the default ones
@@ -80,7 +81,7 @@ class Site:
             self.addtoblock = block
 
     def install(self, meta, extra_vars={}, enable=True,
-                message=DefaultMessage()):
+                message=MessageContext("Websites")):
         """
         Install site, including prep and app recipes.
 
@@ -104,7 +105,8 @@ class Site:
                 raise
 
     def _install(self, meta, extra_vars, enable, message):
-        message.update("info", "Preparing to install...")
+        message.info("Websites", "Preparing to install",
+                     title="Installing website...")
 
         # Make sure the chosen port is indeed open
         if not tracked_services.is_open_port(self.port, self.addr):
@@ -139,7 +141,7 @@ class Site:
             raise errors.InvalidConfigError(
                 "Invalid source archive format in {0}".format(self.meta.id))
 
-        message.update("info", "Running pre-installation...")
+        message.info("Websites", "Running pre-installation...")
 
         # Call website type's pre-install hook
         stage = "Pre-Install"
@@ -160,7 +162,7 @@ class Site:
         # Create DB and/or DB user as necessary
         stage = "Database"
         if getattr(self.meta, "selected_dbengine", None):
-            message.update("info", "Creating database...")
+            message.info("Websites", "Creating database...")
             try:
                 mgr = databases.get_managers(self.meta.selected_dbengine)
                 if not mgr:
@@ -188,7 +190,7 @@ class Site:
 
         # Download and extract the source repo / package
         stage = "Clone"
-        message.update("info", "Downloading website source...")
+        message.info("Websites", "Downloading website source...")
         if self.meta.download_url and ending == ".git":
             git.Repo.clone_from(self.meta.download_url, self.path)
         elif self.meta.download_url:
@@ -199,7 +201,7 @@ class Site:
                     "({0} {1})".format(meta.id, stage), message) from e
 
             # Format extraction command according to type
-            message.update("info", "Extracting source...")
+            message.info("Websites", "Extracting source...")
             try:
                 if ending in [".tar.gz", ".tgz", ".tar.bz2"]:
                     arch = tarfile.open(pkg_path, "r:gz")
@@ -297,8 +299,8 @@ class Site:
             meta.write(f)
 
         # Call site type's post-installation hook
-        message.update("info", "Running post-installation. "
-                       "This may take a few minutes...")
+        message.info("Websites", "Running post-installation. "
+                     "This may take a few minutes...")
         stage = "Post-Install"
         try:
             specialmsg = self.post_install(extra_vars, dbpasswd)
@@ -308,7 +310,7 @@ class Site:
                 "({0} {1})".format(meta.id, stage), message) from e
 
         # Cleanup and reload daemons
-        message.update("info", "Finishing...")
+        message.info("Websites", "Finishing...")
         self.installed = True
         storage.sites.add("sites", self)
         signals.emit("websites", "site_installed", self)
@@ -317,8 +319,8 @@ class Site:
         if enable and self.php:
             php.open_basedir("add", "/srv/http/")
             php_reload()
-        message.complete(
-            "success", "{0} site installed successfully".format(meta.name))
+        msg = "{0} site installed successfully".format(meta.name)
+        message.success("Websites", msg, complete=True)
         if specialmsg:
             return specialmsg
 
@@ -596,7 +598,7 @@ class Site:
             self.site_edited()
         nginx_reload()
 
-    def update(self, message=DefaultMessage()):
+    def update(self, message=MessageContext("Websites")):
         """
         Run an update on this website.
 
@@ -643,7 +645,8 @@ class Site:
 
         # Download and extract the source package
         stage = "Clone"
-        message.update("info", "Downloading website source...")
+        message.info("Websites", "Downloading website source",
+                     title="Updating website...")
         if self.download_url and ending == ".git":
             pkg_path = self.download_url
         elif self.download_url:
@@ -657,18 +660,20 @@ class Site:
         # Call the site type's update hook
         stage = "Hook"
         try:
-            message.update("info", "Updating website...")
+            message.info("Websites", "Updating website...")
             self.update_site(self.path, pkg_path, self.version)
         except Exception as e:
             raise errors.OperationFailedError(
                 "({0} {1})".format(self.id, stage), message) from e
         finally:
             # Update stored version and remove temp source archive
+            msg = "{0} updated successfully".format(self.id)
+            message.success("Websites", msg, complete=True)
             self.version = self.meta.version.rsplit("-", 1)[0]
             if pkg_path:
                 os.unlink(pkg_path)
 
-    def remove(self, message=DefaultMessage()):
+    def remove(self, message=MessageContext("Websites")):
         """
         Remove website, including prep and app recipes.
 
@@ -689,11 +694,12 @@ class Site:
 
     def _remove(self, message):
         # Call site type's pre-removal hook
-        message.update("info", "Running pre-removal...")
+        message.info("Websites", "Running pre-removal...",
+                     title="Removing website...")
         self.pre_remove()
 
         # Remove source directories
-        message.update("info", "Removing website...")
+        message.info("Websites", "Removing website...")
         if self.path.endswith("_site"):
             shutil.rmtree(self.path.split("/_site")[0])
         elif self.path.endswith("htdocs"):
@@ -705,7 +711,7 @@ class Site:
 
         # If there's a database, get rid of that too
         if self.db:
-            message.update("info", "Removing database...")
+            message.info("Websites", "Removing database...")
             if self.db.manager.meta.database_multiuser:
                 db_user = databases.get_user(self.db.id)
                 if db_user:
@@ -719,12 +725,12 @@ class Site:
             pass
 
         # Call site type's post-removal hook
-        message.update("info", "Running post-removal...")
+        message.info("Websites", "Running post-removal...")
         self.post_remove()
         storage.sites.remove("sites", self)
         signals.emit("websites", "site_removed", self)
-        message.complete(
-            "success", "{0} site removed successfully".format(self.meta.name))
+        msg = "{0} site removed successfully".format(self.meta.name)
+        message.success("Websites", msg, complete=True)
 
     @property
     def as_dict(self):

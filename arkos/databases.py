@@ -7,7 +7,8 @@ Written by Jacob Cook
 Licensed under GPLv3, see LICENSE.md
 """
 
-from arkos import errors, storage, signals, applications
+from arkos import storage, signals, applications
+from arkos.utilities import errors
 
 
 class Database:

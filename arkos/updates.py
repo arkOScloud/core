@@ -11,7 +11,8 @@ import json
 import gnupg
 
 from arkos import storage, signals, config, logger
-from arkos.utilities import api, download, shell, DefaultMessage
+from arkos.messages import MessageContext
+from arkos.utilities import api, download, shell
 
 
 def check_updates():
@@ -43,7 +44,7 @@ def check_updates():
     return updates
 
 
-def install_updates(message=DefaultMessage()):
+def install_updates(message=MessageContext("Updates")):
     """
     Install all available updates from arkOS repo server.
 
@@ -56,8 +57,8 @@ def install_updates(message=DefaultMessage()):
     amount = len(updates)
     responses, ids = [], []
     for z in enumerate(updates):
-        message.update("info", "{0} of {1}...".format(z[0] + 1, amount),
-                       head="Installing updates")
+        message.info("Updates", "{0} of {1}...".format(z[0] + 1, amount),
+                     title="Installing updates")
         for x in sorted(z[1]["tasks"], key=lambda y: y["step"]):
             if x["unit"] == "shell":
                 s = shell(x["order"], stdin=x.get("data", None))
@@ -76,13 +77,15 @@ def install_updates(message=DefaultMessage()):
             config.set("updates", "current_update", z[1]["id"])
             config.save()
             continue
-        message.complete("error", "Installation of update {0} failed. "
-                                  "See logs for details.".format(z[1]["id"]))
-        logger.error(responses)
+        message.error("Updates", "Installation of update {0} failed. "
+                                 "See logs for details.".format(z[1]["id"]),
+                      complete=True)
+        logger.debug(responses)
         break
     else:
         signals.emit("updates", "post_install")
-        message.complete("success", "Please restart your system for the "
-                         "updates to take effect.",
-                         head="Updates installed successfully")
+        message.success("Updates", "Please restart your system for the "
+                        "updates to take effect.",
+                        title="Updates installed successfully",
+                        complete=True)
         return ids

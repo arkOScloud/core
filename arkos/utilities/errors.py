@@ -20,6 +20,10 @@ class Error(Exception):
         return self.msg
 
 
+class ConfigurationError(Error):
+    """Raised when a value cannot be found in an arkOS configuration file."""
+
+
 class ConnectionError(Error):
     """Raised in chain when a system API connection fails."""
 
@@ -35,12 +39,12 @@ class ConnectionError(Error):
 class OperationFailedError(Error):
     """Raised in chain when an operation fails due to an exception."""
 
-    def __init__(self, info="", message=None, head=None):
+    def __init__(self, info="", message=None, title=None):
         self.dmsg = info or "General failure"
         if message:
             msg = "Operation failed: {0} {1}"\
                 .format(info, str(self.__cause__ or ""))
-            message.complete("error", msg, head=head)
+            message.error("", msg, title=title, complete=True)
 
     def __str__(self):
         return str(self.__cause__ or self.dmsg)
@@ -49,12 +53,12 @@ class OperationFailedError(Error):
 class InvalidConfigError(Error):
     """Raised in chain when an operation fails due to user choices."""
 
-    def __init__(self, info="", message=None, head=None):
+    def __init__(self, info="", message=None, title=None):
         self.dmsg = info or "Invalid value passed"
         if message:
             msg = "Invalid value: {0} {1}"\
                 .format(info, str(self.__cause__ or ""))
-            message.complete("error", msg, head=head)
+            message.error("", msg, title=title, complete=True)
 
     def __str__(self):
         return str(self.__cause__ or self.dmsg)

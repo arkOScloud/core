@@ -12,7 +12,7 @@ import ldap.modlist
 import xmlrpc.client
 
 
-from .utils import errors
+from .utilities import errors
 from dbus import SystemBus, Interface
 
 

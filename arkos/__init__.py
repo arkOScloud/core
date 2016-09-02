@@ -10,7 +10,7 @@ Licensed under GPLv3, see LICENSE.md
 from arkos.config import Config
 from arkos.storage import StorageControl
 from arkos.utilities import test_dns
-from arkos.utilities.logs import LoggingControl, new_logger
+from arkos.utilities.logs import LoggingControl
 from arkos.connections import ConnectionsManager
 from arkos.utilities import detect_architecture
 
@@ -22,6 +22,7 @@ policies = Config("policies.json")
 storage = StorageControl()
 conns = ConnectionsManager()
 logger = LoggingControl()
+notify = LoggingControl("notify")
 
 
 def init(config_path="/etc/arkos/settings.json",
@@ -39,7 +40,9 @@ def init(config_path="/etc/arkos/settings.json",
     if not test_dns("arkos.io"):
         raise Exception("DNS resolution failed. Please make sure your server"
                         " network connection is properly configured.")
-    logger.logger = log or new_logger(20, debug=True)
+    if log:
+        logger.logger = log
+    logger.add_stream_logger()
     return config
 
 

@@ -30,7 +30,5 @@ __all__ = [
     "test_dns",
     "test_port",
     "detect_architecture",
-    "detect_platform",
-    "new_logger",
-    "DefaultMessage"
+    "detect_platform"
 ]

@@ -10,9 +10,8 @@ Licensed under GPLv3, see LICENSE.md
 import miniupnpc
 import random
 
-from arkos import config, errors, policies, logger, signals, storage, security
-from arkos.utilities import test_port
-from arkos.utilities.errors import SoftFail
+from arkos import config, policies, logger, signals, storage, security
+from arkos.utilities import errors, test_port
 
 COMMON_PORTS = [3000, 3306, 5222, 5223, 5232]
 
@@ -299,7 +298,8 @@ def initialize_upnp(svcs):
     try:
         upnpc.selectigd()
     except Exception as e:
-        logger.warn("Failed to register with uPnP IGD: {0}".format(str(e)))
+        msg = "Failed to register with uPnP IGD: {0}".format(str(e))
+        logger.warning("TrackedSvcs", msg)
         return
 
     for svc in svcs:
@@ -440,10 +440,11 @@ def open_upnp_site(site):
     try:
         test_port(config.get("general", "repo_server"), site.port, addr)
     except:
-        raise SoftFail("Port {0} and/or domain {1} could not be tested."
-                       " Make sure your ports are properly forwarded and"
-                       " that your domain is properly set up."
-                       .format(site.port, site.addr))
+        raise errors.SoftFail(
+            "Port {0} and/or domain {1} could not be tested."
+            " Make sure your ports are properly forwarded and"
+            " that your domain is properly set up."
+            .format(site.port, site.addr))
 
 
 def close_upnp_site(site):
