@@ -17,7 +17,7 @@ import glob
 import os
 
 from arkos import config, signals, storage, websites, applications
-from arkos.messages import MessageContext
+from arkos.messages import Notification, NotificationThread
 from arkos.system import groups
 from arkos.utilities import shell
 
@@ -359,7 +359,7 @@ def generate_dh_params(path, size=2048):
 
 def upload_certificate(
         id, cert, key, chain="", dhparams="/etc/arkos/ssl/dh_params.pem",
-        message=MessageContext("Certificates")):
+        nthread=NotificationThread()):
     """
     Create and save a new certificate from an external file.
 
@@ -367,10 +367,12 @@ def upload_certificate(
     :param str cert: Certificate as string (PEM format)
     :param str key: Key as string (PEM format)
     :param str chain: Chain as string (PEM format)
-    :param message message: Message object to update with status
+    :param NotificationThread nthread: notification thread to use
     :returns: Certificate that was imported
     :rtype: Certificate
     """
+    nthread.title = "Uploading TLS certificate"
+
     # Test the certificates are valid
     try:
         crt = x509.load_pem_x509_certificate(cert, default_backend())
@@ -390,11 +392,13 @@ def upload_certificate(
 
     # Check to see that we have DH params, if not then do that too
     if not os.path.exists(dhparams):
-        message.info("Certificates", "Generating Diffie-Hellman parameters...")
+        msg = "Generating Diffie-Hellman parameters..."
+        nthread.update(Notification("info", "Certificates", msg))
         generate_dh_params(dhparams)
 
     # Create actual certificate object
-    message.info("Certificates", "Importing certificate...")
+    msg = "Importing certificate..."
+    nthread.update(Notification("info", "Certificates", msg))
     cert_dir = config.get("certificates", "cert_dir")
     key_dir = config.get("certificates", "key_dir")
     sha1 = crt.fingerprint(hashes.SHA1())
@@ -424,14 +428,14 @@ def upload_certificate(
     storage.certs.add("certificates", c)
     signals.emit("certificates", "post_add", c)
     msg = "Certificate imported successfully"
-    message.success("Certificates", msg, complete=True)
+    nthread.complete(Notification("success", "Certificates", msg))
     return c
 
 
 def generate_certificate(
         id, domain, country, state="", locale="", email="", keytype="RSA",
         keylength=2048, dhparams="/etc/arkos/ssl/dh_params.pem",
-        message=MessageContext("Certificates")):
+        nthread=NotificationThread()):
     """
     Generate and save a new self-signed certificate.
 
@@ -446,17 +450,20 @@ def generate_certificate(
     :param str email: Contact email for user
     :param str keytype: Key type. One of "RSA" or "DSA"
     :param int keylength: Key length. 2048, 4096, etc.
-    :param message message: Message object to update with status
+    :param NotificationThread nthread: notification thread to use
     :returns: Certificate that was generated
     :rtype: Certificate
     """
+    nthread.title = "Generating TLS certificate"
+
     signals.emit("certificates", "pre_add", id)
 
     # Check to see that we have a CA ready; if not, generate one
     basehost = ".".join(domain.split(".")[-2:])
     ca = get_authorities(id=basehost)
     if not ca:
-        message.info("Certificates", "Generating certificate authority...")
+        msg = "Generating certificate authority..."
+        nthread.update(Notification("info", "Certificates", msg))
         ca = generate_authority(basehost)
     with open(ca.cert_path, "rb") as f:
         ca_cert = x509.load_pem_x509_certificate(f.read(), default_backend())
@@ -469,12 +476,14 @@ def generate_certificate(
 
     # Check to see that we have DH params, if not then do that too
     if not os.path.exists(dhparams):
-        message.info("Websites", "Generating Diffie-Hellman parameters. "
-                     "This may take a few minutes...")
+        msg = ("Generating Diffie-Hellman parameters. "
+               "This may take a few minutes...")
+        nthread.update(Notification("info", "Certificates", msg))
         generate_dh_params(dhparams)
 
     # Generate private key and create X509 certificate, then set options
-    message.info("Certificates", "Generating certificate...")
+    msg = "Generating certificate..."
+    nthread.update(Notification("info", "Certificates", msg))
     cert_path = os.path.join(config.get("certificates", "cert_dir"),
                              "{0}.crt".format(id))
     key_path = os.path.join(config.get("certificates", "key_dir"),
@@ -524,7 +533,7 @@ def generate_certificate(
     storage.certs.add("certificates", c)
     signals.emit("certificates", "post_add", c)
     msg = "Certificate generated successfully"
-    message.success("Certificates", msg, complete=True)
+    nthread.complete(Notification("success", "Certificates", msg))
     return c
 
 

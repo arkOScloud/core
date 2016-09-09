@@ -64,9 +64,8 @@ class User:
         try:
             ldif = conns.LDAP.search_s(
                 self.ldap_id, ldap.SCOPE_BASE, "(objectClass=*)", None)
-            logger.error("Roles", "A user with this name already exists")
-            raise errors.InvalidConfigError(
-                "A user with this name already exists")
+            msg = "A user named {0} already exists".format(self.name)
+            raise errors.InvalidConfigError(msg)
         except ldap.NO_SUCH_OBJECT:
             pass
 

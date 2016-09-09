@@ -1,5 +1,5 @@
 """
-Classes for management of arkOS status message logging.
+Classes for management of arkOS process logging.
 
 arkOS Core
 (c) 2016 CitizenWeb
@@ -11,73 +11,65 @@ from arkos import logger
 from arkos.utilities import random_string
 
 
-class MessageContext(object):
-    """A context for asynchronous, updatable status messages."""
+class Notification(object):
+    """A singular status message, broadcast to log and clients."""
 
-    def __init__(self, comp, title=None, cls="notify"):
-        """
-        Create a new notification context.
+    LEVELS = {
+        "DEBUG": 10,
+        "INFO": 20,
+        "SUCCESS": 25,
+        "WARN": 30,
+        "WARNING": 30,
+        "ERROR": 40,
+        "CRITICAL": 50
+    }
 
-        :param str comp: Section of application to state as origin
-        :param str title: Message title text
-        :param str cls: Either 'runtime' (log) or 'notify' (notification)
-        """
-        self.id = random_string()[0:10]
+    def __init__(self, level, comp, message, cls="notify",
+                 id=None, title=None):
+        level = level.upper()
+        if level not in self.LEVELS:
+            raise Exception("Unrecognized log level specified")
+        self.level = self.LEVELS[level]
         self.comp = comp
-        self.title = title
+        self.message = message
         self.cls = cls
+        self.id = id or random_string(16)
+        self.title = title
+        self.thread_id = None
+        self.complete = True
 
-    def info(self, msg, title=None, complete=False):
-        """
-        Update the notification with an INFO message.
+    def send(self):
+        data = {
+            "id": self.id, "thread_id": self.thread_id, "cls": self.cls,
+            "comp": self.comp, "title": self.title, "message": self.message,
+            "complete": self.complete
+        }
+        logger._log(self.level, data)
 
-        :param str msg: Message text
-        :param str title: Message title text
-        :param bool complete: Is this the last message to be pushed?
-        """
-        logger.info(self.comp, msg, id=self.id, title=self.title,
-                    cls=self.cls, persist=not complete)
 
-    def success(self, msg, title=None, complete=False):
-        """
-        Update the notification with a SUCCESS message.
+class NotificationThread(object):
+    """A thread of Notifications bound together, keeping the same context."""
 
-        :param str msg: Message text
-        :param str title: Message title text
-        :param bool complete: Is this the last message to be pushed?
-        """
-        logger.success(self.comp, msg, id=self.id, title=self.title,
-                       cls=self.cls, persist=not complete)
+    def __init__(self, id=None, title=None, message=None):
+        self.id = id or random_string(16)
+        self.title = title
+        if message:
+            self._send(message, complete=False)
 
-    def warning(self, msg, title=None, complete=False):
-        """
-        Update the notification with a WARN message.
+    def _send(self, message, complete=False):
+        message.thread_id = self.id
+        message.title = self.title or message.title
+        message.complete = complete
+        message.send()
 
-        :param str msg: Message text
-        :param str title: Message title text
-        :param bool complete: Is this the last message to be pushed?
-        """
-        logger.warning(self.comp, msg, id=self.id, title=self.title,
-                       cls=self.cls, persist=not complete)
+    def new(self, level, comp, message, cls="notify",
+            id=None, title=None):
+        return Notification(level, comp, message, cls,
+                            id or random_string(16), title)
 
-    def error(self, msg, title=None, complete=False):
-        """
-        Update the notification with an ERROR message.
+    def update(self, *messages):
+        for message in messages:
+            self._send(message)
 
-        :param str msg: Message text
-        :param str title: Message title text
-        :param bool complete: Is this the last message to be pushed?
-        """
-        logger.error(self.comp, msg, id=self.id, title=self.title,
-                     cls=self.cls, persist=not complete)
-
-    def debug(self, msg, title=None, complete=False):
-        """
-        Update the notification with a DEBUG message.
-
-        :param str msg: Message text
-        :param str title: Message title text
-        :param bool complete: Is this the last message to be pushed?
-        """
-        logger.debug(self.comp, msg, id=self.id, title=self.title,
-                     cls=self.cls, persist=not complete)
+    def complete(self, message):
+        self._send(message, complete=True)

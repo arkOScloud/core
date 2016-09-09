@@ -9,9 +9,6 @@ Licensed under GPLv3, see LICENSE.md
 
 import bz2
 import base64
-import binascii
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import hashes
 import crypt
 import gzip
 import os
@@ -118,9 +115,8 @@ def get_current_entropy():
 
 def random_string(length=40):
     """Create a random alphanumeric string."""
-    digest = hashes.Hash(hashes.SHA1(), backend=default_backend())
-    digest.update(str(random.random()).encode('utf-8'))
-    return binascii.hexlify(digest.finalize()).decode()[:length]
+    chars = string.ascii_uppercase + string.ascii_lowercase + string.digits
+    return ''.join(random.choice(chars) for _ in range(length))
 
 
 def api(url, post=None, method="get", returns="json", headers=[], crit=False):

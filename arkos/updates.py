@@ -10,8 +10,8 @@ Licensed under GPLv3, see LICENSE.md
 import json
 import gnupg
 
-from arkos import storage, signals, config, logger
-from arkos.messages import MessageContext
+from arkos import config, logger, storage, signals
+from arkos.messages import Notification, NotificationThread
 from arkos.utilities import api, download, shell
 
 
@@ -34,7 +34,7 @@ def check_updates():
         v = gpg.verify_data("/tmp/{0}.sig".format(x["id"]), ustr)
         if v.trust_level is None:
             err_str = "Update {0} signature verification failed"
-            logger.error(err_str.format(x["id"]))
+            logger.error("Updates", err_str.format(x["id"]))
             break
         else:
             data = {"id": x["id"], "name": x["name"], "date": x["date"],
@@ -44,12 +44,14 @@ def check_updates():
     return updates
 
 
-def install_updates(message=MessageContext("Updates")):
+def install_updates(nthread=NotificationThread()):
     """
     Install all available updates from arkOS repo server.
 
     :param message message: Message object to update with status
     """
+    nthread.title = "Installing updates"
+
     updates = storage.updates.get("updates")
     if not updates:
         return
@@ -57,8 +59,8 @@ def install_updates(message=MessageContext("Updates")):
     amount = len(updates)
     responses, ids = [], []
     for z in enumerate(updates):
-        message.info("Updates", "{0} of {1}...".format(z[0] + 1, amount),
-                     title="Installing updates")
+        msg = "{0} of {1}...".format(z[0] + 1, amount)
+        nthread.update(Notification("info", "Updates", msg))
         for x in sorted(z[1]["tasks"], key=lambda y: y["step"]):
             if x["unit"] == "shell":
                 s = shell(x["order"], stdin=x.get("data", None))
@@ -77,15 +79,16 @@ def install_updates(message=MessageContext("Updates")):
             config.set("updates", "current_update", z[1]["id"])
             config.save()
             continue
-        message.error("Updates", "Installation of update {0} failed. "
-                                 "See logs for details.".format(z[1]["id"]),
-                      complete=True)
-        logger.debug(responses)
+        for x in responses:
+            nthread.update(Notification("debug", "Updates", x))
+        msg = "Installation of update {0} failed. See logs for details."
+        msg = msg.format(z[1]["id"])
+        nthread.complete(Notification("error", "Updates", msg))
         break
     else:
         signals.emit("updates", "post_install")
-        message.success("Updates", "Please restart your system for the "
-                        "updates to take effect.",
-                        title="Updates installed successfully",
-                        complete=True)
+        for x in responses:
+            nthread.update(Notification("debug", "Updates", x))
+        msg = "Please restart your system for the updates to take effect."
+        nthread.complete(Notification("success", "Updates", msg))
         return ids

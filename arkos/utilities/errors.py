@@ -7,6 +7,8 @@ Written by Jacob Cook
 Licensed under GPLv3, see LICENSE.md
 """
 
+from .logs import LoggingControl
+
 
 class Error(Exception):
     """Base class for exceptions."""
@@ -39,12 +41,14 @@ class ConnectionError(Error):
 class OperationFailedError(Error):
     """Raised in chain when an operation fails due to an exception."""
 
-    def __init__(self, info="", message=None, title=None):
+    def __init__(self, info="", nthread=None, title=None):
         self.dmsg = info or "General failure"
-        if message:
-            msg = "Operation failed: {0} {1}"\
-                .format(info, str(self.__cause__ or ""))
-            message.error("", msg, title=title, complete=True)
+        msg = "Operation failed: {0} {1}"\
+            .format(info, str(self.__cause__ or ""))
+        if nthread:
+            nthread.complete(nthread.new("error", "", msg, title=title))
+        else:
+            LoggingControl().error("", msg)
 
     def __str__(self):
         return str(self.__cause__ or self.dmsg)
@@ -53,12 +57,14 @@ class OperationFailedError(Error):
 class InvalidConfigError(Error):
     """Raised in chain when an operation fails due to user choices."""
 
-    def __init__(self, info="", message=None, title=None):
+    def __init__(self, info="", nthread=None, title=None):
         self.dmsg = info or "Invalid value passed"
-        if message:
-            msg = "Invalid value: {0} {1}"\
-                .format(info, str(self.__cause__ or ""))
-            message.error("", msg, title=title, complete=True)
+        msg = "Invalid value: {0} {1}"\
+            .format(info, str(self.__cause__ or ""))
+        if nthread:
+            nthread.complete(nthread.new("error", "", msg, title=title))
+        else:
+            LoggingControl().error("", msg)
 
     def __str__(self):
         return str(self.__cause__ or self.dmsg)

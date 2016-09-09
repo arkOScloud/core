@@ -18,7 +18,7 @@ import zipfile
 
 from arkos import applications, config, databases, signals, storage
 from arkos import tracked_services
-from arkos.messages import MessageContext
+from arkos.messages import Notification, NotificationThread
 from arkos.languages import php
 from arkos.system import users, groups, services
 from arkos.utilities import download, errors, random_string
@@ -81,7 +81,7 @@ class Site:
             self.addtoblock = block
 
     def install(self, meta, extra_vars={}, enable=True,
-                message=MessageContext("Websites")):
+                nthread=NotificationThread()):
         """
         Install site, including prep and app recipes.
 
@@ -92,7 +92,7 @@ class Site:
         :returns: special message to the user from app post-install hook (opt)
         """
         try:
-            self._install(meta, extra_vars, enable, message)
+            self._install(meta, extra_vars, enable, nthread)
         except Exception as e:
             weberrors = (
                 errors.InvalidConfigError,
@@ -101,17 +101,19 @@ class Site:
             if not isinstance(e, weberrors):
                 self.clean_up()
                 raise errors.OperationFailedError(
-                    "({0})".format(meta.id), message) from e
+                    "({0})".format(meta.id), nthread) from e
             else:
                 raise
 
-    def _install(self, meta, extra_vars, enable, message):
-        message.info("Websites", "Preparing to install",
-                     title="Installing website...")
+    def _install(self, meta, extra_vars, enable, nthread):
+        nthread.title = "Installing website"
+
+        msg = Notification("info", "Websites", "Preparing to install...")
+        nthread.update(msg)
 
         # Make sure the chosen port is indeed open
         if not tracked_services.is_open_port(self.port, self.addr):
-            raise errors.InvalidConfigError("({0})".format(meta.id), message)\
+            raise errors.InvalidConfigError("({0})".format(meta.id), nthread)\
                 from tracked_services.PortConflictError(self.port, self.addr)
 
         # Set some metadata values
@@ -142,7 +144,8 @@ class Site:
             raise errors.InvalidConfigError(
                 "Invalid source archive format in {0}".format(self.meta.id))
 
-        message.info("Websites", "Running pre-installation...")
+        msg = "Running pre-installation..."
+        nthread.update(Notification("info", "Websites", msg))
 
         # Call website type's pre-install hook
         stage = "Pre-Install"
@@ -150,7 +153,7 @@ class Site:
             self.pre_install(extra_vars)
         except Exception as e:
             raise errors.OperationFailedError(
-                "({0} {1})".format(meta.id, stage), message) from e
+                "({0} {1})".format(meta.id, stage), nthread) from e
 
         # If needs DB and user didn't select an engine, choose one for them
         if len(self.meta.database_engines) > 1 \
@@ -163,7 +166,8 @@ class Site:
         # Create DB and/or DB user as necessary
         stage = "Database"
         if getattr(self.meta, "selected_dbengine", None):
-            message.info("Websites", "Creating database...")
+            msg = "Creating database..."
+            nthread.update(Notification("info", "Websites", msg))
             try:
                 mgr = databases.get_managers(self.meta.selected_dbengine)
                 if not mgr:
@@ -176,12 +180,12 @@ class Site:
                 self.db = mgr.add_db(self.id)
                 # If multiuser DB type, create user
                 if mgr.meta.database_multiuser:
-                    dbpasswd = random_string()[0:16]
+                    dbpasswd = random_string(16)
                     db_user = mgr.add_user(self.id, dbpasswd)
                     db_user.chperm("grant", self.db)
             except Exception as e:
                 raise errors.OperationFailedError(
-                    "({0} {1})".format(meta.id, stage), message) from e
+                    "({0} {1})".format(meta.id, stage), nthread) from e
 
         # Make sure the target directory exists, but is empty
         pkg_path = os.path.join("/tmp", self.id + ending)
@@ -191,7 +195,8 @@ class Site:
 
         # Download and extract the source repo / package
         stage = "Clone"
-        message.info("Websites", "Downloading website source...")
+        msg = "Downloading website source..."
+        nthread.update(Notification("info", "Websites", msg))
         if self.meta.download_url and ending == ".git":
             git.Repo.clone_from(self.meta.download_url, self.path)
         elif self.meta.download_url:
@@ -199,10 +204,11 @@ class Site:
                 download(self.meta.download_url, file=pkg_path, crit=True)
             except Exception as e:
                 raise errors.OperationFailedError(
-                    "({0} {1})".format(meta.id, stage), message) from e
+                    "({0} {1})".format(meta.id, stage), nthread) from e
 
             # Format extraction command according to type
-            message.info("Websites", "Extracting source...")
+            msg = "Extracting source..."
+            nthread.update(Notification("info", "Websites", msg))
             try:
                 if ending in [".tar.gz", ".tgz", ".tar.bz2"]:
                     arch = tarfile.open(pkg_path, "r:gz")
@@ -224,7 +230,7 @@ class Site:
                 os.remove(pkg_path)
             except Exception as e:
                 raise errors.OperationFailedError(
-                    "({0} {1})".format(meta.id, stage), message) from e
+                    "({0} {1})".format(meta.id, stage), nthread) from e
 
         # Set proper starting permissions on source directory
         uid, gid = users.get_system("http").uid, groups.get_system("http").gid
@@ -255,7 +261,7 @@ class Site:
                 self.data_path = self.path
         except Exception as e:
             raise errors.OperationFailedError(
-                "({0} {1})".format(meta.id, stage), message) from e
+                "({0} {1})".format(meta.id, stage), nthread) from e
 
         # Create the nginx serverblock
         stage = "NGINX"
@@ -280,7 +286,7 @@ class Site:
                         self.id))
         except Exception as e:
             raise errors.OperationFailedError(
-                "({0} {1})".format(meta.id, stage), message) from e
+                "({0} {1})".format(meta.id, stage), nthread) from e
 
         # Create arkOS metadata file
         meta = configparser.SafeConfigParser()
@@ -300,17 +306,18 @@ class Site:
             meta.write(f)
 
         # Call site type's post-installation hook
-        message.info("Websites", "Running post-installation. "
-                     "This may take a few minutes...")
+        msg = "Running post-installation. This may take a few minutes..."
+        nthread.update(Notification("info", "Websites", msg))
         stage = "Post-Install"
         try:
             specialmsg = self.post_install(extra_vars, dbpasswd)
         except Exception as e:
             raise errors.OperationFailedError(
-                "({0} {1})".format(meta.id, stage), message) from e
+                "({0} {1})".format(meta.id, stage), nthread) from e
 
         # Cleanup and reload daemons
-        message.info("Websites", "Finishing...")
+        msg = "Finishing..."
+        nthread.update(Notification("info", "Websites", msg))
         self.installed = True
         storage.sites.add("sites", self)
         signals.emit("websites", "site_installed", self)
@@ -319,8 +326,9 @@ class Site:
         if enable and self.php:
             php.open_basedir("add", "/srv/http/")
             php_reload()
+
         msg = "{0} site installed successfully".format(self.meta.name)
-        message.success("Websites", msg, complete=True)
+        nthread.complete(Notification("success", "Websites", msg))
         if specialmsg:
             return specialmsg
 
@@ -598,7 +606,7 @@ class Site:
             self.site_edited()
         nginx_reload()
 
-    def update(self, message=MessageContext("Websites")):
+    def update(self, nthread=NotificationThread()):
         """
         Run an update on this website.
 
@@ -608,7 +616,7 @@ class Site:
         :param message message: Message object to update with status
         """
         try:
-            self._update(message)
+            self._update(nthread)
         except Exception as e:
             weberrors = (
                 errors.InvalidConfigError,
@@ -616,11 +624,12 @@ class Site:
             )
             if not isinstance(e, weberrors):
                 raise errors.OperationFailedError(
-                    "({0})".format(self.id), message) from e
+                    "({0})".format(self.id), nthread) from e
             else:
                 raise
 
-    def _update(self, message):
+    def _update(self, nthread):
+        nthread.title = "Updating website"
         if self.version == self.meta.version.rsplit("-", 1)[0]:
             raise Exception("Website is already at the latest version")
         elif self.version in [None, "None"]:
@@ -645,8 +654,8 @@ class Site:
 
         # Download and extract the source package
         stage = "Clone"
-        message.info("Websites", "Downloading website source",
-                     title="Updating website...")
+        msg = "Downloading website source..."
+        nthread.update(Notification("info", "Websites", msg))
         if self.download_url and ending == ".git":
             pkg_path = self.download_url
         elif self.download_url:
@@ -655,32 +664,33 @@ class Site:
                 download(self.meta.download_url, file=pkg_path, crit=True)
             except Exception as e:
                 raise errors.OperationFailedError(
-                    "({0} {1})".format(self.id, stage), message) from e
+                    "({0} {1})".format(self.id, stage), nthread) from e
 
         # Call the site type's update hook
         stage = "Hook"
         try:
-            message.info("Websites", "Updating website...")
+            msg = "Updating website..."
+            nthread.update(Notification("info", "Websites", msg))
             self.update_site(self.path, pkg_path, self.version)
         except Exception as e:
             raise errors.OperationFailedError(
-                "({0} {1})".format(self.id, stage), message) from e
+                "({0} {1})".format(self.id, stage), nthread) from e
         finally:
             # Update stored version and remove temp source archive
             msg = "{0} updated successfully".format(self.id)
-            message.success("Websites", msg, complete=True)
+            nthread.complete(Notification("success", "Websites", msg))
             self.version = self.meta.version.rsplit("-", 1)[0]
             if pkg_path:
                 os.unlink(pkg_path)
 
-    def remove(self, message=MessageContext("Websites")):
+    def remove(self, nthread=NotificationThread()):
         """
         Remove website, including prep and app recipes.
 
         :param message message: Message object to update with status
         """
         try:
-            self._remove(message)
+            self._remove(nthread)
         except Exception as e:
             weberrors = (
                 errors.InvalidConfigError,
@@ -688,18 +698,21 @@ class Site:
             )
             if not isinstance(e, weberrors):
                 raise errors.OperationFailedError(
-                    "({0})".format(self.id), message) from e
+                    "({0})".format(self.id), nthread) from e
             else:
                 raise
 
-    def _remove(self, message):
+    def _remove(self, nthread):
+        nthread.title = "Removing website"
+
         # Call site type's pre-removal hook
-        message.info("Websites", "Running pre-removal...",
-                     title="Removing website...")
+        msg = "Running pre-removal. This may take a few minutes..."
+        nthread.update(Notification("info", "Websites", msg))
         self.pre_remove()
 
         # Remove source directories
-        message.info("Websites", "Removing website...")
+        msg = "Cleaning directories..."
+        nthread.update(Notification("info", "Websites", msg))
         if self.path.endswith("_site"):
             shutil.rmtree(self.path.split("/_site")[0])
         elif self.path.endswith("htdocs"):
@@ -711,7 +724,8 @@ class Site:
 
         # If there's a database, get rid of that too
         if self.db:
-            message.info("Websites", "Removing database...")
+            msg = "Removing database..."
+            nthread.update(Notification("info", "Websites", msg))
             if self.db.manager.meta.database_multiuser:
                 db_user = databases.get_user(self.db.id)
                 if db_user:
@@ -725,12 +739,13 @@ class Site:
             pass
 
         # Call site type's post-removal hook
-        message.info("Websites", "Running post-removal...")
+        msg = "Running post-removal..."
+        nthread.update(Notification("info", "Websites", msg))
         self.post_remove()
         storage.sites.remove("sites", self)
         signals.emit("websites", "site_removed", self)
         msg = "{0} site removed successfully".format(self.meta.name)
-        message.success("Websites", msg, complete=True)
+        nthread.complete(Notification("success", "Websites", msg))
 
     @property
     def as_dict(self):
@@ -795,7 +810,7 @@ class ReverseProxy(Site):
         self.cert = None
         self.installed = False
 
-    def install(self, extra_vars={}, enable=True, message=None):
+    def install(self, extra_vars={}, enable=True, nthread=None):
         """
         Install reverse proxy, including prep and app recipes.
 
@@ -804,7 +819,7 @@ class ReverseProxy(Site):
         :param message message: Message object to update with status
         """
         try:
-            self._install(extra_vars, enable, message)
+            self._install(extra_vars, enable, nthread)
         except Exception as e:
             weberrors = (
                 errors.InvalidConfigError,
@@ -812,11 +827,11 @@ class ReverseProxy(Site):
             )
             if not isinstance(e, weberrors):
                 raise errors.OperationFailedError(
-                    "({0})".format(self.id), message) from e
+                    "({0})".format(self.id), nthread) from e
             else:
                 raise
 
-    def _install(self, extra_vars, enable, message):
+    def _install(self, extra_vars, enable, nthread):
         # Set metadata values
         site_dir = config.get("websites", "site_dir")
         path = (self.path or os.path.join(site_dir, self.id))
@@ -883,7 +898,7 @@ class ReverseProxy(Site):
         signals.emit("websites", "site_installed", self)
         self.nginx_enable()
 
-    def remove(self, message=None):
+    def remove(self, nthread=None):
         """
         Remove reverse proxy, including prep and app recipes.
 

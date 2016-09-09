@@ -17,6 +17,7 @@ from . import crypto
 from . import losetup
 
 from arkos import config, signals, sharers
+from arkos.messages import Notification, NotificationThread
 from arkos.utilities import shell
 
 libc = ctypes.CDLL(ctypes.util.find_library("libc"), use_errno=True)
@@ -182,36 +183,51 @@ class VirtualDisk:
         self.enabled = enabled
         self.crypt = crypt
 
-    def create(self, mount=False):
+    def create(self, mount=False, will_crypt=False,
+               nthread=NotificationThread()):
         """
         Create virtual disk image.
 
         :param bool mount: Mount after creation?
+        :param bool will_crypt: Will this disk be encrypted later?
+        :param NotificationThread nthread: notification thread to use
         """
+        nthread.title = "Creating virtual disk"
+
         vdisk_dir = config.get("filesystems", "vdisk_dir")
         if not os.path.exists(vdisk_dir):
             os.mkdir(vdisk_dir)
         self.path = str(os.path.join(vdisk_dir, self.id+".img"))
         if os.path.exists(self.path):
             raise Exception("This virtual disk already exists")
-        signals.emit("filesystems", "pre_add", self)
+
         # Create an empty file matching disk size
+        signals.emit("filesystems", "pre_add", self)
+        msg = "Creating virtual disk..."
+        nthread.update(Notification("info", "Filesystems", msg))
         with open(self.path, "wb") as f:
             written = 0
-            with file("/dev/zero", "r") as zero:
+            with open("/dev/zero", "r") as zero:
                 while self.size > written:
                     written += 1024
                     f.write(zero.read(1024))
-        # Get a free loopback device and mount
-        loop = losetup.find_unused_loop_device()
-        loop.mount(str(self.path), offset=1048576)
-        # Make a filesystem
-        s = shell("mkfs.ext4 {0}".format(loop.device))
-        if s["code"] != 0:
-            excmsg = "Failed to format loop device: {0}"
-            raise Exception(excmsg.format(s["stderr"]))
-        loop.unmount()
-        signals.emit("filesystems", "pre_add", self)
+
+        if not will_crypt:
+            # Get a free loopback device and mount
+            loop = losetup.find_unused_loop_device()
+            loop.mount(str(self.path), offset=1048576)
+            # Make a filesystem
+            msg = "Writing filesystem..."
+            nthread.update(Notification("info", "Filesystems", msg))
+            s = shell("mkfs.ext4 {0}".format(loop.device))
+            if s["code"] != 0:
+                excmsg = "Failed to format loop device: {0}"
+                raise Exception(excmsg.format(s["stderr"]))
+            loop.unmount()
+            msg = "Virtual disk created successfully"
+            nthread.complete(Notification("success", "Filesystems", msg))
+
+        signals.emit("filesystems", "post_add", self)
         if mount:
             self.mount()
 
@@ -240,7 +256,7 @@ class VirtualDisk:
                 raise Exception(excmsg.format(self.id, str(s)))
             s = libc.mount(ctypes.c_char_p(bytes(luks_point, 'utf-8')),
                            ctypes.c_char_p(bytes(mount_point, 'utf-8')),
-                           ctypes.c_char_p(bytes(self.fstype)), 0,
+                           ctypes.c_char_p(bytes(self.fstype, 'utf-8')), 0,
                            ctypes.c_char_p(b""))
             if s == -1:
                 crypto.luks_close(self.id)
@@ -253,9 +269,9 @@ class VirtualDisk:
             raise Exception(excstr)
         else:
             s = libc.mount(ctypes.c_char_p(loop.device),
-                           ctypes.c_char_p(mount_point),
-                           ctypes.c_char_p(self.fstype), 0,
-                           ctypes.c_char_p(""))
+                           ctypes.c_char_p(bytes(mount_point, 'utf-8')),
+                           ctypes.c_char_p(bytes(self.fstype, 'utf-8')), 0,
+                           ctypes.c_char_p(b""))
             if s == -1:
                 loop.unmount()
                 excstr = "Failed to mount {0}: {1}"

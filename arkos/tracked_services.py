@@ -10,7 +10,7 @@ Licensed under GPLv3, see LICENSE.md
 import miniupnpc
 import random
 
-from arkos import config, policies, logger, signals, storage, security
+from arkos import config, logger, policies, signals, storage, security
 from arkos.utilities import errors, test_port
 
 COMMON_PORTS = [3000, 3306, 5222, 5223, 5232]
@@ -241,7 +241,7 @@ def _upnp_igd_connect():
         upnpc.selectigd()
     except Exception as e:
         msg = "Failed to connect to uPnP IGD: {0}"
-        logger.error("TrackedSvcs", msg.format(str(e)))
+        logger.warning("TrackedSvcs", msg.format(str(e)))
     return upnpc
 
 
@@ -307,8 +307,9 @@ def initialize_upnp(svcs):
                 upnpc.addportmapping(port, protocol.upper(), upnpc.lanaddr,
                                      port, pf.format(port), '')
             except Exception as e:
-                msg = "Failed to register {0} with uPnP IGD: {1}"
-                logger.error("TrackedSvcs", msg.format(port, str(e)))
+                msg = "Failed to register {0} with uPnP IGD: {1}"\
+                    .format(port, str(e))
+                logger.warning("TrackedSvcs", msg)
 
 
 def open_all_upnp(ports):

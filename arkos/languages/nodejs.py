@@ -9,8 +9,7 @@ Licensed under GPLv3, see LICENSE.md
 
 import os
 
-from arkos import logger
-from arkos.utilities import shell
+from arkos.utilities import errors, shell
 
 
 def install(*mods, **kwargs):
@@ -35,9 +34,8 @@ def install(*mods, **kwargs):
     s = shell("npm install {0}{1}{2}".format(as_global, mods, ))
     os.chdir(cwd)
     if s["code"] != 0:
-        logmsg = "NPM install of {0} failed; log output follows:\n{1}"
-        logger.error(logmsg.format(mods, s["stderr"]))
-        raise Exception("NPM install failed, check logs for info")
+        logmsg = "NPM install of {0} failed.".format(mods)
+        raise errors.OperationFailedError(logmsg) from Exception(s["stderr"])
 
 
 def remove(*mods):
@@ -49,10 +47,8 @@ def remove(*mods):
     mods = " ".join(x for x in mods)
     s = shell("npm uninstall {0}".format(mods), stderr=True)
     if s["code"] != 0:
-        logmsg = "Failed to remove {0} via npm; log output follows:\n{1}"
-        excmsg = "Failed to remove {0} via npm, check logs for info"
-        logger.error(logmsg.format(mods, s["stderr"]))
-        raise Exception(excmsg.format(mods))
+        logmsg = "NPM removal of {0} failed.".format(mods)
+        raise errors.OperationFailedError(logmsg) from Exception(s["stderr"])
 
 
 def install_from_package(path, stat="production", opts={}):
@@ -69,9 +65,8 @@ def install_from_package(path, stat="production", opts={}):
     s = shell("npm install {0}{1}".format(stat, opts))
     os.chdir(cwd)
     if s["code"] != 0:
-        logmsg = "NPM install of {0} failed; log output follows:\n{1}"
-        logger.error(logmsg.format(path, s["stderr"]))
-        raise Exception("NPM install failed, check logs for info")
+        logmsg = "NPM install of {0} failed.".format(path)
+        raise errors.OperationFailedError(logmsg) from Exception(s["stderr"])
 
 
 def is_installed(name, as_global=True):

@@ -30,5 +30,6 @@ __all__ = [
     "test_dns",
     "test_port",
     "detect_architecture",
-    "detect_platform"
+    "detect_platform",
+    "NotificationFilter"
 ]

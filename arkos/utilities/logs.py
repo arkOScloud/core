@@ -7,6 +7,7 @@ Written by Jacob Cook
 Licensed under GPLv3, see LICENSE.md
 """
 
+import datetime
 import logging
 
 from .utils import random_string
@@ -15,47 +16,43 @@ from .utils import random_string
 class StreamFormatter(logging.Formatter):
     def format(self, record):
         if type(record.msg) in [str, bytes]:
-            data = {"id": id or random_string(16), "title": None,
-                    "message": record.msg, "component": "Unknown",
-                    "class": "runtime", "persist": False}
+            data = {"id": random_string(16), "thread_id": random_string(16),
+                    "title": None, "message": record.msg, "comp": "Unknown",
+                    "cls": "runtime", "complete": True}
         else:
-            data = record.msg
-        record.msg = data["message"]
+            data = record.msg.copy()
+        levelname = "CRITICAL"
+        logtime = datetime.datetime.fromtimestamp(record.created)
+        logtime = logtime.strftime("%Y-%m-%d %H:%M:%S")
+        logtime = "%s,%03d" % (logtime, record.msecs)
         if record.levelname == "DEBUG":
-            record.levelname = "\033[37mDEBUG\033[0m  "
+            levelname = "\033[37mDEBUG\033[0m  "
         if record.levelname == "INFO":
-            record.levelname = "\033[36mINFO\033[0m   "
+            levelname = "\033[36mINFO\033[0m   "
         if record.levelname == "SUCCESS":
-            record.levelname = "\033[32mSUCCESS\033[0m"
+            levelname = "\033[32mSUCCESS\033[0m"
         if record.levelname == "WARNING":
-            record.levelname = "\033[33mWARN\033[0m   "
+            levelname = "\033[33mWARN\033[0m   "
         if record.levelname == "ERROR":
-            record.levelname = "\033[31mERROR\033[0m  "
-        for x in data:
-            if x == "message":
-                continue
-            setattr(record, x, data[x])
-        record.cls = data["class"][0].upper()
-        result = logging.Formatter.format(self, record)
+            levelname = "\033[31mERROR\033[0m  "
+        data.update({"cls": data["cls"].upper()[0], "levelname": levelname,
+                     "asctime": logtime})
+        result = self._fmt.format(**data)
         return result
 
 
 class RuntimeFilter(logging.Filter):
     def filter(self, record):
-        if record.msg.cls.startswith("r"):
-            return 1
-        return 0
+        return 1 if record.msg["cls"].startswith("r") else 0
 
 
 class NotificationFilter(logging.Filter):
     def filter(self, record):
-        if record.msg.cls.startswith("n"):
-            return 1
-        return 0
+        return 1 if record.msg["cls"].startswith("n") else 0
 
 
 class LoggingControl:
-    """Control logging for runtime or notification events."""
+    """Control logging for runtime events, using `logging` module API."""
 
     def __init__(self, logger=None):
         self.logger = logger or logging.getLogger("arkos")
@@ -67,49 +64,52 @@ class LoggingControl:
         stdout = logging.StreamHandler()
         self.logger.setLevel(logging.DEBUG)
         stdout.setLevel(logging.DEBUG if debug else logging.INFO)
-        st = "%(asctime)s [%(cls)s] [%(levelname)s] %(component)s: %(message)s"
+        st = "{asctime} [{cls}] [{levelname}] {comp}: {message}"
         dformatter = StreamFormatter(st)
         stdout.setFormatter(dformatter)
         self.logger.addHandler(stdout)
 
-    def info(self, comp, msg, id=None, title=None,
-             cls="runtime", persist=False):
-        """Send a message with log level INFO."""
-        self.logger.info(
-            {"id": id or random_string(16), "title": title, "message": msg,
-             "component": comp, "class": cls, "persist": persist}
-        )
+    def _log(self, level, mobj):
+        self.logger.log(level, mobj)
 
-    def success(self, comp, msg, id=None, title=None,
-                cls="runtime", persist=False):
-        """Send a message with log level SUCCESS."""
-        self.logger.log(
-            25,
-            {"id": id or random_string(16), "title": title, "message": msg,
-             "component": comp, "class": cls, "persist": persist}
-        )
-
-    def warning(self, comp, msg, id=None, title=None,
-                cls="runtime", persist=False):
-        """Send a message with log level WARNING."""
-        self.logger.warning(
-            {"id": id or random_string(16), "title": title, "message": msg,
-             "component": comp, "class": cls, "persist": persist}
-        )
-
-    def error(self, comp, msg, id=None, title=None,
-              cls="runtime", persist=False):
-        """Send a message with log level ERROR."""
-        self.logger.error(
-            {"id": id or random_string(16), "title": title, "message": msg,
-             "component": comp, "class": cls, "persist": persist},
-            exc_info=True
-        )
-
-    def debug(self, comp, msg, id=None, title=None,
-              cls="runtime", persist=False):
+    def debug(self, comp, message, id=None):
         """Send a message with log level DEBUG."""
-        self.logger.debug(
-            {"id": id or random_string(16), "title": title, "message": msg,
-             "component": comp, "class": cls, "persist": persist}
-        )
+        self._log(10, {
+            "id": id or random_string(16), "thread_id": None, "cls": "runtime",
+            "comp": comp, "title": None, "message": message
+        })
+
+    def info(self, comp, message, id=None):
+        """Send a message with log level INFO."""
+        self._log(20, {
+            "id": id or random_string(16), "thread_id": None, "cls": "runtime",
+            "comp": comp, "title": None, "message": message
+        })
+
+    def success(self, comp, message, id=None):
+        """Send a message with log level SUCCESS."""
+        self._log(25, {
+            "id": id or random_string(16), "thread_id": None, "cls": "runtime",
+            "comp": comp, "title": None, "message": message
+        })
+
+    def warning(self, comp, message, id=None):
+        """Send a message with log level WARNING."""
+        self._log(30, {
+            "id": id or random_string(16), "thread_id": None, "cls": "runtime",
+            "comp": comp, "title": None, "message": message
+        })
+
+    def error(self, comp, message, id=None):
+        """Send a message with log level ERROR."""
+        self._log(40, {
+            "id": id or random_string(16), "thread_id": None, "cls": "runtime",
+            "comp": comp, "title": None, "message": message
+        })
+
+    def critical(self, comp, message, id=None):
+        """Send a message with log level CRITICAL."""
+        self._log(50, {
+            "id": id or random_string(16), "thread_id": None, "cls": "runtime",
+            "comp": comp, "title": None, "message": message
+        })
