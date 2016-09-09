@@ -220,7 +220,7 @@ class Site:
                     os.rename(os.path.join(site_dir, toplvl), self.path)
                 else:
                     arch = zipfile.ZipFile(pkg_path)
-                    r = (x for x in arch.filelist() if re.match("^[^/]*/$", x))
+                    r = (x for x in arch.namelist() if re.match("^[^/]*/$", x))
                     toplvl = next(r, None)
                     if not toplvl:
                         raise Exception("Malformed source archive")
@@ -994,7 +994,7 @@ def scan():
                 continue
             site = app._website(id=meta.get("website", "id"))
             site.meta = app
-            site.data_path = meta.get("website", "data_path", "") \
+            site.data_path = (meta.get("website", "data_path") or "") \
                 if meta.has_option("website", "data_path") else ""
             site.db = databases.get(site.id) \
                 if meta.has_option("website", "dbengine") else None
