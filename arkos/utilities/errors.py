@@ -7,34 +7,11 @@ Written by Jacob Cook
 Licensed under GPLv3, see LICENSE.md
 """
 
-
-class ConfigurationError(Exception):
-    """Configuration error."""
-
-    def __init__(self, text):
-        """Initialize class."""
-        self.text = self.id
-
-    def __str__(self):
-        """String format."""
-        return self.text
+from .logs import LoggingControl
 
 
-class ArkOSConnectionError(Exception):
-    """Connection error."""
-
-    def __init__(self, id_):
-        """Initialize class."""
-        self.id = id_
-
-    def __str__(self):
-        """String format."""
-
-        return "Failed to connect to {0} service".format(self.id)
-
-
-class SoftFail(Exception):
-    """Soft failure exception."""
+class Error(Exception):
+    """Base class for exceptions."""
 
     def __init__(self, msg):
         """Initialize class."""
@@ -45,25 +22,62 @@ class SoftFail(Exception):
         return self.msg
 
 
-class RequestError(Exception):
-    """Request error made."""
-
-    def __init__(self, msg):
-        """Initialize class."""
-        self.msg = msg
-
-    def __str__(self):
-        """String format."""
-        return self.msg
+class ConfigurationError(Error):
+    """Raised when a value cannot be found in an arkOS configuration file."""
 
 
-class DefaultException(Exception):
-    """Default exception class."""
+class GenesisBuildException(Error):
+    """Raise for ember build exception of Genesis"""
 
-    def __init__(self, msg):
-        """Initialize class."""
-        self.msg = msg
+    def __init__(self, stderr=""):
+        self.stderr = stderr
 
     def __str__(self):
-        """String format."""
-        return self.msg
+        msg = "Genesis failed to build. Kraken will finish loading "\
+              "but you may not be able to access the Web interface."\
+              "\n{0}".format(self.stderr)
+        return msg
+
+
+class ConnectionServiceError(Error):
+    """Raised in chain when a system API connection fails."""
+
+    def __init__(self, service, info=""):
+        self.service = service
+        self.info = info
+
+    def __str__(self):
+        return "Failed to connect to {0} service{1}".format(
+            self.service, self.info)
+
+
+class OperationFailedError(Error):
+    """Raised in chain when an operation fails due to an exception."""
+
+    def __init__(self, info="", nthread=None, title=None):
+        self.dmsg = info or "General failure"
+        msg = "Operation failed: {0} {1}"\
+            .format(info, str(self.__cause__ or ""))
+        if nthread:
+            nthread.complete(nthread.new("error", "", msg, title=title))
+        else:
+            LoggingControl().error("", msg)
+
+    def __str__(self):
+        return str(self.__cause__ or self.dmsg)
+
+
+class InvalidConfigError(Error):
+    """Raised in chain when an operation fails due to user choices."""
+
+    def __init__(self, info="", nthread=None, title=None):
+        self.dmsg = info or "Invalid value passed"
+        msg = "Invalid value: {0} {1}"\
+            .format(info, str(self.__cause__ or ""))
+        if nthread:
+            nthread.complete(nthread.new("error", "", msg, title=title))
+        else:
+            LoggingControl().error("", msg)
+
+    def __str__(self):
+        return str(self.__cause__ or self.dmsg)

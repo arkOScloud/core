@@ -11,8 +11,7 @@ import miniupnpc
 import random
 
 from arkos import config, policies, logger, signals, storage, security
-from arkos.utilities import test_port
-from arkos.utilities.errors import SoftFail
+from arkos.utilities import errors, test_port
 
 COMMON_PORTS = [3000, 3306, 5222, 5223, 5232]
 
@@ -97,12 +96,24 @@ class SecurityPolicy:
         return self.as_dict
 
 
+class PortConflictError(errors.Error):
+    """Raised when an address and port requested are not available."""
+
+    def __init__(self, port, addr):
+        self.port = port
+        self.addr = addr
+
+    def __str__(self):
+        return ("This port is taken by another site or service, "
+                "please choose another")
+
+
 def get(id_=None, type_=None):
     """
     Get all security policies from cache storage.
 
-    :param str id: App or website ID
-    :param str type: Filter by type ('website', 'app', etc)
+    :param str id_: App or website ID
+    :param str type_: Filter by type ('website', 'app', etc)
     """
     data = storage.policies.get("policies")
     if id_ or type_:
@@ -218,24 +229,31 @@ def is_open_port(port, addr=None, ignore_common=False):
     return port not in ports
 
 
+def _upnp_igd_connect():
+    upnpc = miniupnpc.UPnP()
+    upnpc.discoverdelay = 3000
+    devs = upnpc.discover()
+    if devs == 0:
+        msg = "Failed to connect to uPnP IGD: no devices found"
+        logger.warning("TrackedSvcs", msg)
+        return
+    try:
+        upnpc.selectigd()
+    except Exception as e:
+        msg = "Failed to connect to uPnP IGD: {0}"
+        logger.error("TrackedSvcs", msg.format(str(e)))
+    return upnpc
+
+
 def open_upnp(port):
     """
     Open and forward a port with the local uPnP IGD.
 
     :param tuple port: Port protocol and number
     """
-    upnpc = miniupnpc.UPnP()
-    upnpc.discoverdelay = 3000
-    devs = upnpc.discover()
-    if devs == 0:
-        logger.error("Failed to register {0} with uPnP IGD: no devices found"
-                     .format(port))
+    upnpc = _upnp_igd_connect()
+    if not upnpc:
         return
-    try:
-        upnpc.selectigd()
-    except Exception as e:
-        logger.error("Failed to register {0} with uPnP IGD: {1}"
-                     .format(port, str(e)))
     if upnpc.getspecificportmapping(port[1], port[0].upper()):
         try:
             upnpc.deleteportmapping(port[1], port[0].upper())
@@ -256,18 +274,9 @@ def close_upnp(port):
 
     :param tuple port: Port protocol and number
     """
-    upnpc = miniupnpc.UPnP()
-    upnpc.discoverdelay = 3000
-    devs = upnpc.discover()
-    if devs == 0:
-        logger.error("Failed to register {0} with uPnP IGD: no devices found"
-                     .format(port))
+    upnpc = _upnp_igd_connect()
+    if not upnpc:
         return
-    try:
-        upnpc.selectigd()
-    except Exception as e:
-        logger.error("Failed to register {0} with uPnP IGD: {1}"
-                     .format(port, str(e)))
     if upnpc.getspecificportmapping(port[1], port[0].upper()):
         try:
             upnpc.deleteportmapping(port[1], port[0].upper())
@@ -281,33 +290,25 @@ def initialize_upnp(svcs):
 
     :param SecurityPolicy svcs: SecurityPolicies to open
     """
-    upnpc = miniupnpc.UPnP()
-    upnpc.discoverdelay = 3000
-    devs = upnpc.discover()
-    if devs == 0:
-        logger.error("Failed to register with uPnP IGD: no devices found")
+    upnpc = _upnp_igd_connect()
+    if not upnpc:
         return
-    try:
-        upnpc.selectigd()
-    except Exception as e:
-        logger.error("Failed to register with uPnP IGD: {0}"
-                     .format(str(e)))
     for svc in svcs:
         if svc.policy != 2:
             continue
-        for port in [y for x in svc.ports for y in x]:
-            if upnpc.getspecificportmapping(port[1], port[0].upper()):
+        for protocol, port in svc.ports:
+            if upnpc.getspecificportmapping(port, protocol.upper()):
                 try:
-                    upnpc.deleteportmapping(port[1], port[0].upper())
+                    upnpc.deleteportmapping(port, protocol.upper())
                 except:
                     pass
             try:
                 pf = 'arkOS Port Forwarding: {0}'
-                upnpc.addportmapping(port[1], port[0].upper(), upnpc.lanaddr,
-                                     port[1], pf.format(port[1]), '')
+                upnpc.addportmapping(port, protocol.upper(), upnpc.lanaddr,
+                                     port, pf.format(port), '')
             except Exception as e:
-                logger.error("Failed to register {0} with uPnP IGD: {1}"
-                             .format(port, str(e)))
+                msg = "Failed to register {0} with uPnP IGD: {1}"
+                logger.error("TrackedSvcs", msg.format(port, str(e)))
 
 
 def open_all_upnp(ports):
@@ -316,17 +317,9 @@ def open_all_upnp(ports):
 
     :param list ports: List of port objects to open
     """
-    upnpc = miniupnpc.UPnP()
-    upnpc.discoverdelay = 3000
-    devs = upnpc.discover()
-    if devs == 0:
-        logger.error("Failed to register with uPnP IGD: no devices found")
+    upnpc = _upnp_igd_connect()
+    if not upnpc:
         return
-    try:
-        upnpc.selectigd()
-    except Exception as e:
-        logger.error("Failed to register with uPnP IGD: {0}"
-                     .format(str(e)))
     for port in [x for x in ports]:
         if upnpc.getspecificportmapping(port[1], port[0].upper()):
             try:
@@ -338,8 +331,8 @@ def open_all_upnp(ports):
             upnpc.addportmapping(port[1], port[0].upper(), upnpc.lanaddr,
                                  port[1], pf.format(port[1]), '')
         except Exception as e:
-            logger.error("Failed to register {0} with uPnP IGD: {1}"
-                         .format(port, str(e)))
+            msg = "Failed to register {0} with uPnP IGD: {1}"
+            logger.error("TrackedSvcs", msg.format(port, str(e)))
 
 
 def close_all_upnp(ports):
@@ -348,17 +341,9 @@ def close_all_upnp(ports):
 
     :param list ports: List of port objects to close
     """
-    upnpc = miniupnpc.UPnP()
-    upnpc.discoverdelay = 3000
-    devs = upnpc.discover()
-    if devs == 0:
-        logger.error("Failed to register with uPnP IGD: no devices found")
+    upnpc = _upnp_igd_connect()
+    if not upnpc:
         return
-    try:
-        upnpc.selectigd()
-    except Exception as e:
-        logger.error("Failed to register with uPnP IGD: {0}"
-                     .format(str(e)))
     for port in [x for x in ports]:
         if upnpc.getspecificportmapping(port[1], port[0].upper()):
             try:
@@ -388,20 +373,24 @@ def get_open_port(ignore_common=False):
 
 def initialize():
     """Initialize security policy tracking."""
-
+    # arkOS
     policy = policies.get("arkos", "arkos", 2)
-    storage.policies.add("policies",
-                         SecurityPolicy("arkos", "arkos",
-                                        "System Management (Genesis/APIs)",
-                                        "fa fa-desktop",
-                                        [("tcp",
-                                          int(config.get("genesis", "port")))],
-                                        policy))
+    port = [("tcp", int(config.get("genesis", "port")))]
+    SecurityPolicy("arkos", "arkos", "System Management (Genesis/APIs)",
+                   "fa fa-desktop", port, policy)
+
+    # uPNP
+    policy = policies.get("arkos", "upnp", 1)
+    pol = SecurityPolicy("arkos", "upnp", "uPnP Firewall Comms",
+                         "fa fa-desktop", [("udp", 1900)], policy)
+    if config.get("general", "enable_upnp", True):
+        storage.policies.add("policies", pol)
+
+    storage.policies.add("policies", pol)
     for x in policies.get_all("custom"):
-        storage.policies.add("policies",
-                             SecurityPolicy("custom", x["id"],
-                                            x["name"], x["icon"],
-                                            x["ports"], x["policy"]))
+        pol = SecurityPolicy("custom", x["id"], x["name"], x["icon"],
+                             x["ports"], x["policy"])
+        storage.policies.add("policies", pol)
 
 
 def register_website(site):
@@ -426,10 +415,11 @@ def open_upnp_site(site):
     try:
         test_port(config.get("general", "repo_server"), site.port, addr)
     except:
-        raise SoftFail("Port {0} and/or domain {1} could not be tested."
-                       " Make sure your ports are properly forwarded and"
-                       " that your domain is properly set up."
-                       .format(site.port, site.addr))
+        raise errors.InvalidConfigError(
+            "Port {0} and/or domain {1} could not be tested."
+            " Make sure your ports are properly forwarded and"
+            " that your domain is properly set up."
+            .format(site.port, site.addr))
 
 
 def close_upnp_site(site):

@@ -19,7 +19,7 @@ def install(*mods):
     :param *mods: packages to install
     """
     mods = " ".join(x for x in mods)
-    s = shell("pip2 install {0}".format(mods))
+    s = shell("pip install {0}".format(mods))
     if s["code"] != 0:
         logmsg = "Failed to install {0} via PyPI; {1}"
         excmsg = "Failed to install {0} via PyPI, check logs for info"
@@ -33,7 +33,7 @@ def remove(*mods):
 
     :param *mods: packages to remove
     """
-    s = shell("pip2 uninstall {0}".format(mods))
+    s = shell("pip uninstall {0}".format(mods))
     if s["code"] != 0:
         logmsg = "Failed to remove {0} via PyPI; {1}"
         excmsg = "Failed to remove {0} via PyPI, check logs for info"
@@ -49,7 +49,7 @@ def is_installed(name):
     :returns: True if package is installed
     :rtype: bool
     """
-    s = shell("pip2 freeze")
+    s = shell("pip freeze")
     for x in s["stdout"].split("\n"):
         if name.lower() in x.split("==")[0].lower():
             return True

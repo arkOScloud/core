@@ -13,7 +13,7 @@ import re
 from arkos import logger
 from arkos.utilities import shell
 
-NPM_PATH = '/var/lib/npm'
+NPM_PATH = '/usr/bin'
 
 
 def install(*mods, **kwargs):
@@ -29,12 +29,13 @@ def install(*mods, **kwargs):
     cwd = os.getcwd()
     if "install_path" in kwargs:
         os.chdir(kwargs["install_path"])
-    if kwargs is not None and kwargs["opts"] is not None:
+    if kwargs is not None and "opts" in kwargs:
         mods += "".join(" --{0}".format(k+v if v[0] == '=' else k+" "+v)
                         for k, v in kwargs["opts"].items())
     npm_command = _get_npm_command("install", kwargs.get("as_global", False),
                                    kwargs.get("install_path"))
-    s = shell("{0}{1}".format(npm_command, mods))
+    command = "{0} {1}".format(npm_command, mods)
+    s = shell(command)
     os.chdir(cwd)
     if s["code"] != 0:
         logmsg = "NPM install of {0} failed; log output follows:\n{1}"
@@ -90,24 +91,6 @@ def is_installed(name, as_global=True):
         return True
     return False
 
-
-def has_user(user):
-    """ Checks if user exists in npm group """
-    s = shell("groups {0}".format(user))
-    match = re.search(br'\bnpm\b', s['stdout'])
-    if match:
-        return True
-    return False
-
-
-def add_user(user):
-    """ Adds user to the npm group """
-    s = shell("gksu 'gpasswd -a {0} npm'".format(user))
-    if s["code"] != 0:
-        logger.error("NPM group add for {0} failed; log output follows:\n{1}"
-                     .format(user, s["stderr"]))
-        raise Exception("NPM group add failed, check logs for info")
-
 '''
     Private commands
 '''
@@ -124,7 +107,7 @@ def _get_npm_command(command, as_global, path=None):
 def _get_global_npm_command(command):
     """ returns global npm command """
     os.chdir(NPM_PATH)
-    return "gksu -u npm 'npm {0} -g'".format(command)
+    return "npm {0} -g".format(command)
 
 
 def _get_local_npm_command(command, install_path):

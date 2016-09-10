@@ -14,14 +14,14 @@ import os
 import pacman
 import shutil
 import tarfile
-import traceback
 
 from distutils.spawn import find_executable
 
 from arkos import config, storage, signals, logger, tracked_services
+from arkos.messages import Notification, NotificationThread
 from arkos.system import services
 from arkos.languages import python
-from arkos.utilities import api, DefaultMessage
+from arkos.utilities import api, errors
 
 
 class App:
@@ -77,7 +77,7 @@ class App:
                         mgr = y[1]
                         break
                 debug_str = " *** Registering {0} module on {1}"
-                logger.debug(debug_str.format(module, self.id))
+                logger.debug("Apps", debug_str.format(module, self.id))
                 if module == "database":
                     for y in classes:
                         if issubclass(y[1], mgr) and y[1] != mgr:
@@ -110,9 +110,8 @@ class App:
         except Exception as e:
             self.loadable = False
             self.error = "Module error: {0}".format(e)
-            logger.warn("Failed to load {0} -- {1}".format(self.name, str(e)))
-            logger.warn("Stacktrace follows:")
-            logger.warn(traceback.format_exc())
+            raise errors.OperationFailedError(
+                "({0})".format(self.name)) from e
 
     def verify_dependencies(self):
         """
@@ -149,7 +148,7 @@ class App:
                 if to_pip:
                     try:
                         debug_str = " *** Installing {0} (via pip)..."
-                        logger.debug(debug_str.format(to_pip))
+                        logger.debug("Apps", debug_str.format(to_pip))
                         python.install(to_pip)
                     except:
                         error = "Couldn't install {0}".format(to_pip)
@@ -163,7 +162,7 @@ class App:
             pacman.refresh()
         for x in to_pacman:
             try:
-                logger.debug(" *** Installing {0}...".format(x))
+                logger.debug("Apps", " *** Installing {0}...".format(x))
                 pacman.install(x)
             except:
                 error = "Couldn't install {0}".format(x)
@@ -172,16 +171,31 @@ class App:
         self.error = error
         return verify
 
-    def install(self, install_deps=True, load=True,
-                force=False, message=DefaultMessage()):
+    def install(self, install_deps=True, load=True, force=False,
+                cry=False, nthread=NotificationThread()):
         """
         Install the arkOS application to the system.
 
         :param bool install_deps: Install the app's dependencies too?
         :param bool load: Load the app after install?
         :param bool force: Force reinstall if app is already installed?
-        :param message message: Message object to update with status
+        :param bool cry: Raise exception on dependency install failure?
+        :param NotificationThread nthread: notification thread to use
         """
+        try:
+            self._install(install_deps, load, force, cry, nthread)
+        except Exception as e:
+            weberrors = (
+                errors.InvalidConfigError,
+                errors.OperationFailedError
+            )
+            if not isinstance(e, weberrors):
+                raise errors.OperationFailedError(
+                    "({0})".format(self.name), nthread) from e
+            else:
+                raise
+
+    def _install(self, install_deps, load, force, cry, nthread):
         if self.installed and not force:
             return
         signals.emit("apps", "pre_install", self)
@@ -189,15 +203,14 @@ class App:
         deps = get_dependent(self.id, "install")
         if install_deps and deps:
             for x in deps:
-                debug_str = "Installing {0} (dependency for {1})"
-                logger.debug(debug_str.format(x, self.name))
-                msg_str = "Installing dependencies for {0}... ({1})"
-                message.update("info", msg_str.format(self.name, x))
-                _install(x, load=load)
+                msg = "Installing dependencies for {0}... ({1})"
+                nthread.update(
+                    Notification("info", "Apps", msg.format(self.name, x))
+                )
+                _install(x, load=load, cry=cry)
         # Install this app
-        logger.debug("Installing {0}".format(self.name))
-        message.update("info", "Installing {0}...".format(self.name))
-        _install(self.id, load=load)
+        nthread.update(Notification("info", "Apps", msg))
+        _install(self.id, load=load, cry=cry)
         ports = []
         for s in self.services:
             if s.get("default_policy", 0) and s["ports"]:
@@ -205,40 +218,42 @@ class App:
         if ports and config.get("general", "enable_upnp", True):
             tracked_services.open_all_upnp(ports)
         verify_app_dependencies()
+        smsg = "{0} installed successfully.".format(self.name)
+        nthread.complete(Notification("success", "Apps", smsg))
         signals.emit("apps", "post_install", self)
 
-    def uninstall(self, force=False, message=DefaultMessage()):
+    def uninstall(self, force=False, nthread=NotificationThread()):
         """
         Uninstall the arkOS application from the system.
 
         :param bool force: Uninstall the app even if others depend on it?
-        :param message message: Message object to update with status
+        :param NotificationThread nthread: notification thread to use
         """
         signals.emit("apps", "pre_remove", self)
-        message.update("info", "Uninstalling application...")
-        exclude = ["openssl", "openssh", "nginx",
-                   "python2", "git", "nodejs", "npm"]
+        msg = "Uninstalling application..."
+        nthread.update(Notification("info", "Apps", msg))
+        exclude = ["openssl", "openssh", "nginx", "python2", "git",
+                   "nodejs", "npm"]
 
         # Make sure this app can be successfully removed, and if so also remove
         # any system-level packages that *only* this app requires
         for x in get(installed=True):
             for item in x.dependencies:
-                if item["type"] == "app" and \
-                        item["package"] == self.id and not force:
-                    raise Exception("Cannot remove, {0} depends "
-                                    "on this application".format(x.name))
+                if item["type"] == "app" and item["package"] == self.id \
+                        and not force:
+                    exc_str = "{0} depends on this application"
+                    raise errors.InvalidConfigError(exc_str.format(x.name))
                 elif item["type"] == "system":
                     exclude.append(item["package"])
 
         # Stop any running services associated with this app
         for item in self.dependencies:
             if item["type"] == "system" and not item["package"] in exclude:
-                if "daemon" in item and item["daemon"]:
+                if item.get("daemon"):
                     services.get().stop(item["daemon"])
                     services.get().disable(item["daemon"])
                 pacman.remove([item["package"]],
                               purge=config.get("apps", "purge", False))
-        logger.debug("Uninstalling {0}".format(self.name))
 
         # Remove the app's directory and cleanup the app object
         shutil.rmtree(os.path.join(config.get("apps", "app_dir"), self.id))
@@ -258,6 +273,8 @@ class App:
                 ports.append(s["ports"])
         if ports and config.get("general", "enable_upnp", True):
             tracked_services.close_all_upnp(ports)
+        smsg = "{0} uninstalled successfully".format(self.name)
+        nthread.complete(Notification("success", "Apps", smsg))
         signals.emit("apps", "post_remove", self)
 
     def ssl_enable(self, cert, sid=""):
@@ -391,15 +408,15 @@ def scan(verify=True):
             with open(os.path.join(app_dir, x, "manifest.json"), "r") as f:
                 data = json.loads(f.read())
         except ValueError:
-            logger.warn("Failed to load {0} due to a JSON parsing error"
-                        .format(x))
+            warn_str = "Failed to load {0} due to a JSON parsing error"
+            logger.warning("Apps", warn_str.format(x))
             continue
         except IOError:
-            logger.warn("Failed to load {0}: "
-                        "manifest file inaccessible or not present"
-                        .format(x))
+            warn_str = "Failed to load {0}: manifest file inaccessible "\
+                       "or not present"
+            logger.warning("Apps", warn_str.format(x))
             continue
-        logger.debug(" *** Loading {0}".format(data["id"]))
+        logger.debug("Apps", " *** Loading {0}".format(data["id"]))
         app = App(**data)
         app.installed = True
         for y in enumerate(available_apps):
@@ -444,7 +461,7 @@ def verify_app_dependencies():
                               .format(dep["name"])
                     error_str = "*** Verify failed for {0} -- dependent on "\
                                 "{1} which is not installed"
-                    logger.debug(error_str.format(x.name, dep["name"]))
+                    logger.debug("Apps", error_str.format(x.name, dep["name"]))
                     # Cascade this fail message to all apps in dependency chain
                     for z in get_dependent(x.id, "remove"):
                         z = storage.apps.get("applications", z)
@@ -460,7 +477,7 @@ def verify_app_dependencies():
                               .format(dep["name"])
                     error_str = "*** Verify failed for {0} -- dependent on "\
                                 "{1} which failed to load"
-                    logger.debug(error_str.format(x.name, dep["name"]))
+                    logger.debug("Apps", error_str.format(x.name, dep["name"]))
                     # Cascade this fail message to all apps in dependency chain
                     for z in get_dependent(x.id, "remove"):
                         z = storage.apps.get("applications", z)

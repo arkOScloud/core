@@ -9,7 +9,6 @@ Licensed under GPLv3, see LICENSE.md
 
 import bz2
 import base64
-import binascii
 import crypt
 import gzip
 import os
@@ -24,8 +23,10 @@ import tempfile
 import time
 import zipfile
 
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import hashes
+
+def b(text):
+    """Less-ugly way of converting unicode to bytestring."""
+    return text.encode("utf-8")
 
 
 def cidr_to_netmask(cidr):
@@ -97,13 +98,13 @@ def download(url, file=None, crit=False):
     try:
         data = requests.get(url)
         if file:
-            with open(file, "w") as f:
-                f.write(data.text)
+            with open(file, "wb") as f:
+                f.write(data.content)
         else:
             return data.text
-    except Exception as e:
+    except Exception:
         if crit:
-            raise("Download exception: {0}".format(e))
+            raise
 
 
 def get_current_entropy():
@@ -112,14 +113,13 @@ def get_current_entropy():
         return int(f.readline())
 
 
-def random_string():
+def random_string(length=40):
     """Create a random alphanumeric string."""
-    digest = hashes.Hash(hashes.SHA1(), backend=default_backend())
-    digest.update(str(random.random()).encode('utf-8'))
-    return binascii.hexlify(digest.finalize())
+    chars = string.ascii_uppercase + string.ascii_lowercase + string.digits
+    return ''.join(random.choice(chars) for _ in range(length))
 
 
-def api(url, post=None, method="", returns="json", headers=[], crit=False):
+def api(url, post=None, method="get", returns="json", headers=[], crit=False):
     """
     Multipurpose function to send/receive data from an Internet address.
 
@@ -144,8 +144,10 @@ def api(url, post=None, method="", returns="json", headers=[], crit=False):
             req = action(url, headers=headers, json=post)
         if returns == "json":
             return req.json()
-        else:
+        elif returns == "str":
             return req.text
+        else:
+            return req.content
         req.raise_for_status()
     except requests.exceptions.HTTPError as e:
         if crit:
@@ -187,7 +189,7 @@ def shell(c, stdin=None, env={}):
 
 def hashpw(passw, scheme="sha512_crypt"):
     """Create a password hash."""
-    rnd = "".join(random.sample(string.ascii_uppercase+string.digits, 8))
+    rnd = "".join(random.sample(string.ascii_uppercase + string.digits, 16))
     salt = "$6$" + rnd + "$"
     return "{CRYPT}" + crypt.crypt(passw, salt)
 
@@ -204,15 +206,15 @@ def can_be_int(data):
 def str_fsize(sz):
     """Format a size int/float to the most appropriate string."""
     if sz < 1024:
-        return "%.1f bytes" % sz
+        return "{:.1f} bytes".format(sz)
     sz /= 1024.0
     if sz < 1024:
-        return "%.1f Kb" % sz
+        return "{:.1f} Kb".format(sz)
     sz /= 1024.0
     if sz < 1024:
-        return "%.1f Mb" % sz
+        return "{:.1f} Mb".format(sz)
     sz /= 1024.0
-    return "%.1f Gb" % sz
+    return "{:.1f} Gb".format(sz)
 
 
 def str_fperms(mode):

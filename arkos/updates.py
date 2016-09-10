@@ -10,8 +10,9 @@ Licensed under GPLv3, see LICENSE.md
 import json
 import gnupg
 
-from arkos import storage, signals, config, logger
-from arkos.utilities import api, download, shell, DefaultMessage
+from arkos import config, logger, storage, signals
+from arkos.messages import Notification, NotificationThread
+from arkos.utilities import api, download, shell
 
 
 def check_updates():
@@ -43,7 +44,7 @@ def check_updates():
     return updates
 
 
-def install_updates(message=DefaultMessage()):
+def install_updates(nthread=NotificationThread()):
     """
     Install all available updates from arkOS repo server.
 
@@ -56,8 +57,8 @@ def install_updates(message=DefaultMessage()):
     amount = len(updates)
     responses, ids = [], []
     for z in enumerate(updates):
-        message.update("info", "{0} of {1}...".format(z[0] + 1, amount),
-                       head="Installing updates")
+        msg = "{0} of {1}...".format(z[0] + 1, amount)
+        nthread.update(Notification("info", "Updates", msg))
         for x in sorted(z[1]["tasks"], key=lambda y: y["step"]):
             if x["unit"] == "shell":
                 s = shell(x["order"], stdin=x.get("data", None))
@@ -78,14 +79,16 @@ def install_updates(message=DefaultMessage()):
             config.set("updates", "current_update", z[1]["id"])
             config.save()
             continue
-        message.complete("error", "Installation of update {0} "
-                         "failed. See logs for details."
-                         .format(str(z[1]["id"])))
-        logger.error(responses)
+        for x in responses:
+            nthread.update(Notification("debug", "Updates", x))
+        msg = "Installation of update {0} failed. See logs for details."
+        msg = msg.format(z[1]["id"])
+        nthread.complete(Notification("error", "Updates", msg))
         break
     else:
         signals.emit("updates", "post_install")
-        message.complete("success", "Please restart your system for the "
-                         "updates to take effect.",
-                         head="Updates installed successfully")
+        for x in responses:
+            nthread.update(Notification("debug", "Updates", x))
+        msg = "Please restart your system for the updates to take effect."
+        nthread.complete(Notification("success", "Updates", msg))
         return ids
