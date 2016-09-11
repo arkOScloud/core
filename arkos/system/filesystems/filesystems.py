@@ -608,7 +608,6 @@ def get_partition_uuid_by_name(p):
     return shell("blkid -o value -s UUID " + p)["stdout"].split(b"\n")[0]
 
 
-
 def get_partition_name_by_uuid(u):
     """Get a partition's device name from its UUID."""
     return shell("blkid -U " + u)["stdout"].split(b"\n")[0]

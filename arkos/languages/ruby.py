@@ -68,4 +68,3 @@ def update_gem(*gems, **kwargs):
                 logmsg = "Gem install of {0} failed.".format(x)
                 raise errors.OperationFailedError(logmsg) \
                     from Exception(d["stderr"])
-

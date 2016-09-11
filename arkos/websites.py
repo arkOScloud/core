@@ -938,7 +938,7 @@ class ReverseProxy(Site):
         return self.as_dict
 
 
-def get(id_=None, type=None, force=False):
+def get(id_=None, type_=None, force=False):
     """
     Retrieve website data from the system.
 

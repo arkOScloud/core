@@ -26,7 +26,7 @@ class SecurityPolicy:
     (iptables) on regeneration or app update.
     """
 
-    def __init__(self, type="", id_="", name="", icon="", ports=[],
+    def __init__(self, type_="", id_="", name="", icon="", ports=[],
                  policy=2, addr=None):
         """
         Initialize the policy object.
@@ -108,7 +108,6 @@ class PortConflictError(errors.Error):
                 "please choose another")
 
 
-
 def get(id_=None, type_=None):
     """
     Get all security policies from cache storage.
@@ -130,7 +129,7 @@ def get(id_=None, type_=None):
     return data
 
 
-def register(type, id, name, icon, ports, addr=None, policy=0,
+def register(type_, id_, name, icon, ports, addr=None, policy=0,
              default_policy=2, fw=True):
     """
     Register a new security policy with the system.

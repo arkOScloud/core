@@ -344,7 +344,6 @@ def get(id_=None):
     return sorted(svcs, key=lambda s: s.name) if not id_ else None
 
 
-
 def supervisor_ping():
     """Check to make sure Supervisor API connection is functional."""
     try:

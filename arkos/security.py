@@ -48,7 +48,7 @@ def initialize_firewall():
     signals.emit("security", "post_fw_init")
 
 
-def regenerate_firewall(data, range=[]):
+def regenerate_firewall(data, range_=[]):
     """
     Flush and regenerate arkOS firewall chain.
 
@@ -157,6 +157,7 @@ def disable_jail_def(jailname):
     with open(jcfg, "w") as f:
         cfg.write(f)
 
+
 def enable_all_def(service):
     """
     Enable all fail2ban jail definitions for a given service.
@@ -196,7 +197,6 @@ def bantime_def(bantime=""):
         return bantime
 
 
-
 def findtime_def(findtime=""):
     """
     Get or set default find time for fail2ban monitoring.
@@ -216,7 +216,6 @@ def findtime_def(findtime=""):
         return findtime
 
 
-
 def maxretry_def(maxretry=""):
     """
     Get or set default max retry time for fail2ban monitoring.
@@ -234,7 +233,6 @@ def maxretry_def(maxretry=""):
         with open(jailconf, "w") as f:
             cfg.write(f)
         return maxretry
-
 
 
 def ignoreip_def(ranges):

@@ -43,7 +43,6 @@ def verify_composer():
         raise errors.OperationFailedError(logmsg)
 
 
-
 def composer_install(path):
     """
     Install a PHP application bundle via Composer.

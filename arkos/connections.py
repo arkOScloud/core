@@ -10,10 +10,10 @@ Licensed under GPLv3, see LICENSE.md
 import ldap
 import xmlrpc.client
 
-
 from arkos.utilities.errors import ConnectionServiceError
 from arkos.utilities.errors import InvalidConfigError
 from dbus import SystemBus, Interface
+from supervisor.rpcinterface import SupervisorNamespaceRPCInterface
 
 
 class ConnectionsManager:
@@ -98,6 +98,7 @@ def supervisor_connect():
     """
     try:
         s = xmlrpc.client.Server("http://localhost:9001/RPC2")
-        return s.supervisor
+        supervisor = SupervisorNamespaceRPCInterface(s.supervisor)
+        return supervisor
     except Exception as e:
         raise ConnectionServiceError("Supervisor") from e

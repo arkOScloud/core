@@ -18,7 +18,7 @@ import tarfile
 from distutils.spawn import find_executable
 
 
-from arkos import config, logger, storages, signals, tracked_services
+from arkos import config, logger, storage, signals, tracked_services
 from arkos.messages import Notification, NotificationThread
 from arkos.system import services
 from arkos.languages import python
@@ -349,7 +349,7 @@ class AppDependencyError(errors.Error):
         return (self.dep, self.type)
 
 
-def get(id_=None, type=None, loadable=None, installed=None,
+def get(id_=None, type_=None, loadable=None, installed=None,
         verify=True, force=False, cry=True):
     """
     Retrieve arkOS application data from the system.
@@ -506,7 +506,7 @@ def verify_app_dependencies():
                         z.error = error_str.format(x.name, dep["name"])
 
 
-def get_dependent(id, op):
+def get_dependent(id_, op):
     """
     Return list of all apps to install or remove based on specified operation.
 

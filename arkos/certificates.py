@@ -210,7 +210,7 @@ class CertificateAuthority:
         return data
 
 
-def get(id=None, force=False):
+def get(id_=None, force=False):
     """
     Retrieve arkOS certificate data from the system.
 
@@ -219,7 +219,7 @@ def get(id=None, force=False):
     directory is searched, certificates are loaded and verified.
     This is used on first boot.
 
-    :param str id: If present, obtain one certificate that matches this ID
+    :param str id_: If present, obtain one certificate that matches this ID
     :param bool force: Force a rescan (do not rely on cache)
     :return: Certificate(s)
     :rtype: Certificate or list thereof
@@ -292,7 +292,7 @@ def scan():
     return certs
 
 
-def get_authorities(id=None, force=False):
+def get_authorities(id_=None, force=False):
     """
     Retrieve arkOS certificate authority data from the system.
 

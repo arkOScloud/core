@@ -7,7 +7,7 @@ Written by Jacob Cook
 Licensed under GPLv3, see LICENSE.md
 """
 
-import ldap
+import ldap.modlist
 
 from arkos import config, conns, signals
 from arkos.system import users

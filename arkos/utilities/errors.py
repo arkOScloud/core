@@ -22,6 +22,10 @@ class Error(Exception):
         return self.msg
 
 
+class SoftFail(Error):
+    """???"""
+
+
 class ConfigurationError(Error):
     """Raised when a value cannot be found in an arkOS configuration file."""
 
