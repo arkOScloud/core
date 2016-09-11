@@ -405,16 +405,19 @@ def scan(verify=True):
     # Create objects for installed apps with appropriate metadata
     for x in installed_apps:
         try:
-            with open(os.path.join(app_dir, x, "manifest.json"), "r") as f:
+            with open(os.path.join(app_dir, x, "manifest.json"),
+                      "r", encoding='utf-8') as f:
                 data = json.loads(f.read())
-        except ValueError:
+        except ValueError as e:
             warn_str = "Failed to load {0} due to a JSON parsing error"
             logger.warning("Apps", warn_str.format(x))
+            logger.warning("Apps", e)
             continue
-        except IOError:
+        except IOError as e:
             warn_str = "Failed to load {0}: manifest file inaccessible "\
                        "or not present"
             logger.warning("Apps", warn_str.format(x))
+            logger.warning("Apps", e)
             continue
         logger.debug("Apps", " *** Loading {0}".format(data["id"]))
         app = App(**data)
