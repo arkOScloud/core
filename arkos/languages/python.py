@@ -7,9 +7,7 @@ Written by Jacob Cook
 Licensed under GPLv3, see LICENSE.md
 """
 
-
-from arkos import logger
-from arkos.utilities import shell
+from arkos.utilities import errors, shell
 
 
 def install(*mods):
@@ -21,10 +19,7 @@ def install(*mods):
     mods = " ".join(x for x in mods)
     s = shell("pip install {0}".format(mods))
     if s["code"] != 0:
-        logmsg = "Failed to install {0} via PyPI; {1}"
-        excmsg = "Failed to install {0} via PyPI, check logs for info"
-        logger.error(logmsg.format(mods, s["stderr"]))
-        raise Exception(excmsg.format(mods))
+        raise errors.OperationFailedError(mods) from Exception(s["stderr"])
 
 
 def remove(*mods):
@@ -35,10 +30,7 @@ def remove(*mods):
     """
     s = shell("pip uninstall {0}".format(mods))
     if s["code"] != 0:
-        logmsg = "Failed to remove {0} via PyPI; {1}"
-        excmsg = "Failed to remove {0} via PyPI, check logs for info"
-        logger.error(logmsg.format(mods, s["stderr"]))
-        raise Exception(excmsg.format(mods))
+        raise errors.OperationFailedError(mods) from Exception(s["stderr"])
 
 
 def is_installed(name):

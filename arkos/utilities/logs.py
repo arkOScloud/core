@@ -52,7 +52,7 @@ class NotificationFilter(logging.Filter):
 
 
 class LoggingControl:
-    """Control logging for runtime or notification events."""
+    """Control logging for runtime events, using `logging` module API."""
 
     def __init__(self, logger=None):
         self.logger = logger or logging.getLogger("arkos")

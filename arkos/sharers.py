@@ -50,10 +50,10 @@ class Sharer:
 class Share:
     """Represents a file share object."""
 
-    def __init__(self, service_id="", comment="", path="", valid_users=[],
+    def __init__(self, id_="", comment="", path="", valid_users=[],
                  public=True, readonly=False, manager=None):
         """Initialize."""
-        self.id = service_id
+        self.id = id_
         self.comment = comment
         self.path = path
         self.valid_users = valid_users
@@ -71,14 +71,14 @@ class Share:
         """Add a file share."""
         signals.emit("shares", "pre_add", self)
         self.add_share()
-        storage.files.add("shares", self)
+        storage.shares.add("shares", self)
         signals.emit("shares", "post_add", self)
 
     def remove(self, *args, **kwargs):
         """Remove a file share."""
         signals.emit("shares", "pre_remove", self)
         self.remove_share()
-        storage.files.add("shares", self)
+        storage.shares.add("shares", self)
         signals.emit("shares", "post_remove", self)
 
     @property
@@ -123,14 +123,14 @@ class Mount:
         """Mount a file share."""
         signals.emit("shares", "pre_mount", self)
         self.mount()
-        storage.files.add("mounts", self)
+        storage.shares.add("mounts", self)
         signals.emit("shares", "post_mount", self)
 
     def remove(self, *args, **kwargs):
         """Unmount a file share."""
         signals.emit("shares", "pre_umount", self)
         self.umount()
-        storage.files.add("mounts", self)
+        storage.shares.add("mounts", self)
         signals.emit("shares", "post_umount", self)
 
     @property
@@ -187,7 +187,7 @@ def scan_shares():
             shares += x.get_shares()
         except:
             continue
-    storage.files.set("shares", shares)
+    storage.shares.set("shares", shares)
     return shares
 
 
@@ -227,7 +227,7 @@ def scan_mounts():
             mounts += x.get_mounts()
         except:
             continue
-    storage.files.set("mounts", mounts)
+    storage.shares.set("mounts", mounts)
     return mounts
 
 
@@ -239,7 +239,7 @@ def get_sharers(id_=None):
     :return: Sharer(s)
     :rtype: Sharer or list thereof
     """
-    data = storage.files.get("sharers")
+    data = storage.shares.get("sharers")
     if not data:
         data = scan_sharers()
     if id_:

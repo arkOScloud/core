@@ -1,5 +1,5 @@
 """
-Classes and functions for interacting with system management daemons.
+Classes and functions for management of system-level services.
 
 arkOS Core
 (c) 2016 CitizenWeb
@@ -31,6 +31,7 @@ class Service:
 
     Services can be of type ``systemd`` or ``supervisor``.
     """
+
     def __init__(self, name="", stype="", state=False, enabled=False, cfg={}):
         """
         Initialize the service.
@@ -63,8 +64,8 @@ class Service:
         c.add_section(title)
         for x in self.cfg:
             c.set(title, x, self.cfg[x])
-        with open(os.path.join("/etc/supervisor.d", self.name+".ini"),
-                  "w") as f:
+        with open(os.path.join("/etc/supervisor.d",
+                               self.sfname), "w") as f:
             c.write(f)
         if enable:
             self.enable()
@@ -84,8 +85,8 @@ class Service:
         else:
             # Send the start command to systemd
             try:
-                path = conns.SystemD.LoadUnit(self.name+".service")
-                conns.SystemD.StartUnit(self.name+".service", "replace")
+                path = conns.SystemD.LoadUnit(self.sfname)
+                conns.SystemD.StartUnit(self.sfname, "replace")
             except DBusException as e:
                 raise ActionError("dbus", str(e))
             timeout = 0
@@ -97,9 +98,8 @@ class Service:
                 data = data.GetAll("org.freedesktop.systemd1.Unit")
                 if str(data["ActiveState"]) == "failed":
                     raise ActionError("svc", "The service failed to start. "
-                                      "Please check `sudo systemctl -l "
-                                      "status {}.service`"
-                                      .format(self.name))
+                                      "Please check `sudo systemctl -l status "
+                                      "{0}".format(self.sfname))
                 elif str(data["ActiveState"]) == "active":
                     self.state = "running"
                     signals.emit("services", "post_start", self)
@@ -108,9 +108,8 @@ class Service:
                 time.sleep(1)
             else:
                 raise ActionError("svc", "The service start timed out. "
-                                  "Please check `sudo systemctl "
-                                  "-l status {}.service`"
-                                  .format(self.name))
+                                  "Please check `sudo systemctl -l status "
+                                  "{0}".format(self.sfname))
 
     def stop(self):
         """Stop service."""
@@ -123,8 +122,8 @@ class Service:
         else:
             # Send the stop command to systemd
             try:
-                path = conns.SystemD.LoadUnit(self.name+".service")
-                conns.SystemD.StopUnit(self.name+".service", "replace")
+                path = conns.SystemD.LoadUnit(self.sfname)
+                conns.SystemD.StopUnit(self.sfname, "replace")
             except DBusException as e:
                 raise ActionError("dbus", str(e))
             timeout = 0
@@ -142,9 +141,8 @@ class Service:
                 time.sleep(1)
             else:
                 raise ActionError("svc", "The service stop timed out. "
-                                  "Please check `sudo systemctl "
-                                  "-l status {}.service`"
-                                  .format(self.name))
+                                  "Please check `sudo systemctl -l status "
+                                  "{0}".format(self.sfname))
 
     def restart(self, real=False):
         """Restart service."""
@@ -157,13 +155,11 @@ class Service:
         else:
             # Send the restart command to systemd
             try:
-                path = conns.SystemD.LoadUnit(self.name+".service")
+                path = conns.SystemD.LoadUnit(self.sfname)
                 if real:
-                    conns.SystemD.RestartUnit(self.name+".service", "replace")
+                    conns.SystemD.RestartUnit(self.sfname, "replace")
                 else:
-                    conns.SystemD.ReloadOrRestartUnit("{0}.service"
-                                                      .format(self.name),
-                                                      "replace")
+                    conns.SystemD.ReloadOrRestartUnit(self.sfname, "replace")
             except DBusException as e:
                 raise ActionError("dbus", str(e))
             timeout = 0
@@ -175,9 +171,8 @@ class Service:
                 data = data.GetAll("org.freedesktop.systemd1.Unit")
                 if str(data["ActiveState"]) == "failed":
                     raise ActionError("svc", "The service failed to restart. "
-                                      "Please check `sudo systemctl "
-                                      "-l status {}.service`"
-                                      .format(self.name))
+                                      "Please check `sudo systemctl -l status "
+                                      "{0}".format(self.sfname))
                 elif str(data["ActiveState"]) == "active":
                     self.state = "running"
                     signals.emit("services", "post_restart", self)
@@ -186,9 +181,8 @@ class Service:
                 time.sleep(1)
             else:
                 raise ActionError("svc", "The service restart timed out. "
-                                  "Please check `sudo systemctl "
-                                  "-l status {}.service`"
-                                  .format(self.name))
+                                  "Please check `sudo systemctl -l status "
+                                  "{0}".format(self.sfname))
 
     def get_log(self):
         """Get supervisor service logs."""
@@ -196,27 +190,22 @@ class Service:
             supervisor_ping()
             s = conns.Supervisor.tailProcessStdoutLog(self.name)
         else:
-            s = shell("systemctl --no-ask-password status {0}.service"
-                      .format(self.name))["stdout"]
+            s = shell("systemctl --no-ask-password status {0}"
+                      .format(self.sfname))["stdout"]
         return s
 
     def enable(self):
         """Enable service to start on boot."""
         if self.stype == "supervisor":
+            disfsname = "{0}.disabled".format(self.sfname)
             supervisor_ping()
-            if os.path.exists(os.path.join("/etc/supervisor.d",
-                                           "{0}.ini.disabled"
-                                           .format(self.name))):
-                os.rename(os.path.join("/etc/supervisor.d",
-                                       "{0}.ini.disabled"
-                                       .format(self.name)),
-                          os.path.join("/etc/supervisor.d",
-                                       "{0}.ini".format(self.name)))
+            if os.path.exists(os.path.join("/etc/supervisor.d", disfsname)):
+                os.rename(os.path.join("/etc/supervisor.d", disfsname),
+                          os.path.join("/etc/supervisor.d", self.sfname))
             conns.Supervisor.restart()
         else:
             try:
-                conns.SystemD.EnableUnitFiles([self.name+".service"],
-                                              False, True)
+                conns.SystemD.EnableUnitFiles([self.sfname], False, True)
             except DBusException as e:
                 raise ActionError("dbus", str(e))
         self.enabled = True
@@ -224,16 +213,15 @@ class Service:
     def disable(self):
         """Disable service starting on boot."""
         if self.stype == "supervisor":
+            disfsname = "{0}.disabled".format(self.sfname)
             if self.state == "running":
                 self.stop()
-            os.rename(os.path.join("/etc/supervisor.d",
-                                   "{0}.ini".format(self.name)),
-                      os.path.join("/etc/supervisor.d",
-                                   "{0}.ini.disabled".format(self.name)))
+            os.rename(os.path.join("/etc/supervisor.d", self.sfname),
+                      os.path.join("/etc/supervisor.d", disfsname))
             self.state = "stopped"
         else:
             try:
-                conns.SystemD.DisableUnitFiles([self.name+".service"], False)
+                conns.SystemD.DisableUnitFiles([self.sfname], False)
             except DBusException as e:
                 raise ActionError("dbus", str(e))
         self.enabled = False
@@ -246,10 +234,9 @@ class Service:
             if self.state == "running":
                 self.stop()
             try:
-                os.unlink(os.path.join("/etc/supervisor.d",
-                                       "{0}.ini".format(self.name)))
-                os.unlink(os.path.join("/etc/supervisor.d",
-                                       "{0}.ini.disabled".format(self.name)))
+                disfsname = "{0}.disabled".format(self.sfname)
+                os.unlink(os.path.join("/etc/supervisor.d", self.sfname))
+                os.unlink(os.path.join("/etc/supervisor.d", disfsname))
             except:
                 pass
             self.state = "stopped"
@@ -296,8 +283,8 @@ def get(id_=None):
         if not unit[0].endswith(".service"):
             continue
         sname = os.path.splitext(os.path.split(unit[0])[-1])[0]
-        files[sname] = Service(name=sname, stype="system",
-                               state="stopped", enabled=unit[1] == "enabled")
+        files[sname] = Service(sname, "system", "stopped",
+                               unit[1] == "enabled")
 
     # Get all loaded services
     try:
@@ -310,22 +297,19 @@ def get(id_=None):
             continue
         sname = unit[0].split(".service")[0]
         if sname not in files:
-            files[sname] = Service(name=sname, stype="system",
-                                   state="", enabled=unit[1] == "enabled")
-        if "@" in sname and files.get(sname.split("@")[0] + "@", None):
-            files[sname].enabled = files.get(sname.split("@")[0] + "@",
-                                             None).enabled
+            files[sname] = Service(sname, "system", "",
+                                   unit[1] == "enabled")
+        fsvc = files.get(sname.split("@")[0] + "@", None)
+        if "@" in sname and fsvc:
+            files[sname].enabled = fsvc.enabled
         files[sname].state = "running" if unit[3] == "active" else "stopped"
 
-    """
-    If user requests a service with identifier and
-    it's not running or enabled...
-    """
-    if id_ and "@" in id_ and id_ not in files and \
-            (id_.split("@")[0] + "@") in files:
-        files[id_] = Service(name=sname, stype="system",
-                             state="stopped", enabled=False)
-        return files[id_]
+    # If user requests a service with identifier and it's not
+    # running or enabled...
+    if id and "@" in id and id not in files \
+            and (id.split("@")[0] + "@") in files:
+        files[id] = Service(sname, "system", "stopped", False)
+        return files[id]
 
     # Match up loaded services with their unit files and show state
     for unit in files:
@@ -350,14 +334,15 @@ def get(id_=None):
             conns.Supervisor.getProcessInfo(name)
         except:
             continue
-        s = Service(name=name, stype="supervisor",
-                    state=conns.Supervisor.getProcessInfo(name)["statename"]
-                    .lower() if not x.endswith("disabled") else "stopped",
-                    enabled=not x.endswith("disabled"), cfg=cfg)
+        status = conns.Supervisor.getProcessInfo(name)["statename"].lower()\
+            if not x.endswith("disabled") else "stopped"
+        s = Service(name, "supervisor", status, not x.endswith("disabled"),
+                    cfg)
         if id_ == s.name:
             return s
         svcs.append(s)
     return sorted(svcs, key=lambda s: s.name) if not id_ else None
+
 
 
 def supervisor_ping():

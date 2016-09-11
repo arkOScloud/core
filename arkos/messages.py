@@ -1,5 +1,5 @@
 """
-Classes for management of arkOS status message logging.
+Classes for management of arkOS process logging.
 
 arkOS Core
 (c) 2016 CitizenWeb

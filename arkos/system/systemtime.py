@@ -1,5 +1,5 @@
 """
-Classes and functions for interacting with system management daemons.
+Helper functions for managing system time.
 
 arkOS Core
 (c) 2016 CitizenWeb
@@ -35,8 +35,8 @@ def verify_time(update=True, crit=True):
         os = get_offset()
     except Exception as e:
         if crit:
-            raise Exception("System time could not be retrieved. Error: {0}"
-                            .format(str(e)))
+            raise Exception("System time could not be retrieved. "
+                            "Error: {0}".format(e))
         else:
             return "UNKNOWN"
     if (os < -3600 or os > 3600) and update:
@@ -90,6 +90,16 @@ def get_unix_time(ts=None, fmt="%Y-%m-%dT%H:%M:%S"):
         return int(time.time())
 
 
+def get_datetime():
+    """
+    Get current date and time in default formats.
+
+    :returns: date and time
+    :rtype: str
+    """
+    return get_date() + " " + get_time()
+
+
 def set_datetime(ut=0):
     """
     Set system time from provided Unix timestamp (or current time via NTP).
@@ -105,16 +115,6 @@ def set_datetime(ut=0):
         raise Exception("Could not set time: {0}"
                         .format(os.strerror(ctypes.get_errno())))
     signals.emit("config", "time_changed", ut)
-
-
-def get_datetime():
-    """
-    Get date and time from NTP server.
-
-    :returns: Unix timestamp
-    :rtype: float
-    """
-    return get_date() + " " + get_time()
 
 
 def get_idatetime():

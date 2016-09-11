@@ -16,6 +16,7 @@ import tarfile
 
 from arkos import version as arkos_version
 from arkos import secrets, config, signals, applications, databases, websites
+from arkos.messages import Notification, NotificationThread
 from arkos.system import systemtime
 from arkos.utilities import random_string, shell
 
@@ -68,15 +69,19 @@ class BackupController:
             data += self.get_data()
         return data
 
-    def backup(self, data=True, backup_location=""):
+    def backup(self, data=True, backup_location="",
+               nthread=NotificationThread()):
         """
         Initiate a backup of the associated arkOS app.
 
         :param bool data: Include specified data files in the backup?
         :param str backup_location: Save output archive to custom path
+        :param NotificationThread nthread: notification thread to use
         :returns: ``Backup``
         :rtype: dict
         """
+        nthread.title = "Creating a backup"
+
         if not backup_location:
             backup_location = config.get("backups", "location",
                                          "/var/lib/arkos/backups")
@@ -84,6 +89,8 @@ class BackupController:
             self.version = self.site.meta.version
         signals.emit("backups", "pre_backup", self)
 
+        msg = "Running pre-restore for {0}...".format(self.id)
+        nthread.update(Notification("info", "Backup", msg))
         # Trigger the pre-backup hook for the app/site
         if self.ctype == "site":
             self.pre_backup(self.site)
@@ -102,15 +109,16 @@ class BackupController:
         data = self._get_data() if data else []
         timestamp = systemtime.get_serial_time()
         isotime = systemtime.get_iso_time(timestamp)
-        path = os.path.join(backup_dir, "{0}-{1}.tar.gz"
-                            .format(self.id, timestamp))
+        archive_name = "{0}-{1}.tar.gz".format(self.id, timestamp)
+        path = os.path.join(backup_dir, archive_name)
         # Zip up the gathered file paths
+        nthread.complete(Notification("info", "Backup", "Creating archive..."))
         with tarfile.open(path, "w:gz") as t:
             for f in myconfig+data:
                 for x in glob.glob(f):
                     t.add(x)
             if self.ctype == "site" and self.site.db:
-                dbsql = io.StringIO.StringIO(self.site.db.dump())
+                dbsql = io.StringIO(self.site.db.dump())
                 dinfo = tarfile.TarInfo(name="/{0}.sql".format(self.site.id))
                 dinfo.size = len(dbsql.buf)
                 t.addfile(tarinfo=dinfo, fileobj=dbsql)
@@ -119,37 +127,47 @@ class BackupController:
                 "version": self.version, "time": isotime}
         if self.site:
             info["site_type"] = self.site.meta.id
-        with open(os.path.join(backup_dir, "{0}-{1}.meta"
-                               .format(self.id, timestamp)), "w") as f:
+        filename = "{0}-{1}.meta".format(self.id, timestamp)
+        with open(os.path.join(backup_dir, filename), "w") as f:
             f.write(json.dumps(info))
 
         # Trigger post-backup hook for the app/site
+        msg = "Running post-backup for {0}...".format(self.id)
+        nthread.update(Notification("info", "Backup", msg))
         if self.ctype == "site":
             self.post_backup(self.site)
         else:
             self.post_backup()
         signals.emit("backups", "post_backup", self)
 
+        msg = "{0} backed up successfully.".format(self.id)
+        nthread.complete(Notification("info", "Backup", msg))
         return {"id": "{0}/{1}".format(self.id, timestamp), "pid": self.id,
                 "path": path, "icon": self.icon, "type": self.ctype,
                 "time": isotime, "version": self.version,
                 "size": os.path.getsize(path), "is_ready": True,
                 "site_type": self.site.meta.id if self.site else None}
 
-    def restore(self, data):
+    def restore(self, data, nthread=NotificationThread()):
         """
         Restore an associated arkOS app backup.
 
         :param Backup data: backup to restore
+        :param NotificationThread nthread: notification thread to use
         :returns: ``Backup``
         :rtype: dict
         """
-        signals.emit("backups", "pre_restore", self)
+        nthread.title = "Restoring backup"
+
         # Trigger pre-restore hook for the app/site
+        signals.emit("backups", "pre_restore", self)
+        msg = "Running pre-restore for {0}...".format(data["pid"])
+        nthread.update(Notification("info", "Backup", msg))
         self.pre_restore()
 
         # Extract all files in archive
         sitename = ""
+        nthread.update(Notification("info", "Backup", "Extracting files..."))
         with tarfile.open(data["path"], "r:gz") as t:
             for x in t.getnames():
                 if x.startswith("etc/nginx/sites-available"):
@@ -168,21 +186,25 @@ class BackupController:
             sql_path = "/{0}.sql".format(sitename)
             if meta.get("website", "dbengine", None) \
                     and os.path.exists(sql_path):
+                nthread.update(
+                    Notification("info", "Backup", "Restoring database..."))
                 dbmgr = databases.get_managers(meta.get("website", "dbengine"))
                 if databases.get(sitename):
                     databases.get(sitename).remove()
                 db = dbmgr.add_db(sitename)
-                with open("/{0}.sql".format(sitename), "r") as f:
+                with open(sql_path, "r") as f:
                     db.execute(f.read())
-                os.unlink("/{0}.sql".format(sitename))
+                os.unlink(sql_path)
                 if dbmgr.meta.database_multiuser:
-                    dbpasswd = random_string()[0:16]
+                    dbpasswd = random_string(16)
                     if databases.get_user(sitename):
                         databases.get_user(sitename).remove()
                     db_user = dbmgr.add_user(sitename, dbpasswd)
                     db_user.chperm("grant", db)
 
         # Trigger post-restore hook for the app/site
+        msg = "Running post-restore for {0}...".format(data["pid"])
+        nthread.update(Notification("info", "Backup", msg))
         if self.ctype == "site":
             self.post_restore(self.site, dbpasswd)
             self.site.nginx_enable()
@@ -190,6 +212,8 @@ class BackupController:
             self.post_restore()
         signals.emit("backups", "post_restore", self)
         data["is_ready"] = True
+        msg = "{0} restored successfully.".format(data["pid"])
+        nthread.complete(Notification("info", "Backup", msg))
         return data
 
     def get_config(self):
@@ -360,8 +384,8 @@ def create(id_, data=True):
     :rtype: Backup
     """
     controller = None
-    if id_ == "arkOS":
-        controller = arkOSBackupCfg(id_="arkOS", icon="fa fa-cog",
+    if id == "arkOS":
+        controller = arkOSBackupCfg("arkOS", "fa fa-cog",
                                     version=arkos_version)
         return controller.backup()
     app = applications.get(id_)
@@ -378,7 +402,7 @@ def create(id_, data=True):
     return controller.backup(data=data)
 
 
-def restore(backup, data=True):
+def restore(backup, data=True, nthread=NotificationThread()):
     """
     Convenience function to restore a backup.
 
@@ -402,7 +426,7 @@ def restore(backup, data=True):
         controller = app._backup()
     if not controller:
         raise Exception("No backup controller found")
-    b = controller.restore(backup)
+    b = controller.restore(backup, data, nthread)
     return b
 
 
@@ -435,8 +459,8 @@ def site_load(site):
     """
     if site.__class__.__name__ != "ReverseProxy":
         controller = site.meta.get_module("backup") or BackupController
-        site.backup = controller(site.id, site.meta.icon,
-                                 site, site.meta.version)
+        site.backup = controller(site.id, site.meta.icon, site,
+                                 site.meta.version)
     else:
         site.backup = None
 

@@ -20,7 +20,7 @@ class StorageControl:
         self.points = Storage(["points"])
         self.updates = Storage(["updates"])
         self.policies = Storage(["policies"])
-        self.files = Storage(["shares"])
+        self.shares = Storage(["shares"])
         self.signals = Storage(["listeners"])
 
 

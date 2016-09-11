@@ -34,7 +34,7 @@ def check_updates():
         v = gpg.verify_data("/tmp/{0}.sig".format(x["id"]), ustr)
         if v.trust_level is None:
             err_str = "Update {0} signature verification failed"
-            logger.error(err_str.format(x["id"]))
+            logger.error("Updates", err_str.format(x["id"]))
             break
         else:
             data = {"id": x["id"], "name": x["name"], "date": x["date"],
@@ -50,6 +50,8 @@ def install_updates(nthread=NotificationThread()):
 
     :param message message: Message object to update with status
     """
+    nthread.title = "Installing updates"
+
     updates = storage.updates.get("updates")
     if not updates:
         return
@@ -69,9 +71,7 @@ def install_updates(nthread=NotificationThread()):
                 try:
                     download(x["order"], x["data"], True)
                 except Exception as e:
-                    code = 1
-                    if hasattr(e, "code"):
-                        code = e.code
+                    code = getattr(e, "code", 1)
                     responses.append((x["step"], str(code)))
                     break
         else:

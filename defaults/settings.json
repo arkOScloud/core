@@ -3,6 +3,7 @@
         "repo_server": "grm.arkos.io",
         "policy_path": "/etc/arkos/policies.json",
         "firewall": true,
+        "enable_upnp": true,
         "ntp_server": "ntp.arkos.io",
         "date_format": "DD MMM YYYY",
         "time_format": "HH:mm:ss"

@@ -1,5 +1,5 @@
 """
-Classes and functions for interacting with system management daemons.
+Classes and functions for managing LDAP and system groups.
 
 arkOS Core
 (c) 2016 CitizenWeb
@@ -41,16 +41,14 @@ class Group:
     def add(self):
         """Add the group to LDAP."""
         try:
-            conns.LDAP. \
-                search_s("cn={0},ou=groups,{1}"
-                         .format(self.name, self.rootdn),
-                         ldap.SCOPE_SUBTREE, "(objectClass=*)", None)
+            conns.LDAP.search_s(self.ldap_id, ldap.SCOPE_SUBTREE,
+                                "(objectClass=*)", None)
             raise Exception("A group with this name already exists")
         except ldap.NO_SUCH_OBJECT:
             pass
         ldif = {
             "objectClass": ["posixGroup", "top"],
-            "cn": self.name,
+            "cn": [self.name],
             "gidNumber": str(self.gid),
             "memberUid": self.users
         }
@@ -62,19 +60,16 @@ class Group:
     def update(self):
         """Update a group object in LDAP. Change params on the object first."""
         try:
-            ldif = conns.LDAP. \
-                search_s("cn={0},ou=groups,{1}"
-                         .format(self.name, self.rootdn),
-                         ldap.SCOPE_SUBTREE, "(objectClass=*)", None)
+            ldif = conns.LDAP.search_s(self.ldap_id, ldap.SCOPE_SUBTREE,
+                                       "(objectClass=*)", None)
         except ldap.NO_SUCH_OBJECT:
             raise Exception("This group does not exist")
 
-        ldif = ldap.modlist. \
-            modifyModlist(ldif[0][1],
-                          {"memberUid": self.users},
-                          ignore_oldexistent=1)
+        ldif = ldap.modlist.modifyModlist(ldif[0][1],
+                                          {"memberUid": self.users},
+                                          ignore_oldexistent=1)
         signals.emit("groups", "pre_update", self)
-        conns.LDAP.modify_ext_s(self.ldap_id, ldif)
+        conns.LDAP.modify_s(self.ldap_id, ldif)
         signals.emit("groups", "post_update", self)
 
     def delete(self):
@@ -132,7 +127,7 @@ class SystemGroup:
         shell("groupdel {0}".format(self.name))
 
 
-def get(gid=None):
+def get(gid=None, name=None):
     """
     Get all LDAP groups.
 
@@ -150,12 +145,14 @@ def get(gid=None):
             if type(x[1][y]) == list and len(x[1][y]) == 1 \
                     and y != "memberUid":
                 x[1][y] = x[1][y][0]
-        g = Group(x[1]["cn"], int(x[1]["gidNumber"]),
+        g = Group(x[1]["cn"], int(x[1]["gidNumber"][0]),
                   x[1].get("memberUid", []), x[0].split("ou=groups,")[1])
         if g.gid == gid:
             return g
+        elif name and g.name == name:
+            return g
         r.append(g)
-    return r if not gid else None
+    return r if gid is None and name is None else None
 
 
 def get_system(gid=None):

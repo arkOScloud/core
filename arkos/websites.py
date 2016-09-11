@@ -64,7 +64,7 @@ class Site:
         :param bool enabled: Is site enabled through nginx?
         """
         self.id = id_
-        self.path = path.encode("utf-8")
+        self.path = path
         self.addr = addr
         self.port = port
         self.php = php
@@ -74,7 +74,7 @@ class Site:
         self.meta = None
         self.enabled = enabled
         self.data_path = data_path
-        if hasattr(self, "addtoblock") and self.addtoblock and block:
+        if getattr(self, "addtoblock", None) and block:
             self.addtoblock += block
         elif block:
             self.addtoblock = block
@@ -120,9 +120,9 @@ class Site:
         site_dir = config.get("websites", "site_dir")
         self.meta = meta
         path = (self.path or os.path.join(site_dir, self.id))
-        self.path = path.encode("utf-8")
+        self.path = path
         self.php = extra_vars.get("php") or self.php \
-            or self.meta.php or False
+            or self.meta.uses_php or False
         self.version = self.meta.version.rsplit("-", 1)[0] \
             if self.meta.website_updates else None
 
@@ -143,19 +143,23 @@ class Site:
             raise errors.InvalidConfigError(
                 "Invalid source archive format in {0}".format(self.meta.id))
 
+        msg = "Running pre-installation..."
+        nthread.update(Notification("info", "Websites", msg))
+
         # Call website type's pre-install hook
+        stage = "Pre-Install"
         try:
             self.pre_install(extra_vars)
         except Exception as e:
-            raise Exception("Error during website config - "+str(e))
+            raise errors.OperationFailedError(
+                "({0} {1})".format(meta.id, stage), nthread) from e
 
         # If needs DB and user didn't select an engine, choose one for them
-        if len(self.meta.database_engines) > \
-                1 and extra_vars.get("dbengine", None):
+        if len(self.meta.database_engines) > 1 \
+                and extra_vars.get("dbengine", None):
             self.meta.selected_dbengine = extra_vars.get("dbengine")
-        if (not hasattr(self.meta, "selected_dbengine") or
-            not self.meta.selected_dbengine) and \
-                self.meta.database_engines:
+        if not getattr(self.meta, "selected_dbengine", None)\
+                and self.meta.database_engines:
             self.meta.selected_dbengine = self.meta.database_engines[0]
 
         # Create DB and/or DB user as necessary
@@ -198,7 +202,8 @@ class Site:
             try:
                 download(self.meta.download_url, file=pkg_path, crit=True)
             except Exception as e:
-                raise Exception("Couldn't download - {0}".format(str(e)))
+                raise errors.OperationFailedError(
+                    "({0} {1})".format(meta.id, stage), nthread) from e
 
             # Format extraction command according to type
             msg = "Extracting source..."
@@ -350,6 +355,20 @@ class Site:
 
     def ssl_enable(self):
         """Assign a TLS certificate to this site."""
+        try:
+            self._ssl_enable()
+        except Exception as e:
+            weberrors = (
+                errors.InvalidConfigError,
+                errors.OperationFailedError
+            )
+            if not isinstance(e, weberrors):
+                raise errors.OperationFailedError(
+                    "({0})".format(self.id)) from e
+            else:
+                raise
+
+    def _ssl_enable(self):
         # Get server-preferred ciphers
         if config.get("certificates", "ciphers"):
             ciphers = config.get("certificates", "ciphers")
@@ -358,30 +377,36 @@ class Site:
             config.save()
 
         block = nginx.loadf(os.path.join("/etc/nginx/sites-available/",
-                                         self.id))
+                            self.id))
 
         # If the site is on port 80, setup an HTTP redirect to new port 443
-        server = block.servers[0]
-        listen = server.filter("Key", "listen")[0]
-        if listen.value == "80":
-            listen.value = "443 ssl"
-            block.add(nginx.Server(
-                nginx.Key("listen", "80"),
-                nginx.Key("server_name", self.addr),
-                nginx.Key("return", "301 https://{0}$request_uri"
-                          .format(self.addr))
-            ))
-            for x in block.servers:
-                if x.filter("Key", "listen")[0].value == "443 ssl":
-                    server = x
-                    break
-        else:
-            listen.value = listen.value.split(" ssl")[0] + " ssl"
+        server = block.server
+        listens = server.filter("Key", "listen")
+        for listen in listens:
+            httport = "80"
+            sslport = "443"
+            if listen.value.startswith("[::]"):
+                # IPv6
+                httport = "[::]:80"
+                sslport = "[::]:443"
+            if listen.value == httport:
+                listen.value = (sslport + " ssl http2")
+                block.add(nginx.Server(
+                    nginx.Key("listen", httport),
+                    nginx.Key("server_name", self.addr),
+                    nginx.Key("return", "301 https://{0}$request_uri"
+                                        .format(self.addr))
+                ))
+                for x in block.servers:
+                    if " ssl" in x.filter("Key", "listen")[0].value:
+                        server = x
+                        break
+            else:
+                listen.value = listen.value.split(" ssl")[0] + " ssl http2"
 
         # Clean up any pre-existing SSL directives that no longer apply
-        for x in server.all():
-            if type(x) == nginx.Key and x.name.startswith("ssl_"):
-                server.remove(x)
+        to_remove = [x for x in server.keys if x.name.startswith("ssl_")]
+        server.remove(*to_remove)
 
         # Add the necessary SSL directives to the serverblock and save
         server.add(
@@ -409,8 +434,22 @@ class Site:
 
     def ssl_disable(self):
         """Remove a TLS certificate from this site."""
+        try:
+            self._ssl_disable()
+        except Exception as e:
+            weberrors = (
+                errors.InvalidConfigError,
+                errors.OperationFailedError
+            )
+            if not isinstance(e, weberrors):
+                raise errors.OperationFailedError(
+                    "({0})".format(self.id)) from e
+            else:
+                raise
+
+    def _ssl_disable(self):
         block = nginx.loadf(os.path.join("/etc/nginx/sites-available/",
-                                         self.id))
+                            self.id))
 
         # If there's an 80-to-443 redirect block, get rid of it
         if len(block.servers) > 1:
@@ -421,14 +460,17 @@ class Site:
                     break
 
         # Remove all SSL directives and save
-        server = block.servers[0]
-        listen = server.filter("Key", "listen")[0]
-        if listen.value == "443 ssl":
-            listen.value = "80"
-        else:
-            listen.value = listen.value.rstrip(" ssl")
-        server.remove(*[x for x in server.filter("Key")
-                        if x.name.startswith("ssl_")])
+        server = block.server
+        listens = server.filter("Key", "listen")
+        for listen in listens:
+            if listen.value.startswith("443"):
+                listen.value = "80"
+            elif listen.value.startswith("[::]:443"):
+                listen.value = "[::]:80"
+            else:
+                listen.value = listen.value.split(" ssl")[0]
+        skeys = [x for x in server.filter("Key") if x.name.startswith("ssl_")]
+        server.remove(*skeys)
         nginx.dumpf(block, os.path.join("/etc/nginx/sites-available/",
                                         self.id))
         meta = configparser.SafeConfigParser()
@@ -572,6 +614,21 @@ class Site:
 
         :param message message: Message object to update with status
         """
+        try:
+            self._update(nthread)
+        except Exception as e:
+            weberrors = (
+                errors.InvalidConfigError,
+                errors.OperationFailedError
+            )
+            if not isinstance(e, weberrors):
+                raise errors.OperationFailedError(
+                    "({0})".format(self.id), nthread) from e
+            else:
+                raise
+
+    def _update(self, nthread):
+        nthread.title = "Updating website"
         if self.version == self.meta.version.rsplit("-", 1)[0]:
             raise Exception("Website is already at the latest version")
         elif self.version in [None, "None"]:
@@ -744,7 +801,7 @@ class ReverseProxy(Site):
         self.id = id_
         self.name = name
         self.addr = addr
-        self.path = path.encode("utf-8")
+        self.path = path
         self.port = port
         self.base_path = base_path
         self.block = block
@@ -752,7 +809,7 @@ class ReverseProxy(Site):
         self.cert = None
         self.installed = False
 
-    def install(self, extra_vars={}, enable=True, message=None):
+    def install(self, extra_vars={}, enable=True, nthread=None):
         """
         Install reverse proxy, including prep and app recipes.
 
@@ -761,7 +818,7 @@ class ReverseProxy(Site):
         :param message message: Message object to update with status
         """
         try:
-            self._install(extra_vars, enable, message)
+            self._install(extra_vars, enable, nthread)
         except Exception as e:
             weberrors = (
                 errors.InvalidConfigError,
@@ -769,15 +826,15 @@ class ReverseProxy(Site):
             )
             if not isinstance(e, weberrors):
                 raise errors.OperationFailedError(
-                    "({0})".format(self.id), message) from e
+                    "({0})".format(self.id), nthread) from e
             else:
                 raise
 
-    def _install(self, extra_vars, enable, message):
+    def _install(self, extra_vars, enable, nthread):
         # Set metadata values
         site_dir = config.get("websites", "site_dir")
-        self.path = self.path.encode("utf-8") or \
-            os.path.join(site_dir, self.id).encode("utf-8")
+        path = (self.path or os.path.join(site_dir, self.id))
+        self.path = path
 
         try:
             os.makedirs(self.path)
@@ -797,8 +854,8 @@ class ReverseProxy(Site):
                          nginx.Key("proxy_set_header", "Host $host"))]
         if extra_vars:
             if not extra_vars.get("type") or not extra_vars.get("pass"):
-                raise Exception("Must enter ReverseProxy type and "
-                                "location to pass to")
+                raise errors.InvalidConfigError(
+                    "Must enter ReverseProxy type and location to pass to")
             elif extra_vars.get("type") in ["fastcgi", "uwsgi"]:
                 self.block = uwsgi_block
             else:
@@ -840,7 +897,7 @@ class ReverseProxy(Site):
         signals.emit("websites", "site_installed", self)
         self.nginx_enable()
 
-    def remove(self, message=None):
+    def remove(self, nthread=None):
         """
         Remove reverse proxy, including prep and app recipes.
 
@@ -881,7 +938,7 @@ class ReverseProxy(Site):
         return self.as_dict
 
 
-def get(id_=None, type_=None, verify=True):
+def get(id_=None, type=None, force=False):
     """
     Retrieve website data from the system.
 
@@ -896,16 +953,15 @@ def get(id_=None, type_=None, verify=True):
     :rtype: Website or list thereof
     """
     sites = storage.sites.get("sites")
-    if not sites:
+    if not sites or force:
         sites = scan()
     if id_ or type_:
         type_list = []
         for site in sites:
-            if site.id == id_:
+            isRP = (type == "ReverseProxy" and isinstance(site, ReverseProxy))
+            if site.id == id:
                 return site
-            elif (type and (type == "ReverseProxy" and
-                            isinstance(site, ReverseProxy))) or \
-                    (type and site.meta.id == type_):
+            elif (type and isRP) or (type and site.meta.id == type):
                 type_list.append(site)
         if type_list:
             return type_list
@@ -937,7 +993,7 @@ def scan():
                 continue
             site = app._website(id=meta.get("website", "id"))
             site.meta = app
-            site.data_path = meta.get("website", "data_path", "") \
+            site.data_path = (meta.get("website", "data_path") or "") \
                 if meta.has_option("website", "data_path") else ""
             site.db = databases.get(site.id) \
                 if meta.has_option("website", "dbengine") else None
@@ -947,16 +1003,17 @@ def scan():
             site.name = meta.get("website", "name")
             site.type = meta.get("website", "extra")
             site.meta = None
-        certname = meta.get("website", "ssl", "None")
+        certname = meta.get("website", "ssl", fallback="None")
         site.cert = certificates.get(certname) if certname != "None" else None
         if site.cert:
             site.cert.assigns.append({
                 "type": "website", "id": site.id,
                 "name": site.id if site.meta else site.name
             })
-        site.version = meta.get("website", "version", None)
-        site.enabled = os.path.exists(os.path
-                                      .join("/etc/nginx/sites-enabled", x))
+        site.version = meta.get("website", "version", fallback=None)
+        site.enabled = os.path.exists(
+            os.path.join("/etc/nginx/sites-enabled", x)
+        )
         site.installed = True
 
         # Load the proper nginx serverblock and get more data
@@ -968,12 +1025,10 @@ def scan():
                     server = y
                     break
             else:
-                server = block.servers[0]
+                server = block.server
             port_regex = re.compile("(\\d+)\s*(.*)")
-            site.port = int(re.match(port_regex,
-                                     server.filter("Key",
-                                                   "listen")[0].value)
-                            .group(1))
+            listen = server.filter("Key", "listen")[0].value.lstrip("[::]:")
+            site.port = int(re.match(port_regex, listen).group(1))
             site.addr = server.filter("Key", "server_name")[0].value
             site.path = server.filter("Key", "root")[0].value
             site.php = "php" in server.filter("Key", "index")[0].value

@@ -8,6 +8,7 @@ Licensed under GPLv3, see LICENSE.md
 """
 
 from arkos import storage, signals, applications
+from arkos.utilities import errors
 
 
 class Database:
@@ -38,9 +39,21 @@ class Database:
         per that application's needs.
         """
         signals.emit("databases", "pre_add", self)
-        self.add_db()
-        storage.dbs.add("databases", self)
-        signals.emit("databases", "post_add", self)
+        try:
+            self.add_db()
+        except Exception as e:
+            weberrors = (
+                errors.InvalidConfigError,
+                errors.OperationFailedError
+            )
+            if not isinstance(e, weberrors):
+                raise errors.OperationFailedError(
+                    "({0})".format(self.id)) from e
+            else:
+                raise
+        finally:
+            storage.dbs.add("databases", self)
+            signals.emit("databases", "post_add", self)
 
     def add_db(self):
         """Add a database. Override in database app code."""
@@ -54,9 +67,21 @@ class Database:
         per that application's needs.
         """
         signals.emit("databases", "pre_remove", self)
-        self.remove_db()
-        storage.dbs.remove("databases", self)
-        signals.emit("databases", "post_remove", self)
+        try:
+            self.remove_db()
+        except Exception as e:
+            weberrors = (
+                errors.InvalidConfigError,
+                errors.OperationFailedError
+            )
+            if not isinstance(e, weberrors):
+                raise errors.OperationFailedError(
+                    "({0})".format(self.id)) from e
+            else:
+                raise
+        finally:
+            storage.dbs.remove("databases", self)
+            signals.emit("databases", "post_remove", self)
 
     def remove_db(self):
         """Remove a database. Override in database app code."""
@@ -113,9 +138,21 @@ class DatabaseUser:
         per that application's needs.
         """
         signals.emit("databases", "pre_user_add", self)
-        self.add_user(passwd)
-        storage.dbs.add("users", self)
-        signals.emit("databases", "post_user_add", self)
+        try:
+            self.add_user(passwd)
+        except Exception as e:
+            weberrors = (
+                errors.InvalidConfigError,
+                errors.OperationFailedError
+            )
+            if not isinstance(e, weberrors):
+                raise errors.OperationFailedError(
+                    "({0})".format(self.id)) from e
+            else:
+                raise
+        finally:
+            storage.dbs.add("users", self)
+            signals.emit("databases", "post_user_add", self)
 
     def add_user(self):
         """Add a database user. Override in database app code."""
@@ -129,9 +166,21 @@ class DatabaseUser:
         per that application's needs.
         """
         signals.emit("databases", "pre_user_remove", self)
-        self.remove_user()
-        storage.dbs.remove("users", self)
-        signals.emit("databases", "post_user_remove", self)
+        try:
+            self.remove_user()
+        except Exception as e:
+            weberrors = (
+                errors.InvalidConfigError,
+                errors.OperationFailedError
+            )
+            if not isinstance(e, weberrors):
+                raise errors.OperationFailedError(
+                    "({0})".format(self.id)) from e
+            else:
+                raise
+        finally:
+            storage.dbs.remove("users", self)
+            signals.emit("databases", "post_user_remove", self)
 
     def remove_user(self):
         """Remove a database user. Override in database app code."""

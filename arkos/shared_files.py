@@ -11,7 +11,7 @@ from arkos import storage
 from arkos.system import systemtime
 
 
-class Share:
+class SharedFile:
     """
     Class representing a Shared File.
 
@@ -49,7 +49,7 @@ class Share:
 
         :param nexpiry: datetime representing expiry date/time; 0 for never
         """
-        if not nexpiry:
+        if nexpiry is False:
             self.expires = 0
         else:
             self.expires = systemtime.get_unix_time(nexpiry)
@@ -77,17 +77,17 @@ class Share:
     def serialized(self):
         """Return serializable shared file metadata as dict."""
         data = self.as_dict
-        data["expires_at"] = systemtime\
-            .get_iso_time(self.expires, "unix") if self.expires != 0 else "",
+        data["expires_at"] = systemtime.get_iso_time(self.expires, "unix")\
+            if self.expires != 0 else ""
         return data
 
 
 def get(id_=None):
     """List all shared file objects present in cache storage."""
-    data = storage.files.get("shares")
+    data = storage.files.get("sharedfiles")
     to_purge = []
     for x in data:
-        if x.is_expired():
+        if x.is_expired:
             to_purge.append(x)
     for x in to_purge:
         x.delete()

@@ -42,8 +42,8 @@ class Daemon:
                 # exit first parent
                 sys.exit(0)
         except OSError as e:
-            sys.stderr.write("fork #1 failed: {0} ({1})\n"
-                             .format(e.errno, e.strerror))
+            err_str = "fork #1 failed: {0} ({1})\n"
+            sys.stderr.write(err_str.format(e.errno, e.strerror))
             sys.exit(1)
 
         # decouple from parent environment
@@ -85,7 +85,7 @@ class Daemon:
         os.remove(self.pidfile)
 
     def start(self):
-        """Start the daemon"""
+        """Start the daemon."""
         # Check for a pidfile to see if the daemon already runs
         try:
             pf = open(self.pidfile, 'r')
@@ -104,7 +104,7 @@ class Daemon:
         self.run()
 
     def stop(self):
-        """Stop the daemon"""
+        """Stop the daemon."""
         # Get the pid from the pidfile
         try:
             pf = open(self.pidfile, 'r')
@@ -115,7 +115,7 @@ class Daemon:
 
         if not pid:
             message = "pidfile {0} does not exist. Daemon not running?\n"
-            sys.stderr.write(message + "{0}".format(self.pidfile))
+            sys.stderr.write(message.format(self.pidfile))
             return  # not an error in a restart
 
         # Try killing the daemon process
@@ -129,11 +129,11 @@ class Daemon:
                 if os.path.exists(self.pidfile):
                     os.remove(self.pidfile)
             else:
-                print(str(err))
+                print((str(err)))
                 sys.exit(1)
 
     def restart(self):
-        """Restart the daemon"""
+        """Restart the daemon."""
         self.stop()
         self.start()
 

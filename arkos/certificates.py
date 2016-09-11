@@ -18,7 +18,7 @@ import os
 
 from arkos import config, signals, storage, websites, applications
 from arkos.messages import Notification, NotificationThread
-from arkos.system import systemtime, groups
+from arkos.system import groups
 from arkos.utilities import shell
 
 
@@ -151,7 +151,7 @@ class Certificate:
             "keytype": self.keytype,
             "keylength": self.keylength,
             "assigns": self.assigns,
-            "expiry": systemtime.ts_to_datetime(self.expiry.rstrip("Z")),
+            "expiry": self.expiry,
             "sha1": self.sha1,
             "md5": self.md5,
             "is_ready": True
@@ -161,7 +161,7 @@ class Certificate:
     def serialized(self):
         """Return serializable certificate metadata as dict."""
         data = self.as_dict
-        data["expiry"] = systemtime.get_iso_time(self.expiry.rstrip("Z"))
+        data["expiry"] = data["expiry"].isoformat()
         return data
 
 
@@ -199,18 +199,18 @@ class CertificateAuthority:
         """Return certificate metadata as dict."""
         return {
             "id": self.id,
-            "expiry": systemtime.ts_to_datetime(self.expiry.rstrip("Z"))
+            "expiry": self.expiry
         }
 
     @property
     def serialized(self):
         """Return serializable certificate metadata as dict."""
         data = self.as_dict
-        data["expiry"] = systemtime.get_iso_time(self.expiry.rstrip("Z"))
+        data["expiry"] = data["expiry"].isoformat()
         return data
 
 
-def get(id_=None):
+def get(id=None, force=False):
     """
     Retrieve arkOS certificate data from the system.
 
@@ -225,7 +225,7 @@ def get(id_=None):
     :rtype: Certificate or list thereof
     """
     data = storage.certs.get("certificates")
-    if not data:
+    if not data or force:
         data = scan()
     if id_:
         for x in data:
@@ -244,10 +244,8 @@ def scan():
     """
     certs, assigns = [], {}
     if config.get("genesis", "ssl"):
-        ssl = os.path\
-            .splitext(os.path
-                      .basename(config.get("genesis",
-                                           "cert_file", "")))[0]
+        gen_cert = config.get("genesis", "cert_file", "")
+        ssl = os.path.splitext(os.path.basename(gen_cert))[0]
         if ssl and ssl in assigns:
             assigns[ssl].append({"type": "genesis", "id": "genesis",
                                  "name": "arkOS Genesis/API"})
@@ -294,7 +292,7 @@ def scan():
     return certs
 
 
-def get_authorities(id_=None):
+def get_authorities(id=None, force=False):
     """
     Retrieve arkOS certificate authority data from the system.
 
@@ -309,7 +307,7 @@ def get_authorities(id_=None):
     :rtype: CertificateAuthority or list thereof
     """
     data = storage.certs.get("authorities")
-    if not data:
+    if not data or force:
         data = scan_authorities()
     if id_:
         for x in data:
@@ -455,7 +453,9 @@ def generate_certificate(
     :returns: Certificate that was generated
     :rtype: Certificate
     """
-    signals.emit("certificates", "pre_add", id_)
+    nthread.title = "Generating TLS certificate"
+
+    signals.emit("certificates", "pre_add", id)
 
     # Check to see that we have a CA ready; if not, generate one
     basehost = ".".join(domain.split(".")[-2:])

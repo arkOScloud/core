@@ -1,5 +1,5 @@
 """
-Classes and functions for interacting with system management daemons.
+Helper functions for managing certain system actions.
 
 arkOS Core
 (c) 2016 CitizenWeb

@@ -1,5 +1,3 @@
-
-
 """
 Helper functions for managing Ruby gems.
 
@@ -11,8 +9,9 @@ Licensed under GPLv3, see LICENSE.md
 
 import os
 
-from arkos import logger
-from arkos.utilities import shell
+from arkos.utilities import errors, shell
+
+BINPATH = "/usr/lib/ruby/gems/2.2.0/bin"
 
 BINPATH = "/usr/lib/ruby/gems/2.2.0/bin"
 
@@ -42,15 +41,14 @@ def install_gem(*gems, **kwargs):
     :param *gems: gems to install
     """
     verify_path()
-    gemlist = shell("gem list")["stdout"].split("\n")
+    gemlist = shell("gem list")["stdout"].split(b"\n")
     for x in gems:
         if not any(x == s for s in gemlist) or kwargs.get('force'):
             d = shell("gem install -N --no-user-install {0}".format(x))
             if d["code"] != 0:
-                logmsg = "Gem install '{0}' failed: {1}"
-                excmsg = "Gem install '{0}' failed. See logs for more info"
-                logger.error(logmsg.format(x, str(d["stderr"])))
-                raise Exception(excmsg.format(x))
+                logmsg = "Gem install of {0} failed.".format(x)
+                raise errors.OperationFailedError(logmsg) \
+                    from Exception(d["stderr"])
 
 
 def update_gem(*gems, **kwargs):
@@ -67,7 +65,7 @@ def update_gem(*gems, **kwargs):
         if not any(x == s for s in gemlist) or kwargs.get('force'):
             d = shell("gem update -N --no-user-install {0}".format(x))
             if d["code"] != 0:
-                logmsg = "Gem update '{0}' failed: {1}"
-                excmsg = "Gem update '{0}' failed. See logs for more info"
-                logger.error(logmsg.format(x, str(d["stderr"])))
-                raise Exception(excmsg.format(x))
+                logmsg = "Gem install of {0} failed.".format(x)
+                raise errors.OperationFailedError(logmsg) \
+                    from Exception(d["stderr"])
+

@@ -33,7 +33,7 @@ def cidr_to_netmask(cidr):
     """Convert a CIDR prefix to an IP subnet mask."""
     mask = [0, 0, 0, 0]
     for i in range(cidr):
-        mask[i/8] = mask[i/8] + (1 << (7 - i % 8))
+        mask[int(i/8)] = mask[int(i/8)] + (1 << (7 - i % 8))
     return ".".join(map(str, mask))
 
 
@@ -70,10 +70,10 @@ def test_port(server, port, host=None):
     :returns: True if port test was successful
     """
     timer = 5
-    rsid = random_string(16)
+    id_ = random_string(16)
     pfile = os.path.join(os.path.dirname(__file__), "test-port.py")
-    p = subprocess.Popen(["python", pfile, str(port), rsid])
-    data = {"id": rsid, "port": port, "host": host or ""}
+    p = subprocess.Popen(["python", pfile, str(port), id_])
+    data = {"id": id_, "port": port, "host": host or ""}
     requests.post("https://" + server + "/api/v1/echo", data=data)
     while timer > 0:
         p.poll()
@@ -187,7 +187,7 @@ def shell(c, stdin=None, env={}):
             "stderr": data[1]}
 
 
-def hashpw(passw, scheme="sha512_crypt"):
+def hashpw(passw):
     """Create a password hash."""
     rnd = "".join(random.sample(string.ascii_uppercase + string.digits, 16))
     salt = "$6$" + rnd + "$"
@@ -241,15 +241,15 @@ def b64_to_path(b64):
     return base64.b64decode(str(b64).replace("*", "="), altchars="+-")
 
 
-def compress(pin, pout="", fileformat="tgz"):
+def compress(pin, pout="", format_="tgz"):
     """
     Recursively compress a provided directory.
 
     :param str pin: path to directory to compress
     :param str pout: full path to save archive to
-    :param str fileformat: "tgz" or "zip"
+    :param str format: "tgz" or "zip"
     """
-    if fileformat == "tgz":
+    if format_ == "tgz":
         pout = tempfile.mkstemp(".tar.gz")[1] if not pout else pout
         a = tarfile.open(pout, "w:gz")
         if os.path.isdir(pin):
@@ -261,7 +261,7 @@ def compress(pin, pout="", fileformat="tgz"):
         else:
             a.add(x)
         a.close()
-    elif fileformat == "zip":
+    elif format_ == "zip":
         pout = tempfile.mkstemp(".zip")[1] if not pout else pout
         a = zipfile.ZipFile(pout, "w")
         if os.path.isdir(pin):

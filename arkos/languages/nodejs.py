@@ -11,7 +11,7 @@ import os
 import re
 
 from arkos import logger
-from arkos.utilities import shell
+from arkos.utilities import errors, shell
 
 NPM_PATH = '/usr/bin'
 
@@ -52,10 +52,8 @@ def remove(*mods):
     mods = " ".join(x for x in mods)
     s = shell("npm uninstall {0}".format(mods), stderr=True)
     if s["code"] != 0:
-        logmsg = "Failed to remove {0} via npm; log output follows:\n{1}"
-        excmsg = "Failed to remove {0} via npm, check logs for info"
-        logger.error(logmsg.format(mods, s["stderr"]))
-        raise Exception(excmsg.format(mods))
+        logmsg = "NPM removal of {0} failed.".format(mods)
+        raise errors.OperationFailedError(logmsg) from Exception(s["stderr"])
 
 
 def install_from_package(path, stat="production", opts={}):
@@ -68,14 +66,12 @@ def install_from_package(path, stat="production", opts={}):
     stat = (" --"+stat) if stat else ""
     opts = (" --"+" --".join(x+"="+y for x, y in opts)) if opts else ""
     cwd = os.getcwd()
-    npm_command = _get_npm_command("install", False, path)
-    npm_args = "{0}{1}".format(stat, opts)
-    s = shell("{0}{1}".format(npm_command, npm_args))
+    os.chdir(path)
+    s = shell("npm install {0}{1}".format(stat, opts))
     os.chdir(cwd)
     if s["code"] != 0:
-        logger.error("NPM install of {0} failed; log output follows:\n{1}"
-                     .format(path, s["stderr"]))
-        raise Exception("NPM install failed, check logs for info")
+        logmsg = "NPM install of {0} failed.".format(path)
+        raise errors.OperationFailedError(logmsg) from Exception(s["stderr"])
 
 
 def is_installed(name, as_global=True):

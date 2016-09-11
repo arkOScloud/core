@@ -10,7 +10,7 @@ Licensed under GPLv3, see LICENSE.md
 import miniupnpc
 import random
 
-from arkos import config, policies, logger, signals, storage, security
+from arkos import config, logger, policies, signals, storage, security
 from arkos.utilities import errors, test_port
 
 COMMON_PORTS = [3000, 3306, 5222, 5223, 5232]
@@ -26,8 +26,8 @@ class SecurityPolicy:
     (iptables) on regeneration or app update.
     """
 
-    def __init__(self, type_="", id_="", name="", icon="",
-                 ports=[], policy=2, addr=None):
+    def __init__(self, type="", id_="", name="", icon="", ports=[],
+                 policy=2, addr=None):
         """
         Initialize the policy object.
 
@@ -108,6 +108,7 @@ class PortConflictError(errors.Error):
                 "please choose another")
 
 
+
 def get(id_=None, type_=None):
     """
     Get all security policies from cache storage.
@@ -129,8 +130,8 @@ def get(id_=None, type_=None):
     return data
 
 
-def register(type_, id_, name, icon, ports, addr=None,
-             policy=0, default_policy=2, fw=True):
+def register(type, id, name, icon, ports, addr=None, policy=0,
+             default_policy=2, fw=True):
     """
     Register a new security policy with the system.
 
@@ -241,7 +242,7 @@ def _upnp_igd_connect():
         upnpc.selectigd()
     except Exception as e:
         msg = "Failed to connect to uPnP IGD: {0}"
-        logger.error("TrackedSvcs", msg.format(str(e)))
+        logger.warning("TrackedSvcs", msg.format(str(e)))
     return upnpc
 
 
@@ -264,8 +265,8 @@ def open_upnp(port):
         upnpc.addportmapping(port[1], port[0].upper(), upnpc.lanaddr, port[1],
                              pf.format(port[1]), '')
     except Exception as e:
-        logger.error("Failed to register {0} with uPnP IGD: {1}"
-                     .format(port, str(e)))
+        msg = "Failed to register {0} with uPnP IGD: {1}"
+        logger.error("TrackedSvcs", msg.format(port, str(e)))
 
 
 def close_upnp(port):
@@ -307,8 +308,9 @@ def initialize_upnp(svcs):
                 upnpc.addportmapping(port, protocol.upper(), upnpc.lanaddr,
                                      port, pf.format(port), '')
             except Exception as e:
-                msg = "Failed to register {0} with uPnP IGD: {1}"
-                logger.error("TrackedSvcs", msg.format(port, str(e)))
+                msg = "Failed to register {0} with uPnP IGD: {1}"\
+                    .format(port, str(e))
+                logger.warning("TrackedSvcs", msg)
 
 
 def open_all_upnp(ports):
@@ -415,7 +417,7 @@ def open_upnp_site(site):
     try:
         test_port(config.get("general", "repo_server"), site.port, addr)
     except:
-        raise errors.InvalidConfigError(
+        raise errors.SoftFail(
             "Port {0} and/or domain {1} could not be tested."
             " Make sure your ports are properly forwarded and"
             " that your domain is properly set up."

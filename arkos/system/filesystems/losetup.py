@@ -25,28 +25,23 @@ LOOPMAJOR = 7
 
 
 class LosetupError(Exception):
-    """Base class for all losetup exceptions"""
-    pass
+    """Base class for all losetup exceptions."""
 
 
 class NoLoopSupportError(LosetupError):
-    """Loop support is not detected for running system"""
-    pass
+    """Loop support is not detected for running system."""
 
 
 class LoopNotFoundError(LosetupError):
-    """Specified loop device is not found"""
-    pass
+    """Specified loop device is not found."""
 
 
 class LoopNotMountedError(LosetupError):
-    """Loop device is not mounted error"""
-    pass
+    """Loop device is not mounted error."""
 
 
 class NotLoopError(LosetupError):
-    """Specified device is not a loop device"""
-    pass
+    """Specified device is not a loop device."""
 
 
 class Status64(object):
@@ -63,19 +58,19 @@ class Status64(object):
 
         data = struct.unpack(self._fmt, buf.tostring())
         i = iter(data)
-        self.lo_device = i.next()
-        self.lo_inode = i.next()
-        self.lo_rdevice = i.next()
-        self.lo_offset = i.next()
-        self.lo_sizelimit = i.next()
-        self.lo_number = i.next()
-        self.lo_encrypt_type = i.next()
-        self.lo_encrypt_key_size = i.next()
-        self.lo_flags = i.next()
-        self.lo_filename = i.next().rstrip('\0')
-        self.lo_crypt_name = i.next().rstrip('\0')
-        self.lo_encrypt_key = i.next()[:self.lo_encrypt_key_size]
-        self.lo_init = (i.next(), i.next())
+        self.lo_device = next(i)
+        self.lo_inode = next(i)
+        self.lo_rdevice = next(i)
+        self.lo_offset = next(i)
+        self.lo_sizelimit = next(i)
+        self.lo_number = next(i)
+        self.lo_encrypt_type = next(i)
+        self.lo_encrypt_key_size = next(i)
+        self.lo_flags = next(i)
+        self.lo_filename = next(i).decode().rstrip('\0')
+        self.lo_crypt_name = next(i).decode().rstrip('\0')
+        self.lo_encrypt_key = next(i)[:self.lo_encrypt_key_size]
+        self.lo_init = (next(i), next(i))
 
     def dump(self):
         """Dump properties."""
@@ -89,8 +84,8 @@ class Status64(object):
                            self.lo_encrypt_type,
                            self.lo_encrypt_key_size,
                            self.lo_flags,
-                           self.lo_filename,
-                           self.lo_crypt_name,
+                           bytes(self.lo_filename, 'utf-8'),
+                           bytes(self.lo_crypt_name, 'utf-8'),
                            self.lo_encrypt_key,
                            self.lo_init[0],
                            self.lo_init[1])
@@ -118,7 +113,7 @@ class LoopDevice(object):
             raise NotLoopError("'{0}' is not a loop device".format(device))
 
     def is_used(self):
-        """Check if device is used"""
+        """Check if device is used."""
         try:
             self.get_status()
             return True
@@ -126,7 +121,7 @@ class LoopDevice(object):
             return False
 
     def mount(self, target_path, offset=0, sizelimit=0):
-        """Mount file to loop device"""
+        """Mount file to loop device."""
         status = Status64()
         status.lo_filename = target_path
         status.lo_offset = offset
@@ -142,7 +137,7 @@ class LoopDevice(object):
         self._do_mount(target_path, status)
 
     def unmount(self):
-        """Unmount device"""
+        """Unmount device."""
         try:
             fd = self._open_fd()
             self._do_unmount(fd)
@@ -202,8 +197,8 @@ class LoopDevice(object):
             fcntl.ioctl(fd, self.LOOP_GET_STATUS64, buf, True)
         except IOError as e:
             if e.errno == 6:
-                raise LoopNotMountedError("Loop device '{0}' is not mounted"
-                                          .format(self.device))
+                excmsg = "Loop device '{0}' is not mounted"
+                raise LoopNotMountedError(excmsg.format(self.device))
             else:
                 raise
 
@@ -216,15 +211,15 @@ class LoopDevice(object):
 
 
 def is_loop(filename):
-    """Check whether specified filename is a loop device"""
+    """Check whether specified filename is a loop device."""
     st = os.stat(filename)
     return stat.S_ISBLK(st.st_mode) and (_major(st.st_rdev) == LOOPMAJOR)
 
 
 def find_unused_loop_device():
-    """Find first unused loop device"""
+    """Find first unused loop device."""
     get_loop_devices()
-    for _, dev in _loop_devices.iteritems():
+    for _, dev in _loop_devices.items():
         if not dev.is_used():
             return dev
 

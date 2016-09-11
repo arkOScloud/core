@@ -13,7 +13,7 @@ import requests
 
 from distutils.spawn import find_executable
 
-from arkos.utilities import shell
+from arkos.utilities import errors, shell
 
 
 def install_composer():
@@ -27,8 +27,8 @@ def install_composer():
     s = shell("php", stdin=r.text)
     os.chdir(cwd)
     if s["code"] != 0:
-        excmsg = "Composer download/config failed. Error: {0}"
-        raise Exception(excmsg.format(str(s["stderr"])))
+        logmsg = "Composer download/config failed."
+        raise errors.OperationFailedError(logmsg) from Exception(s["stderr"])
     os.rename("/root/composer.phar", "/usr/local/bin/composer")
     os.chmod("/usr/local/bin/composer", 0o755)
     open_basedir("add", "/usr/local/bin")
@@ -39,7 +39,9 @@ def verify_composer():
     if not find_executable("composer"):
         install_composer()
     if not find_executable("composer"):
-        raise Exception("Composer was not installed successfully.")
+        logmsg = "Composer installation failed."
+        raise errors.OperationFailedError(logmsg)
+
 
 
 def composer_install(path):
@@ -55,8 +57,8 @@ def composer_install(path):
     s = shell("composer install")
     os.chdir(cwd)
     if s["code"] != 0:
-        excmsg = "Composer failed to install this app's bundle. Error: {0}"
-        raise Exception(excmsg.format(str(s["stderr"])))
+        logmsg = "Composer app bundle installation failed."
+        raise errors.OperationFailedError(logmsg) from Exception(s["stderr"])
 
 
 def change_setting(name, value, config_file="/etc/php/php.ini"):

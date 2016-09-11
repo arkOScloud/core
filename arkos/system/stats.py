@@ -1,5 +1,6 @@
+# coding: utf-8
 """
-Classes and functions for interacting with system management daemons.
+Helper functions for obtaining system statistics.
 
 arkOS Core
 (c) 2016 CitizenWeb
@@ -7,7 +8,6 @@ Written by Jacob Cook
 Licensed under GPLv3, see LICENSE.md
 """
 
-# coding: utf-8
 import os
 import psutil
 import time
@@ -36,13 +36,13 @@ def get_load():
 def get_temp():
     """Get CPU temperature readings."""
     # TODO: replace this with libsensors.so / PySensors
-    if config.get("enviro", "board").startswith("Raspberry Pi"):
+    if config.get("enviro", "board", "Unknown").startswith("Raspberry Pi"):
         with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
-            return "%3.1f°C" % (float(f.read().rstrip("\n"))/1000)
+            return "{:3.1f}°C".format(float(f.read().rstrip("\n"))/1000)
     else:
         if os.path.exists("/sys/class/hwmon/hwmon1/temp1_input"):
             with open("/sys/class/hwmon/hwmon1/temp1_input", "r") as f:
-                return "%3.1f°C" % (float(f.read().rstrip("\n"))/1000)
+                return "{:3.1}f°C".format(float(f.read().rstrip("\n"))/1000)
     return ""
 
 

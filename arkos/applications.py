@@ -17,7 +17,8 @@ import tarfile
 
 from distutils.spawn import find_executable
 
-from arkos import config, storage, signals, logger, tracked_services
+
+from arkos import config, logger, storages, signals, tracked_services
 from arkos.messages import Notification, NotificationThread
 from arkos.system import services
 from arkos.languages import python
@@ -39,32 +40,32 @@ class App:
         self.installed = False
         self.error = ""
 
-    def get_module(self, type_):
+    def get_module(self, mod_type):
         """
         Helper function to get linked auxillary modules.
 
-        :param type_: Type of module to return (``backup``, ``ssl``, etc)
+        :param mod_type: Type of module to return (``backup``, ``ssl``, etc)
         :returns: Auxillary module (Backup, SSL, etc)
         :rtype: module
         """
-        return getattr(self, "_{0}".format(type_), None)
+        return getattr(self, "_{0}".format(mod_type), None)
 
-    def load(self, verify=True):
+    def load(self, verify=True, cry=True):
         """
         Load an application and associated metadata into the running process.
 
         :param bool verify: Verify System/Python/OS dependencies
+        :param bool cry: Raise exception on dependency install failure?
         """
         try:
             signals.emit("apps", "pre_load", self)
             if verify:
-                self.verify_dependencies()
+                self.verify_dependencies(cry)
 
             # Load the application module into Python
             app_dir = config.get("apps", "app_dir")
             imp.load_module(self.id, *imp.find_module(self.id, [app_dir]))
-            # Get module and its important classes
-            # and track them on this object
+            # Get module and its important classes and track them here
             for module in self.modules:
                 submod = imp.load_module(
                     "{0}.{1}".format(self.id, module),
@@ -76,8 +77,6 @@ class App:
                     if y[0] in ["DatabaseManager", "Site", "BackupController"]:
                         mgr = y[1]
                         break
-                debug_str = " *** Registering {0} module on {1}"
-                logger.debug("Apps", debug_str.format(module, self.id))
                 if module == "database":
                     for y in classes:
                         if issubclass(y[1], mgr) and y[1] != mgr:
@@ -91,8 +90,7 @@ class App:
                         if issubclass(y[1], mgr) and y[1] != mgr:
                             setattr(self, "_backup", y[1])
                 elif module == "api":
-                    if hasattr(self, "_backend"):
-                        setattr(submod, self.id, self._backend)
+                    setattr(submod, self.id, getattr(self, "_backend", None))
                     setattr(self, "_api", submod)
                 elif module == "ssl":
                     self.ssl = submod
@@ -102,9 +100,8 @@ class App:
             for s in self.services:
                 if s["ports"]:
                     tracked_services.register(
-                        self.id, s["binary"], s["name"], self.icon,
-                        s["ports"], default_policy=s.get("default_policy", 2),
-                        fw=False
+                        self.id, s["binary"], s["name"], self.icon, s["ports"],
+                        default_policy=s.get("default_policy", 2), fw=False
                     )
             signals.emit("apps", "post_load", self)
         except Exception as e:
@@ -113,7 +110,7 @@ class App:
             raise errors.OperationFailedError(
                 "({0})".format(self.name)) from e
 
-    def verify_dependencies(self):
+    def verify_dependencies(self, cry):
         """
         Verify that the associated dependencies are all properly installed.
 
@@ -147,12 +144,12 @@ class App:
                         to_pip = dep["package"]
                 if to_pip:
                     try:
-                        debug_str = " *** Installing {0} (via pip)..."
-                        logger.debug("Apps", debug_str.format(to_pip))
                         python.install(to_pip)
                     except:
                         error = "Couldn't install {0}".format(to_pip)
                         verify = False
+                        if cry:
+                            raise AppDependencyError(to_pip, "python")
                     finally:
                         if dep.get("internal"):
                             error = "Restart required"
@@ -162,11 +159,12 @@ class App:
             pacman.refresh()
         for x in to_pacman:
             try:
-                logger.debug("Apps", " *** Installing {0}...".format(x))
                 pacman.install(x)
             except:
                 error = "Couldn't install {0}".format(x)
                 verify = False
+                if cry:
+                    raise AppDependencyError(x, "system")
         self.loadable = verify
         self.error = error
         return verify
@@ -209,6 +207,7 @@ class App:
                 )
                 _install(x, load=load, cry=cry)
         # Install this app
+        msg = "Installing {0}...".format(self.name)
         nthread.update(Notification("info", "Apps", msg))
         _install(self.id, load=load, cry=cry)
         ports = []
@@ -339,7 +338,19 @@ class App:
         return self.as_dict
 
 
-def get(id_=None, type_=None, loadable=None, installed=None, verify=True):
+class AppDependencyError(errors.Error):
+    """Raised when an application dependency could not be installed."""
+
+    def __init__(self, dep, dtype):
+        self.dep = dep
+        self.type = dtype
+
+    def __str__(self):
+        return (self.dep, self.type)
+
+
+def get(id_=None, type=None, loadable=None, installed=None,
+        verify=True, force=False, cry=True):
     """
     Retrieve arkOS application data from the system.
 
@@ -353,13 +364,15 @@ def get(id_=None, type_=None, loadable=None, installed=None, verify=True):
     :param bool installed: Filter by installed (True) or uninstalled (False)
     :param bool verify: Verify app dependencies as the apps are scanned
     :param bool force: Force a rescan (do not rely on cache)
+    :param bool cry: Raise exception on dependency install failure?
     :return: Application(s)
     :rtype: Application or list thereof
     """
     data = storage.apps.get("applications")
-    if not data:
-        data = scan(verify)
-    if id_ or type_ or loadable or installed:
+    if not data or force:
+        data = scan(verify, cry)
+    if id or type or loadable or installed:
+
         type_list = []
         for x in data:
             if x.id == id_ and (x.loadable or not loadable):
@@ -375,7 +388,7 @@ def get(id_=None, type_=None, loadable=None, installed=None, verify=True):
     return data
 
 
-def scan(verify=True):
+def scan(verify=True, cry=True):
     """
     Search app directory for applications, load them and store metadata.
 
@@ -383,6 +396,7 @@ def scan(verify=True):
     apps, and merges in any updates as necessary.
 
     :param bool verify: Verify app dependencies as the apps are scanned
+    :param bool cry: Raise exception on dependency install failure?
     :return: list of Application objects
     :rtype: list
     """
@@ -394,8 +408,8 @@ def scan(verify=True):
 
     # Get paths for installed apps, metadata for available ones
     installed_apps = [x for x in os.listdir(app_dir) if not x.startswith(".")]
-    available_apps = api("https://{0}/api/v1/apps"
-                         .format(config.get("general", "repo_server")),
+    api_url = "https://{0}/api/v1/apps"
+    available_apps = api(api_url.format(config.get("general", "repo_server")),
                          crit=False)
     if available_apps:
         available_apps = available_apps["applications"]
@@ -428,7 +442,7 @@ def scan(verify=True):
             if app.id == y[1]["id"]:
                 app.assets = y[1]["assets"]
                 available_apps[y[0]]["installed"] = True
-        app.load()
+        app.load(cry)
         apps.append(app)
 
     # Convert available apps payload to objects
@@ -464,7 +478,8 @@ def verify_app_dependencies():
                               .format(dep["name"])
                     error_str = "*** Verify failed for {0} -- dependent on "\
                                 "{1} which is not installed"
-                    logger.debug("Apps", error_str.format(x.name, dep["name"]))
+                    error_str = error_str.format(x.name, dep["name"])
+                    logger.debug("Apps", error_str)
                     # Cascade this fail message to all apps in dependency chain
                     for z in get_dependent(x.id, "remove"):
                         z = storage.apps.get("applications", z)
@@ -480,7 +495,8 @@ def verify_app_dependencies():
                               .format(dep["name"])
                     error_str = "*** Verify failed for {0} -- dependent on "\
                                 "{1} which failed to load"
-                    logger.debug("Apps", error_str.format(x.name, dep["name"]))
+                    error_str = error_str.format(x.name, dep["name"])
+                    logger.debug("Apps", error_str)
                     # Cascade this fail message to all apps in dependency chain
                     for z in get_dependent(x.id, "remove"):
                         z = storage.apps.get("applications", z)
@@ -490,7 +506,7 @@ def verify_app_dependencies():
                         z.error = error_str.format(x.name, dep["name"])
 
 
-def get_dependent(id_, op):
+def get_dependent(id, op):
     """
     Return list of all apps to install or remove based on specified operation.
 
@@ -519,25 +535,25 @@ def get_dependent(id_, op):
     return metoo
 
 
-def _install(id_, load=True):
+def _install(id_, load=True, cry=True):
     """
     Utility function to download and install arkOS app packages.
 
-    :param str id_: ID of arkOS app to install
+    :param str id: ID of arkOS app to install
     :param bool load: Load the app after install?
+    :param bool cry: Raise exception on dependency install failure?
     """
     app_dir = config.get("apps", "app_dir")
     # Download and extract the app source package
-    data = api("https://{0}/api/v1/apps/{1}"
-               .format((config.get("general", "repo_server"), id_)),
+    api_url = "https://{0}/api/v1/apps/{1}"
+    data = api(api_url.format(config.get("general", "repo_server"), id_),
                returns="raw", crit=True)
-    with open(os.path.join(app_dir, "{0}.tar.gz".format(id)), "wb") as f:
+    path = os.path.join(app_dir, "{0}.tar.gz".format(id_))
+    with open(path, "wb") as f:
         f.write(data)
-    with tarfile.open(os.path.join(app_dir,
-                                   "{0}.tar.gz".format(id)),
-                      "r:gz") as t:
+    with tarfile.open(path, "r:gz") as t:
         t.extractall(app_dir)
-    os.unlink(os.path.join(app_dir, "{0}.tar.gz".format(id)))
+    os.unlink(path)
     # Read the app's metadata and create an object
     with open(os.path.join(app_dir, id, "manifest.json")) as f:
         data = json.loads(f.read())
@@ -547,4 +563,4 @@ def _install(id_, load=True):
     app.upgradable = ""
     app.installed = True
     if load:
-        app.load()
+        app.load(cry)
