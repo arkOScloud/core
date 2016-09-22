@@ -48,7 +48,8 @@ class RuntimeFilter(logging.Filter):
 
 class NotificationFilter(logging.Filter):
     def filter(self, record):
-        return 1 if record.msg["cls"].startswith("n") else 0
+        cls = "r" if type(record.msg) != dict else record.msg["cls"][0]
+        return 1 if cls == "n" else 0
 
 
 class LoggingControl:
@@ -69,8 +70,8 @@ class LoggingControl:
         stdout.setFormatter(dformatter)
         self.logger.addHandler(stdout)
 
-    def _log(self, level, mobj):
-        self.logger.log(level, mobj)
+    def _log(self, level, mobj, exc_info=False):
+        self.logger.log(level, mobj, exc_info=exc_info)
 
     def debug(self, comp, message, id=None):
         """Send a message with log level DEBUG."""
@@ -105,7 +106,7 @@ class LoggingControl:
         self._log(40, {
             "id": id or random_string(16), "thread_id": None, "cls": "runtime",
             "comp": comp, "title": None, "message": message
-        })
+        }, exc_info=True)
 
     def critical(self, comp, message, id=None):
         """Send a message with log level CRITICAL."""

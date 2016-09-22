@@ -12,7 +12,7 @@ import ldap
 import ldap.modlist
 
 from arkos import conns, config, signals
-from arkos.utilities import shell
+from arkos.utilities import b, shell
 
 
 class Group:
@@ -28,9 +28,9 @@ class Group:
         :param list users: List of user members
         :param str rootdn: Associated root DN in LDAP
         """
-        self.name = str(name)
+        self.name = name
         self.gid = gid or get_next_gid()
-        self.users = [str(user) for user in users]
+        self.users = users
         self.rootdn = rootdn
 
     @property
@@ -48,11 +48,12 @@ class Group:
         except ldap.NO_SUCH_OBJECT:
             pass
         ldif = {
-            "objectClass": ["posixGroup", "top"],
-            "cn": [self.name],
-            "gidNumber": str(self.gid),
-            "memberUid": self.users
+            "objectClass": [b"posixGroup", b"top"],
+            "cn": [b(self.name)],
+            "gidNumber": [b(str(self.gid))]
         }
+        if self.users:
+            ldif["memberUid"] = [b(u) for u in self.users]
         ldif = ldap.modlist.addModlist(ldif)
         signals.emit("groups", "pre_add", self)
         conns.LDAP.add_s(self.ldap_id, ldif)
@@ -66,9 +67,9 @@ class Group:
         except ldap.NO_SUCH_OBJECT:
             raise Exception("This group does not exist")
 
-        ldif = ldap.modlist.modifyModlist(ldif[0][1],
-                                          {"memberUid": self.users},
-                                          ignore_oldexistent=1)
+        ldif = ldap.modlist.modifyModlist(
+            ldif[0][1], {"memberUid": [b(u) for u in self.users]},
+            ignore_oldexistent=1)
         signals.emit("groups", "pre_update", self)
         conns.LDAP.modify_s(self.ldap_id, ldif)
         signals.emit("groups", "post_update", self)
@@ -146,8 +147,9 @@ def get(gid=None, name=None):
             if type(x[1][y]) == list and len(x[1][y]) == 1 \
                     and y != "memberUid":
                 x[1][y] = x[1][y][0]
-        g = Group(x[1]["cn"], int(x[1]["gidNumber"][0]),
-                  x[1].get("memberUid", []), x[0].split("ou=groups,")[1])
+        g = Group(x[1]["cn"].decode(), int(x[1]["gidNumber"]),
+                  [z.decode() for z in x[1].get("memberUid", [])],
+                  x[0].split("ou=groups,")[1])
         if g.gid == gid:
             return g
         elif name and g.name == name:

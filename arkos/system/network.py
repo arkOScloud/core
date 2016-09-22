@@ -206,19 +206,20 @@ def get_connections(id=None, iface=None):
     """
     conns = []
     netctl = shell("netctl list")
-    for line in netctl["stdout"].split("\n"):
+    for line in netctl["stdout"].split(b"\n"):
         if not line.split():
             continue
         svc = "/etc/systemd/system/multi-user.target.wants/netctl@{0}.service"
         enabled = os.path.exists(svc.format(line[2:]))
-        c = Connection(line[2:], line.startswith("*"), enabled)
+        c = Connection(line[2:].decode(), line.startswith(b"*"), enabled)
         with open(os.path.join("/etc/netctl", c.id), "r") as f:
             data = f.readlines()
         for x in data:
             if x.startswith("#") or not x.strip():
                 continue
             parse = x.split("=")
-            c.config[parse[0].lower()] = parse[1].translate(None, "()\"\"\n")
+            to_trans = dict.fromkeys(map(ord, "()\"\"\n"), None)
+            c.config[parse[0].lower()] = parse[1].translate(to_trans)
         if id == c.id:
             return c
         if not iface or c.config.get("interface") == iface:

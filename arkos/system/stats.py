@@ -8,9 +8,9 @@ Written by Jacob Cook
 Licensed under GPLv3, see LICENSE.md
 """
 
+import datetime
 import os
 import psutil
-import time
 
 from arkos import config
 
@@ -76,25 +76,9 @@ def get_space():
 
 def get_uptime():
     """Get system uptime."""
-    minute = 60
-    hour = minute * 60
-    day = hour * 24
+    n = datetime.datetime.now() - datetime.datetime.fromtimestamp(psutil.boot_time())
+    m, s = divmod(n.seconds, 60)
+    h, m = divmod(m, 60)
+    d, h = divmod(h, 24)
 
-    d = h = m = 0
-
-    s = int(time.time()) - int(psutil.boot_time())
-
-    d = s / day
-    s -= d * day
-    h = s / hour
-    s -= h * hour
-    m = s / minute
-    s -= m * minute
-
-    uptime = ""
-    if d > 1:
-        uptime = "{0} days, ".format(d)
-    elif d == 1:
-        uptime = "1 day, "
-
-    return uptime + "{0}:{:02d}:{:02d}".format(h, m, s)
+    return [s, m, h, d]

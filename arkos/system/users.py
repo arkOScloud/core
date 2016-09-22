@@ -110,6 +110,10 @@ class User:
             raise errors.InvalidConfigError(
                 "Roles", "This user does not exist")
 
+        for i, x in enumerate(self.mail):
+            if not x.endswith(self.domain):
+                self.mail[i] = x.split("@")[0] + "@" + self.domain
+
         ldif = ldif[0][1]
         attrs = {
             "givenName": [b(self.first_name)],
