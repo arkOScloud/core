@@ -29,6 +29,23 @@ def b(text):
     return text.encode("utf-8")
 
 
+def is_binary(chunk):
+    """Give an educated guess whether a file is binary or plaintext."""
+    if chunk == b"":
+        return False
+    control_chars = b'\n\r\t\f\b'
+    normal_range = control_chars + bytes(range(32, 127))
+    high_range = bytes(range(127, 256))
+    normal_chars = chunk.translate(None, normal_range)
+    high_chars = chunk.translate(None, high_range)
+    ratio1 = float(len(normal_chars)) / float(len(chunk))
+    ratio2 = float(len(high_chars)) / float(len(chunk))
+    return (
+        (ratio1 > 0.3 and ratio2 < 0.05) or
+        (ratio1 > 0.8 and ratio2 > 0.8)
+    )
+
+
 def cidr_to_netmask(cidr):
     """Convert a CIDR prefix to an IP subnet mask."""
     mask = [0, 0, 0, 0]
@@ -232,13 +249,15 @@ def str_fperms(mode):
 
 def path_to_b64(path):
     """Convert a filesystem path to a safe base64-encoded string."""
+    if type(path) == str:
+        path = bytes(path, 'utf-8')
     path = path.replace(b"//", b"/")
-    return base64.b64encode(path, altchars=b"+-").replace(b"=", b"*")
+    return base64.b64encode(path, altchars=b"+-").replace(b"=", b"*").decode()
 
 
 def b64_to_path(b64):
     """Convert a base64-encoded string to regular one (filesystem path)."""
-    return base64.b64decode(str(b64).replace("*", "="), altchars="+-")
+    return base64.b64decode(str(b64).replace("*", "="), altchars="+-").decode()
 
 
 def compress(pin, pout="", format="tgz"):
