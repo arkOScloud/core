@@ -96,8 +96,7 @@ class Database:
         """Return database metadata as dict."""
         return {
             "id": self.id,
-            "type_id": self.manager.id,
-            "type_name": self.manager.name,
+            "database_type": self.manager.id,
             "size": self.get_size(),
             "is_ready": True
         }
@@ -195,8 +194,7 @@ class DatabaseUser:
         """Return database user metadata as dict."""
         return {
             "id": self.id,
-            "type_id": self.manager.id,
-            "type_name": self.manager.name,
+            "database_type": self.manager.id,
             "permissions": self.chperm("check"),
             "is_ready": True
         }

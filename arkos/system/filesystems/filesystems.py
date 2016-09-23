@@ -18,7 +18,7 @@ from . import losetup
 
 from arkos import config, signals, sharers
 from arkos.messages import Notification, NotificationThread
-from arkos.utilities import shell
+from arkos.utilities import b, shell
 
 libc = ctypes.CDLL(ctypes.util.find_library("libc"), use_errno=True)
 
@@ -73,10 +73,10 @@ class DiskPartition:
             if s != 0:
                 excmsg = "Failed to decrypt {0} with errno {1}"
                 raise Exception(excmsg.format(self.id, str(s)))
-            s = libc.mount(ctypes.c_char_p(luks_point),
-                           ctypes.c_char_p(mount_point),
-                           ctypes.c_char_p(self.fstype), 0,
-                           ctypes.c_char_p(""))
+            s = libc.mount(ctypes.c_char_p(b(luks_point)),
+                           ctypes.c_char_p(b(mount_point)),
+                           ctypes.c_char_p(b(self.fstype)), 0,
+                           ctypes.c_char_p(b""))
             if s == -1:
                 crypto.luks_close(self.id)
                 excmsg = "Failed to mount {0}: {1}"
@@ -85,10 +85,10 @@ class DiskPartition:
         elif self.crypt and not passwd:
             raise Exception("Must provide password to decrypt encrypted disk")
         else:
-            s = libc.mount(ctypes.c_char_p(self.path),
-                           ctypes.c_char_p(mount_point),
-                           ctypes.c_char_p(self.fstype), 0,
-                           ctypes.c_char_p(""))
+            s = libc.mount(ctypes.c_char_p(b(self.path)),
+                           ctypes.c_char_p(b(mount_point)),
+                           ctypes.c_char_p(b(self.fstype)), 0,
+                           ctypes.c_char_p(b""))
             if s == -1:
                 excmsg = "Failed to mount {0}: {1}"
                 raise Exception(excmsg.format(self.id,
@@ -101,13 +101,13 @@ class DiskPartition:
         signals.emit("filesystems", "pre_umount", self)
         if not self.mountpoint:
             return
-        s = libc.umount2(ctypes.c_char_p(self.mountpoint), 0)
+        s = libc.umount2(ctypes.c_char_p(b(self.mountpoint)), 0)
         if s == -1:
             excmsg = "Failed to unmount {0}: {1}"
             raise Exception(excmsg.format(self.id,
                                           os.strerror(ctypes.get_errno())))
         if self.crypt:
-            crypto.luks_close(self.id)
+            crypto.luks_close(b(self.id))
         signals.emit("filesystems", "post_umount", self)
         self.mountpoint = None
 
@@ -207,7 +207,7 @@ class VirtualDisk:
         nthread.update(Notification("info", "Filesystems", msg))
         with open(self.path, "wb") as f:
             written = 0
-            with open("/dev/zero", "r") as zero:
+            with open("/dev/zero", "rb") as zero:
                 while self.size > written:
                     written += 1024
                     f.write(zero.read(1024))
@@ -254,9 +254,9 @@ class VirtualDisk:
                 loop.unmount()
                 excmsg = "Failed to decrypt {0} with errno {1}"
                 raise Exception(excmsg.format(self.id, str(s)))
-            s = libc.mount(ctypes.c_char_p(bytes(luks_point, 'utf-8')),
-                           ctypes.c_char_p(bytes(mount_point, 'utf-8')),
-                           ctypes.c_char_p(bytes(self.fstype, 'utf-8')), 0,
+            s = libc.mount(ctypes.c_char_p(b(luks_point)),
+                           ctypes.c_char_p(b(mount_point)),
+                           ctypes.c_char_p(b(self.fstype)), 0,
                            ctypes.c_char_p(b""))
             if s == -1:
                 crypto.luks_close(self.id)
@@ -268,9 +268,9 @@ class VirtualDisk:
             excstr = "Must provide password to decrypt encrypted container"
             raise Exception(excstr)
         else:
-            s = libc.mount(ctypes.c_char_p(loop.device),
-                           ctypes.c_char_p(bytes(mount_point, 'utf-8')),
-                           ctypes.c_char_p(bytes(self.fstype, 'utf-8')), 0,
+            s = libc.mount(ctypes.c_char_p(b(loop.device)),
+                           ctypes.c_char_p(b(mount_point)),
+                           ctypes.c_char_p(b(self.fstype)), 0,
                            ctypes.c_char_p(b""))
             if s == -1:
                 loop.unmount()
@@ -290,7 +290,7 @@ class VirtualDisk:
             if loops[l].is_used() and loops[l].get_filename() == self.path:
                 dev = loops[l]
                 break
-        s = libc.umount2(ctypes.c_char_p(self.mountpoint), 0)
+        s = libc.umount2(ctypes.c_char_p(b(self.mountpoint)), 0)
         if s == -1:
             excstr = "Failed to unmount {0}: {1}"
             raise Exception(excstr.format(self.id,

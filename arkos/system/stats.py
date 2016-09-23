@@ -23,7 +23,7 @@ def get_all():
         "ram": get_ram(),
         "cpu": get_cpu(),
         "swap": get_swap(),
-        # "space": get_space(),
+        "disks": get_space(),
         "uptime": get_uptime()
     }
 
@@ -66,11 +66,12 @@ def get_swap():
 
 def get_space():
     """Get used disk space."""
-    result = {}
-    s = psutil.disk_partitions()
-    for x in s:
-        r = psutil.disk_usage(x.device)
-        result[x.device] = [r.used, r.total, r.percent]
+    result = []
+    for x in psutil.disk_partitions():
+        r = psutil.disk_usage(x.mountpoint)
+        did = x.mountpoint.split("/")[-1] if "/loop" in x.device else x.device
+        result.append({"id": did , "used": r.used, "total": r.total,
+                       "percent": r.percent})
     return result
 
 
