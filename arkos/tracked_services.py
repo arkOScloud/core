@@ -377,8 +377,9 @@ def initialize():
     # arkOS
     policy = policies.get("arkos", "arkos", 2)
     port = [("tcp", int(config.get("genesis", "port")))]
-    SecurityPolicy("arkos", "arkos", "System Management (Genesis/APIs)",
-                   "fa fa-desktop", port, policy)
+    pol = SecurityPolicy("arkos", "arkos", "System Management (Genesis/APIs)",
+                         "fa fa-desktop", port, policy)
+    storage.policies.add("policies", pol)
 
     # uPNP
     policy = policies.get("arkos", "upnp", 1)

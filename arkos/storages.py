@@ -14,14 +14,15 @@ class StorageControl:
     def __init__(self):
         """Initialize arkOS storage."""
         self.apps = Storage(["applications"])
-        self.sites = Storage(["sites"])
         self.certs = Storage(["certificates", "authorities"])
         self.dbs = Storage(["databases", "users", "managers"])
         self.points = Storage(["points"])
-        self.updates = Storage(["updates"])
         self.policies = Storage(["policies"])
         self.shares = Storage(["shares"])
+        self.shared_files = Storage(["shared_files"])
         self.signals = Storage(["listeners"])
+        self.sites = Storage(["sites"])
+        self.updates = Storage(["updates"])
 
 
 class Storage:

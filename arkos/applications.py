@@ -249,8 +249,8 @@ class App:
         for item in self.dependencies:
             if item["type"] == "system" and not item["package"] in exclude:
                 if item.get("daemon"):
-                    services.get().stop(item["daemon"])
-                    services.get().disable(item["daemon"])
+                    services.get(item["daemon"]).stop()
+                    services.get(item["daemon"]).disable()
                 pacman.remove([item["package"]],
                               purge=config.get("apps", "purge", False))
 

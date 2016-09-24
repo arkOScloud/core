@@ -13,8 +13,6 @@ from arkos.utilities import errors, shell
 
 BINPATH = "/usr/lib/ruby/gems/2.2.0/bin"
 
-BINPATH = "/usr/lib/ruby/gems/2.2.0/bin"
-
 
 def verify_path():
     """Verify that the proper dirs are available on the system's exec PATH."""
