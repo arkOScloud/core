@@ -273,7 +273,7 @@ class arkOSBackupCfg(BackupController):
         if s["code"] != 0:
             raise Exception("Could not backup LDAP database. "
                             "Please check logs for errors.")
-        with open("/tmp/ldap.ldif", "w") as f:
+        with open("/tmp/ldap.ldif", "wb") as f:
             f.write(s["stdout"])
 
     def post_backup(self):
@@ -347,7 +347,7 @@ def get(backup_location=""):
                     "time": data["time"], "version": data["version"],
                     "size": os.path.getsize(path), "is_ready": True,
                     "site_type": data.get("site_type", None)}
-            backups.append()
+            backups.append(data)
     return backups
 
 
@@ -375,7 +375,7 @@ def get_able():
     return able
 
 
-def create(id, data=True):
+def create(id, data=True, nthread=NotificationThread()):
     """
     Convenience function to create a backup.
 
@@ -400,7 +400,7 @@ def create(id, data=True):
                 break
     if not controller:
         raise Exception("No backup controller found")
-    return controller.backup(data=data)
+    return controller.backup(data=data, nthread=nthread)
 
 
 def restore(backup, data=True, nthread=NotificationThread()):
