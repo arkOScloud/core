@@ -108,7 +108,7 @@ class App:
             self.loadable = False
             self.error = "Module error: {0}".format(e)
             raise errors.OperationFailedError(
-                "({0})".format(self.name)) from e
+                "({0})".format(self.name), e)
 
     def verify_dependencies(self, cry):
         """

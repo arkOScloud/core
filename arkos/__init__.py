@@ -38,12 +38,12 @@ def init(config_path="/etc/arkos/settings.json",
     config.set("enviro", "version", version)
     config.set("enviro", "arch", arch[0])
     config.set("enviro", "board", arch[1])
-    if not test_dns("arkos.io"):
-        raise Exception("DNS resolution failed. Please make sure your server"
-                        " network connection is properly configured.")
     if log:
         logger.logger = log
     logger.add_stream_logger(debug or config.get("general", "debug", False))
+    if not test_dns("arkos.io"):
+        logger.warning("Init", "DNS resolution failed. Please make sure your "
+                       "server network connection is properly configured.")
     return config
 
 
