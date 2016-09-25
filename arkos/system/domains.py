@@ -11,6 +11,7 @@ import ldap.modlist
 
 from arkos import config, conns, signals
 from arkos.system import users
+from arkos.utilities import b
 
 
 class Domain:
@@ -23,7 +24,7 @@ class Domain:
         :param str name: domain name
         :param str rootdn: Associated root DN in LDAP
         """
-        self.name = str(name)
+        self.name = name
         self.rootdn = rootdn
 
     def __str__(self):
@@ -44,8 +45,8 @@ class Domain:
             raise Exception("This domain is already present here")
         except:
             pass
-        ldif = {"virtualdomain": [self.name],
-                "objectClass": ["mailDomain", "top"]}
+        ldif = {"virtualdomain": [b(self.name)],
+                "objectClass": [b"mailDomain", b"top"]}
         signals.emit("domains", "pre_add", self)
         conns.LDAP.add_s(self.ldap_id, ldap.modlist.addModlist(ldif))
         signals.emit("domains", "post_add", self)
@@ -87,7 +88,8 @@ def get(id_=None):
                  "(virtualdomain=*)",
                  ["virtualdomain"])
     for x in qset:
-        d = Domain(x[1]["virtualdomain"][0], x[0].split("ou=domains,")[1])
+        d = Domain(x[1]["virtualdomain"][0].decode(),
+                   x[0].split("ou=domains,")[1])
         if d.name == id:
             return d
         results.append(d)

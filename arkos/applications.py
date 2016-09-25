@@ -17,7 +17,6 @@ import tarfile
 
 from distutils.spawn import find_executable
 
-
 from arkos import config, logger, storage, signals, tracked_services
 from arkos.messages import Notification, NotificationThread
 from arkos.system import services
@@ -108,7 +107,7 @@ class App:
             self.loadable = False
             self.error = "Module error: {0}".format(e)
             raise errors.OperationFailedError(
-                "({0})".format(self.name), e)
+                "({0})".format(self.name)) from e
 
     def verify_dependencies(self, cry):
         """
@@ -371,20 +370,14 @@ def get(id_=None, type_=None, loadable=None, installed=None,
     data = storage.apps.get("applications")
     if not data or force:
         data = scan(verify, cry)
-    if id or type or loadable or installed:
-
-        type_list = []
-        for x in data:
-            if x.id == id_ and (x.loadable or not loadable):
-                return x
-            elif str(x.installed).lower() == str(installed).lower() \
-                    and (x.type or not type_):
-                type_list.append(x)
-            elif x.type == type_ and (x.loadable or not loadable):
-                type_list.append(x)
-        if type_list:
-            return type_list
-        return []
+    if id:
+        return next(filter(lambda x: x.id == id_, data), None)
+    if type:
+        data = list(filter(lambda x: x.type == type_, data))
+    if loadable:
+        data = list(filter(lambda x: x.loadable == loadable, data))
+    if installed:
+        data = list(filter(lambda x: x.installed == installed, data))
     return data
 
 

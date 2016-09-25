@@ -65,7 +65,7 @@ class Site:
         """
         self.id = id_
         self.path = path
-        self.addr = addr
+        self.domain = domain
         self.port = port
         self.php = php
         self.version = version
@@ -87,7 +87,7 @@ class Site:
         :param Application meta: Application metadata
         :param dict extra_vars: Extra form variables as provided by client
         :param bool enable: Enable the site in nginx on install?
-        :param NotificationThread nthread: notification thread to use
+        :param message message: Message object to update with status
         :returns: special message to the user from app post-install hook (opt)
         """
         try:
@@ -111,9 +111,9 @@ class Site:
         nthread.update(msg)
 
         # Make sure the chosen port is indeed open
-        if not tracked_services.is_open_port(self.port, self.addr):
+        if not tracked_services.is_open_port(self.port, self.domain):
             raise errors.InvalidConfigError("({0})".format(meta.id), nthread)\
-                from tracked_services.PortConflictError(self.port, self.addr)
+                from tracked_services.PortConflictError(self.port, self.domain)
 
         # Set some metadata values
         specialmsg, dbpasswd = "", ""
@@ -273,7 +273,7 @@ class Site:
             server = nginx.Server(
                 nginx.Key("listen", str(self.port)),
                 nginx.Key("listen", "[::]:" + str(self.port)),
-                nginx.Key("server_name", self.addr),
+                nginx.Key("server_name", self.domain),
                 nginx.Key("root", self.path),
                 nginx.Key("index", getattr(self.meta, "website_index", None) or
                           default_index)
@@ -393,9 +393,9 @@ class Site:
                 listen.value = (sslport + " ssl http2")
                 block.add(nginx.Server(
                     nginx.Key("listen", httport),
-                    nginx.Key("server_name", self.addr),
+                    nginx.Key("server_name", self.domain),
                     nginx.Key("return", "301 https://{0}$request_uri"
-                                        .format(self.addr))
+                                        .format(self.domain))
                 ))
                 for x in block.servers:
                     if " ssl" in x.filter("Key", "listen")[0].value:
@@ -555,9 +555,9 @@ class Site:
             block.add(nginx.Server(
                 nginx.Key("listen", "80"),
                 nginx.Key("listen", "[::]:80"),
-                nginx.Key("server_name", self.addr),
+                nginx.Key("server_name", self.domain),
                 nginx.Key("return", "301 https://{0}$request_uri"
-                                    .format(self.addr))
+                                    .format(self.domain))
             ))
 
         # If the name was changed...
@@ -593,7 +593,7 @@ class Site:
                 listen.value = "[::]:" + str(port)
             else:
                 listen.value = str(port)
-        server.filter("Key", "server_name")[0].value = self.addr
+        server.filter("Key", "server_name")[0].value = self.domain
         server.filter("Key", "root")[0].value = self.path
         server.filter("Key", "index")[0].value = "index.php" \
             if getattr(self, "php", False) else "index.html"
@@ -754,7 +754,7 @@ class Site:
         return {
             "id": self.id,
             "path": self.path,
-            "addr": self.addr,
+            "domain": self.domain,
             "port": self.port,
             "site_type": self.meta.id,
             "site_name": self.meta.name,
@@ -764,7 +764,7 @@ class Site:
             "database": self.db.id if self.db else None,
             "php": self.php,
             "enabled": self.enabled,
-            "has_actions": getattr(self.meta, "website_extra_actions", None),
+            "website_actions": getattr(self.meta, "website_actions", []),
             "has_update": has_upd,
             "is_ready": True
         }
@@ -784,8 +784,8 @@ class ReverseProxy(Site):
     """
 
     def __init__(
-            self, id_="", name="", path="", addr="", port=80,
-            base_path="", block=[], type_="internal"):
+            self, id_="", name="", path="", domain="", port=80,
+            base_path="", block=[], type="internal"):
         """
         Initialize the reverse proxy website object.
 
@@ -800,7 +800,7 @@ class ReverseProxy(Site):
         """
         self.id = id_
         self.name = name
-        self.addr = addr
+        self.domain = domain
         self.path = path
         self.port = port
         self.base_path = base_path
@@ -872,7 +872,7 @@ class ReverseProxy(Site):
         server = nginx.Server(
             nginx.Key("listen", self.port),
             nginx.Key("listen", "[::]:" + str(self.port)),
-            nginx.Key("server_name", self.addr),
+            nginx.Key("server_name", self.domain),
             nginx.Key("root", self.base_path or self.path),
         )
         server.add(*[x for x in self.block])
@@ -919,7 +919,7 @@ class ReverseProxy(Site):
             "id": self.id,
             "name": self.name,
             "path": self.path,
-            "addr": self.addr,
+            "domain": self.domain,
             "port": self.port,
             "site_name": "Reverse Proxy",
             "site_type": self.type,
@@ -985,10 +985,10 @@ def scan():
             continue
 
         # Create the proper type of website object
-        type_ = meta.get("website", "type")
-        if type_ != "ReverseProxy":
+        site_type = meta.get("website", "type")
+        if site_type != "ReverseProxy":
             # If it's a regular website, initialize its class, metadata, etc
-            app = applications.get(type_)
+            app = applications.get(site_type)
             if not app or not app.loadable or not app.installed:
                 continue
             site = app._website(id=meta.get("website", "id"))
@@ -1029,7 +1029,7 @@ def scan():
             port_regex = re.compile("(\\d+)\s*(.*)")
             listen = server.filter("Key", "listen")[0].value.lstrip("[::]:")
             site.port = int(re.match(port_regex, listen).group(1))
-            site.addr = server.filter("Key", "server_name")[0].value
+            site.domain = server.filter("Key", "server_name")[0].value
             site.path = server.filter("Key", "root")[0].value
             site.php = "php" in server.filter("Key", "index")[0].value
         except IndexError:

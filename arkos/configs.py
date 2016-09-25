@@ -79,10 +79,10 @@ class Config:
                 and type(self.config.get(section)) not in [dict, list]:
             return self.config.get(section)
         elif section in self.config:
-            value = self.config.get(section).get(key) or default
+            value = self.config.get(section).get(key)
         else:
             value = None or default
-        return value
+        return default if value in [None, [], {}] else value
 
     def get_all(self, section=None):
         """

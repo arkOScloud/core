@@ -7,6 +7,7 @@ Written by Jacob Cook
 Licensed under GPLv3, see LICENSE.md
 """
 
+import binascii
 from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.backends import default_backend
@@ -199,7 +200,11 @@ class CertificateAuthority:
         """Return certificate metadata as dict."""
         return {
             "id": self.id,
-            "expiry": self.expiry
+            "keytype": self.keytype,
+            "keylength": self.keylength,
+            "expiry": self.expiry,
+            "sha1": self.sha1,
+            "md5": self.md5
         }
 
     @property
@@ -277,13 +282,15 @@ def scan():
                 password=None,
                 backend=default_backend()
             )
-        sha1 = crt.fingerprint(hashes.SHA1())
-        md5 = crt.fingerprint(hashes.MD5())
+        sha1 = binascii.hexlify(crt.fingerprint(hashes.SHA1())).decode()
+        md5 = binascii.hexlify(crt.fingerprint(hashes.MD5())).decode()
+        sha1 = ":".join([sha1[i:i+2].upper() for i in range(0, len(sha1), 2)])
+        md5 = ":".join([md5[i:i+2].upper() for i in range(0, len(md5), 2)])
         kt = "RSA" if isinstance(key.public_key(), rsa.RSAPublicKey) else "DSA"
         common_name = crt.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
         c = Certificate(id_=id_, cert_path=x, key_path=key_path,
                         keytype=kt, keylength=key.key_size,
-                        domain=common_name,
+                        domain=common_name[0].value,
                         assigns=assigns.get(id_, []),
                         expiry=crt.not_valid_after,
                         sha1=sha1, md5=md5)
@@ -336,7 +343,18 @@ def scan_authorities():
         with open(x, "rb") as f:
             cert = x509.load_pem_x509_certificate(f.read(), default_backend())
         key_path = os.path.join(ca_key_dir, "{0}.key".format(id_))
-        ca = CertificateAuthority(id, x, key_path, cert.not_valid_after())
+        with open(key_path, "rb") as f:
+            with open(key_path, "rb") as f:
+                key = serialization.load_pem_private_key(
+                    f.read(),
+                    password=None,
+                    backend=default_backend()
+                )
+        sha1 = binascii.hexlify(cert.fingerprint(hashes.SHA1())).decode()
+        md5 = binascii.hexlify(cert.fingerprint(hashes.MD5())).decode()
+        kt = "RSA" if isinstance(key.public_key(), rsa.RSAPublicKey) else "DSA"
+        ca = CertificateAuthority(id, x, key_path, cert.not_valid_after,
+                                  kt, key.key_size, sha1, md5)
         certs.append(ca)
     storage.certs.set("authorities", certs)
     return certs
@@ -400,8 +418,8 @@ def upload_certificate(
     nthread.update(Notification("info", "Certificates", msg))
     cert_dir = config.get("certificates", "cert_dir")
     key_dir = config.get("certificates", "key_dir")
-    sha1 = crt.fingerprint(hashes.SHA1())
-    md5 = crt.fingerprint(hashes.MD5())
+    sha1 = binascii.hexlify(crt.fingerprint(hashes.SHA1())).decode()
+    md5 = binascii.hexlify(crt.fingerprint(hashes.MD5())).decode()
     kt = "RSA" if isinstance(ky.public_key(), rsa.RSAPublicKey) else "DSA"
     common_name = crt.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
     c = Certificate(id_=id_,
@@ -525,8 +543,8 @@ def generate_certificate(
     os.chmod(key_path, 0o660)
 
     # Create actual certificate object
-    sha1 = cert.fingerprint(hashes.SHA1())
-    md5 = cert.fingerprint(hashes.MD5())
+    sha1 = binascii.hexlify(cert.fingerprint(hashes.SHA1())).decode()
+    md5 = binascii.hexlify(cert.fingerprint(hashes.MD5())).decode()
     c = Certificate(id, domain, cert_path, key_path, keytype, keylength,
                     [], cert.not_valid_after, sha1, md5)
     storage.certs.add("certificates", c)

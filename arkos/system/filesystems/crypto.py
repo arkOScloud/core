@@ -62,29 +62,21 @@ def logFunc(p, t):
     return None
 
 
-def passwordDialog(t):
-    """Create password dialog."""
-    return None
-
-
 def is_luks(device):
     """Check to see if provided device is a LUKS device."""
-    cs = CryptSetup(device=device, yesDialog=yesDialog, logFunc=logFunc,
-                    passwordDialog=passwordDialog)
+    cs = CryptSetup(device=device, yesDialog=yesDialog, logFunc=logFunc)
     return cs.isLuks()
 
 
 def luks_uuid(device):
     """Obtain LUKS device's UUID."""
-    cs = CryptSetup(device=device, yesDialog=yesDialog, logFunc=logFunc,
-                    passwordDialog=passwordDialog)
+    cs = CryptSetup(device=device, yesDialog=yesDialog, logFunc=logFunc)
     return cs.luksUUID()
 
 
 def luks_status(name):
     """Obtain LUKS device status."""
-    cs = CryptSetup(name=name, yesDialog=yesDialog, logFunc=logFunc,
-                    passwordDialog=passwordDialog)
+    cs = CryptSetup(name=name, yesDialog=yesDialog, logFunc=logFunc)
     return cs.status()
 
 
@@ -101,8 +93,7 @@ def luks_format(device, passphrase, cipher=None, key_size=None,
     :param int min_entropy: Don't encrypt until system has this much entropy
     :returns: 0 on success
     """
-    cs = CryptSetup(device=device, yesDialog=yesDialog, logFunc=logFunc,
-                    passwordDialog=passwordDialog)
+    cs = CryptSetup(device=device, yesDialog=yesDialog, logFunc=logFunc)
     kwargs = {}
 
     cipherType, cipherMode = None, None
@@ -139,8 +130,7 @@ def luks_open(device, name, passphrase, key_file=None):
     :param str key_file: path to key file to unlock with
     :returns: 0 on success
     """
-    cs = CryptSetup(device=device, yesDialog=yesDialog, logFunc=logFunc,
-                    passwordDialog=passwordDialog)
+    cs = CryptSetup(device=device, yesDialog=yesDialog, logFunc=logFunc)
     return cs.activate(passphrase=passphrase, name=name)
 
 
@@ -151,8 +141,7 @@ def luks_close(name):
     :param str name: redirected device identifier
     :returns: 0 on success
     """
-    cs = CryptSetup(name=name, yesDialog=yesDialog, logFunc=logFunc,
-                    passwordDialog=passwordDialog)
+    cs = CryptSetup(name=name, yesDialog=yesDialog, logFunc=logFunc)
     return cs.deactivate()
 
 
@@ -166,8 +155,7 @@ def luks_add_key(device, new_passphrase, passphrase, key_file=None):
     :param str key_file: authenticate with this key file
     :returns: 0 on success
     """
-    cs = CryptSetup(device=device, yesDialog=yesDialog, logFunc=logFunc,
-                    passwordDialog=passwordDialog)
+    cs = CryptSetup(device=device, yesDialog=yesDialog, logFunc=logFunc)
     return cs.addKeyByPassphrase(passphrase=passphrase,
                                  newPassphrase=new_passphrase)
 
@@ -182,6 +170,5 @@ def luks_remove_key(device, del_passphrase, passphrase, key_file=None):
     :param str key_file: authenticate with this key file
     :returns: 0 on success
     """
-    cs = CryptSetup(device=device, yesDialog=yesDialog, logFunc=logFunc,
-                    passwordDialog=passwordDialog)
+    cs = CryptSetup(device=device, yesDialog=yesDialog, logFunc=logFunc)
     return cs.removePassphrase(passphrase=passphrase)

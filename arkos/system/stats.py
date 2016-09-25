@@ -8,9 +8,9 @@ Written by Jacob Cook
 Licensed under GPLv3, see LICENSE.md
 """
 
+import datetime
 import os
 import psutil
-import time
 
 from arkos import config
 
@@ -23,7 +23,7 @@ def get_all():
         "ram": get_ram(),
         "cpu": get_cpu(),
         "swap": get_swap(),
-        # "space": get_space(),
+        "disks": get_space(),
         "uptime": get_uptime()
     }
 
@@ -66,33 +66,20 @@ def get_swap():
 
 def get_space():
     """Get used disk space."""
-    result = {}
-    s = psutil.disk_partitions()
-    for x in s:
-        r = psutil.disk_usage(x.device)
-        result[x.device] = [r.used, r.total, r.percent]
+    result = []
+    for x in psutil.disk_partitions():
+        r = psutil.disk_usage(x.mountpoint)
+        did = x.mountpoint.split("/")[-1] if "/loop" in x.device else x.device
+        result.append({"id": did , "used": r.used, "total": r.total,
+                       "percent": r.percent})
     return result
 
 
 def get_uptime():
     """Get system uptime."""
-    minute = 60
-    hour = minute * 60
-    day = hour * 24
+    n = datetime.datetime.now() - datetime.datetime.fromtimestamp(psutil.boot_time())
+    m, s = divmod(n.seconds, 60)
+    h, m = divmod(m, 60)
+    d, h = divmod(h, 24)
 
-    s = int(time.time()) - int(psutil.boot_time())
-
-    d = s / day
-    s -= d * day
-    h = s / hour
-    s -= h * hour
-    m = s / minute
-    s -= m * minute
-
-    uptime = ""
-    if d > 1:
-        uptime = "{0} days, ".format(d)
-    elif d == 1:
-        uptime = "1 day, "
-
-    return uptime + "{0}:{:02d}:{:02d}".format(h, m, s)
+    return [s, m, h, d]

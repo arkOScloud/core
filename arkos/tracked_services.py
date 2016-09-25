@@ -99,9 +99,9 @@ class SecurityPolicy:
 class PortConflictError(errors.Error):
     """Raised when an address and port requested are not available."""
 
-    def __init__(self, port, addr):
+    def __init__(self, port, domain):
         self.port = port
-        self.addr = addr
+        self.domain = domain
 
     def __str__(self):
         return ("This port is taken by another site or service, "
@@ -129,7 +129,7 @@ def get(id_=None, type_=None):
     return data
 
 
-def register(type_, id_, name, icon, ports, addr=None, policy=0,
+def register(type_, id_, name, icon, ports, domain=None, policy=0,
              default_policy=2, fw=True):
     """
     Register a new security policy with the system.
@@ -152,7 +152,7 @@ def register(type_, id_, name, icon, ports, addr=None, policy=0,
     :param str name: Display name to use in Security settings pane
     :param str icon: FontAwesome icon class name
     :param list ports: List of port tuples to allow/restrict
-    :param str addr: Address (for websites)
+    :param str domain: Address (for websites)
     :param int policy: Policy identifier
     :param int default_policy: Application default policy to use on first init
     :param bool fw: Regenerate the firewall after save?
@@ -164,7 +164,7 @@ def register(type_, id_, name, icon, ports, addr=None, policy=0,
         for x in pget:
             if x.id == id_:
                 storage.policies.remove("policies", x)
-    svc = SecurityPolicy(type_, id_, name, icon, ports, policy, addr)
+    svc = SecurityPolicy(type_, id_, name, icon, ports, policy, domain)
     svc.save(fw)
 
 
@@ -204,7 +204,7 @@ def refresh_policies():
     policies.save()
 
 
-def is_open_port(port, addr=None, ignore_common=False):
+def is_open_port(port, domain=None, ignore_common=False):
     """
     Check if the specified port is taken by a tracked service or not.
 
@@ -220,7 +220,7 @@ def is_open_port(port, addr=None, ignore_common=False):
     data = get()
     ports = []
     for x in data:
-        if addr and x.type == "website" and addr != x.addr:
+        if domain and x.type == "website" and domain != x.addr:
             continue
         for y in x.ports:
             ports.append(int(y[1]))
@@ -379,7 +379,6 @@ def initialize():
     port = [("tcp", int(config.get("genesis", "port")))]
     pol = SecurityPolicy("arkos", "arkos", "System Management (Genesis/APIs)",
                          "fa fa-desktop", port, policy)
-    storage.policies.add("policies", pol)
 
     # uPNP
     policy = policies.get("arkos", "upnp", 1)
@@ -399,7 +398,7 @@ def register_website(site):
     """Convenience function to register a website as tracked service."""
     register("website", site.id, getattr(site, "name", site.id),
              site.meta.icon if site.meta else "fa fa-globe",
-             [("tcp", site.port)], site.addr)
+             [("tcp", site.port)], site.domain)
 
 
 def deregister_website(site):
@@ -411,23 +410,24 @@ def open_upnp_site(site):
     """Convenience function to register a website with uPnP."""
     if config.get("general", "enable_upnp", True):
         open_upnp(("tcp", site.port))
-    addr = site.addr
-    if addr == "localhost" or addr.endswith(".local"):
-        addr = None
+    domain = site.domain
+    if domain == "localhost" or domain.endswith(".local"):
+        domain = None
     try:
-        test_port(config.get("general", "repo_server"), site.port, addr)
+        test_port(config.get("general", "repo_server"), site.port, domain)
     except:
         raise errors.SoftFail(
             "Port {0} and/or domain {1} could not be tested."
             " Make sure your ports are properly forwarded and"
             " that your domain is properly set up."
-            .format(site.port, site.addr))
+            .format(site.port, site.domain))
 
 
 def close_upnp_site(site):
     """Convenience function to deregister a website with uPnP."""
     if config.get("general", "enable_upnp", True):
         close_upnp(("tcp", site.port))
+
 
 signals.add("tracked_services", "websites", "site_loaded", register_website)
 signals.add("tracked_services", "websites", "site_installed", register_website)

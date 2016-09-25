@@ -18,8 +18,13 @@ class StorageControl:
         self.dbs = Storage(["databases", "users", "managers"])
         self.points = Storage(["points"])
         self.policies = Storage(["policies"])
+<<<<<<< HEAD:arkos/storages.py
         self.shares = Storage(["shares"])
         self.shared_files = Storage(["shared_files"])
+=======
+        self.files = Storage(["sharedfiles"])
+        self.shares = Storage(["sharers"])
+>>>>>>> 60c70ba9295edab289e8e4b1e5733e7a779d866d:arkos/storage.py
         self.signals = Storage(["listeners"])
         self.sites = Storage(["sites"])
         self.updates = Storage(["updates"])

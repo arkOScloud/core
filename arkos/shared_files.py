@@ -7,6 +7,8 @@ Written by Jacob Cook
 Licensed under GPLv3, see LICENSE.md
 """
 
+import os
+
 from arkos import storage
 from arkos.system import systemtime
 
@@ -34,6 +36,11 @@ class SharedFile:
         self.path = path
         self.expires = expires
         self.fetch_count = 0
+
+    @property
+    def name(self):
+        """Returns the `os.path.basename` for the file."""
+        return os.path.basename(self.path)
 
     def add(self):
         """Add a shared file reference to cache."""
@@ -67,6 +74,7 @@ class SharedFile:
             if self.expires != 0 else ""
         return {
             "id": self.id,
+            "name": self.name,
             "path": self.path,
             "expires": self.expires != 0,
             "expires_at": exp,
