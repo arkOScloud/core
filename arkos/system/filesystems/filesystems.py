@@ -518,7 +518,7 @@ def get_points(id=None, path=None):
         if x.mountpoint and x.mountpoint not in ["/", "/boot"]:
             p = PointOfInterest(x.id, x.mountpoint,
                                 "crypt" if x.crypt else "disk",
-                                "fa-hdd-o")
+                                "disk outline")
             points.append(p)
     for x in websites.get():
         if x.app and x.app.type == "website":
@@ -526,10 +526,10 @@ def get_points(id=None, path=None):
                                 x.app.icon)
             points.append(p)
     for x in sharers.get_shares():
-        p = PointOfInterest(x.id, x.path, "share", "fa-folder-open")
+        p = PointOfInterest(x.id, x.path, "share", "open folder")
         points.append(p)
     for x in sharers.get_mounts():
-        p = PointOfInterest(x.id, x.path, "mount", "fa-folder-open-o")
+        p = PointOfInterest(x.id, x.path, "mount", "open folder outline")
         points.append(p)
     if id:
         for x in points:

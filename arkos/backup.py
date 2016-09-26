@@ -305,7 +305,7 @@ def get(backup_location=""):
     ``Backup`` dicts are in the following format (example):
 
         {
-          "icon": "fa fa-globe",
+          "icon": "globe",
           "id": "testghost/20150317124530",
           "is_ready": true,
           "path": "/var/lib/arkos/backups/testghost/testghost-xxx.tar.gz",
@@ -371,7 +371,7 @@ def get_able():
         if not x["pid"] in [y["id"] for y in able]:
             able.append({"type": x["type"], "icon": x["icon"], "id": x["pid"]})
     if "arkOS" not in [x["id"] for x in able]:
-        able.append({"type": "app", "icon": "fa fa-cog", "id": "arkOS"})
+        able.append({"type": "app", "icon": "setting", "id": "arkOS"})
     return able
 
 
@@ -386,7 +386,7 @@ def create(id, data=True, nthread=NotificationThread()):
     """
     controller = None
     if id == "arkOS":
-        controller = arkOSBackupCfg("arkOS", "fa fa-cog",
+        controller = arkOSBackupCfg("arkOS", "setting",
                                     version=arkos_version)
         return controller.backup()
     app = applications.get(id)

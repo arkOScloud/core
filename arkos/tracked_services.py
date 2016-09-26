@@ -378,12 +378,12 @@ def initialize():
     policy = policies.get("arkos", "arkos", 2)
     port = [("tcp", int(config.get("genesis", "port")))]
     pol = SecurityPolicy("arkos", "arkos", "System Management (Genesis/APIs)",
-                         "fa fa-desktop", port, policy)
+                         "server", port, policy)
 
     # uPNP
     policy = policies.get("arkos", "upnp", 1)
     pol = SecurityPolicy("arkos", "upnp", "uPnP Firewall Comms",
-                         "fa fa-desktop", [("udp", 1900)], policy)
+                         "server", [("udp", 1900)], policy)
     if config.get("general", "enable_upnp", True):
         storage.policies.add("policies", pol)
 
@@ -397,7 +397,7 @@ def initialize():
 def register_website(site):
     """Convenience function to register a website as tracked service."""
     register("website", site.id, getattr(site, "name", site.id),
-             site.app.icon if site.app else "fa fa-globe",
+             site.app.icon if site.app else "globe",
              [("tcp", site.port)], site.domain)
 
 
