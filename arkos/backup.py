@@ -87,7 +87,7 @@ class BackupController:
             backup_location = config.get("backups", "location",
                                          "/var/lib/arkos/backups")
         if self.ctype == "site":
-            self.version = self.site.meta.version
+            self.version = self.site.app.version
         signals.emit("backups", "pre_backup", self)
 
         msg = "Running pre-restore for {0}...".format(self.id)
@@ -127,7 +127,7 @@ class BackupController:
         info = {"pid": self.id, "type": self.ctype, "icon": self.icon,
                 "version": self.version, "time": isotime}
         if self.site:
-            info["site_type"] = self.site.meta.id
+            info["site_type"] = self.site.app.id
         filename = "{0}-{1}.meta".format(self.id, timestamp)
         with open(os.path.join(backup_dir, filename), "w") as f:
             f.write(json.dumps(info))
@@ -147,7 +147,7 @@ class BackupController:
                 "path": path, "icon": self.icon, "type": self.ctype,
                 "time": isotime, "version": self.version,
                 "size": os.path.getsize(path), "is_ready": True,
-                "site_type": self.site.meta.id if self.site else None}
+                "site_type": self.site.app.id if self.site else None}
 
     def restore(self, data, nthread=NotificationThread()):
         """
@@ -366,7 +366,7 @@ def get_able():
             able.append({"type": "app", "icon": x.icon, "id": x.id})
     for x in websites.get():
         if not isinstance(x, websites.ReverseProxy):
-            able.append({"type": "site", "icon": x.meta.icon, "id": x.id})
+            able.append({"type": "site", "icon": x.app.icon, "id": x.id})
     for x in get():
         if not x["pid"] in [y["id"] for y in able]:
             able.append({"type": x["type"], "icon": x["icon"], "id": x["pid"]})
@@ -459,9 +459,9 @@ def site_load(site):
     :param Website site: Site to create controller for
     """
     if site.__class__.__name__ != "ReverseProxy":
-        controller = site.meta.get_module("backup") or BackupController
-        site.backup = controller(site.id, site.meta.icon, site,
-                                 site.meta.version)
+        controller = site.app.get_module("backup") or BackupController
+        site.backup = controller(site.id, site.app.icon, site,
+                                 site.app.version)
     else:
         site.backup = None
 

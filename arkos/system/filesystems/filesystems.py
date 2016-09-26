@@ -521,9 +521,9 @@ def get_points(id=None, path=None):
                                 "fa-hdd-o")
             points.append(p)
     for x in websites.get():
-        if x.meta:
+        if x.app and x.app.type == "website":
             p = PointOfInterest(x.id, x.data_path or x.path, "site",
-                                x.meta.icon)
+                                x.app.icon)
             points.append(p)
     for x in sharers.get_shares():
         p = PointOfInterest(x.id, x.path, "share", "fa-folder-open")

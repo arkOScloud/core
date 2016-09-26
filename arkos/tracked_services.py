@@ -397,7 +397,7 @@ def initialize():
 def register_website(site):
     """Convenience function to register a website as tracked service."""
     register("website", site.id, getattr(site, "name", site.id),
-             site.meta.icon if site.meta else "fa fa-globe",
+             site.app.icon if site.app else "fa fa-globe",
              [("tcp", site.port)], site.domain)
 
 
