@@ -11,7 +11,6 @@ import json
 import os
 
 import arkos
-from arkos.utilities import detect_architecture
 from arkos.utilities.errors import ConfigurationError
 
 
@@ -42,23 +41,29 @@ class Config:
             dirname = os.path.dirname(os.path.abspath(
                 os.path.dirname(arkos.__file__)))
             if os.path.exists(os.path.join(dirname, self.filename)):
-                path = os.path.join(dir, self.filename)
+                path = os.path.join(dirname, self.filename)
             else:
-                raise ConfigurationError("{} not found".format(self.filename))
+                raise ConfigurationError("{0} not found".format(self.filename))
         self.path = path
         with open(path) as f:
             self.config = json.loads(f.read())
-        self._set_enviro()
 
-    def _set_enviro(self):
-        """Private method to set environment variables in the loaded config."""
-        arch = detect_architecture()
-        self.set("enviro", "version", arkos.version)
-        self.set("enviro", "arch", arch[0])
-        self.set("enviro", "board", arch[1])
+    def load_object(self, obj, path=""):
+        """
+        Load the config from a dictionary object.
+
+        If `path` is empty, config will not be saved.
+
+        :param dict obj: dictionary to load as config
+        :param str path: Path to save to on disk
+        """
+        self.config = obj
+        self.path = path
 
     def save(self):
         """Save the config in memory to disk."""
+        if not self.path:
+            return
         config = self.config.copy()
         if "enviro" in config:
             del config["enviro"]
