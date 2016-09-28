@@ -15,6 +15,7 @@ import os
 import time
 
 from arkos import config, signals
+from arkos.utilities import errors
 
 ntp = ntplib.NTPClient()
 
@@ -36,8 +37,8 @@ def verify_time(update=True, crit=True):
         os = get_offset()
     except Exception as e:
         if crit:
-            raise Exception("System time could not be retrieved. "
-                            "Error: {0}".format(e))
+            raise errors.OperationFailedError(
+                "System time could not be retrieved. Error: {0}".format(e))
         else:
             return "UNKNOWN"
     if (os < -3600 or os > 3600) and update:
@@ -113,8 +114,8 @@ def set_datetime(ut=0):
     ts.tv_sec, ts.tv_nsec = ut, 0
     res = librt.clock_settime(0, ctypes.byref(ts))
     if res == -1:
-        raise Exception("Could not set time: {0}"
-                        .format(os.strerror(ctypes.get_errno())))
+        raise errors.OperationFailedError(
+            "Could not set time: {0}".format(os.strerror(ctypes.get_errno())))
     signals.emit("config", "time_changed", ut)
 
 

@@ -18,7 +18,7 @@ from . import losetup
 
 from arkos import config, signals, sharers
 from arkos.messages import Notification, NotificationThread
-from arkos.utilities import b, shell
+from arkos.utilities import b, errors, shell
 
 libc = ctypes.CDLL(ctypes.util.find_library("libc"), use_errno=True)
 
@@ -59,9 +59,10 @@ class DiskPartition:
         :param str passwd: If disk is encrypted, use this passphrase to unlock
         """
         if self.mountpoint and os.path.ismount(self.mountpoint):
-            raise Exception("Disk partition already mounted")
+            raise errors.InvalidConfigError("Disk partition already mounted")
         elif self.fstype == "Unknown":
-            raise Exception("Cannot mount a partition of unknown type")
+            emsg = "Cannot mount a partition of unknown type"
+            raise errors.InvalidConfigError(emsg)
         signals.emit("filesystems", "pre_mount", self)
         mount_point = self.mountpoint or os.path.join("/media", self.id)
         luks_point = os.path.join("/dev/mapper", self.id)
@@ -72,7 +73,8 @@ class DiskPartition:
             s = crypto.luks_open(self.path, self.id, passwd)
             if s != 0:
                 excmsg = "Failed to decrypt {0} with errno {1}"
-                raise Exception(excmsg.format(self.id, str(s)))
+                excmsg = excmsg.format(self.id, str(s))
+                raise errors.OperationFailedError(excmsg)
             s = libc.mount(ctypes.c_char_p(b(luks_point)),
                            ctypes.c_char_p(b(mount_point)),
                            ctypes.c_char_p(b(self.fstype)), 0,
@@ -80,10 +82,11 @@ class DiskPartition:
             if s == -1:
                 crypto.luks_close(self.id)
                 excmsg = "Failed to mount {0}: {1}"
-                raise Exception(excmsg.format(self.id,
-                                              os.strerror(ctypes.get_errno())))
+                raise errors.OperationFailedError(
+                    excmsg.format(self.id, os.strerror(ctypes.get_errno())))
         elif self.crypt and not passwd:
-            raise Exception("Must provide password to decrypt encrypted disk")
+            emsg = "Must provide password to decrypt encrypted disk"
+            raise errors.InvalidConfigError(emsg)
         else:
             s = libc.mount(ctypes.c_char_p(b(self.path)),
                            ctypes.c_char_p(b(mount_point)),
@@ -91,8 +94,8 @@ class DiskPartition:
                            ctypes.c_char_p(b""))
             if s == -1:
                 excmsg = "Failed to mount {0}: {1}"
-                raise Exception(excmsg.format(self.id,
-                                              os.strerror(ctypes.get_errno())))
+                raise errors.OperationFailedError(
+                    excmsg.format(self.id, os.strerror(ctypes.get_errno())))
         signals.emit("filesystems", "post_mount", self)
         self.mountpoint = mount_point
 
@@ -104,8 +107,8 @@ class DiskPartition:
         s = libc.umount2(ctypes.c_char_p(b(self.mountpoint)), 0)
         if s == -1:
             excmsg = "Failed to unmount {0}: {1}"
-            raise Exception(excmsg.format(self.id,
-                                          os.strerror(ctypes.get_errno())))
+            raise errors.OperationFailedError(
+                excmsg.format(self.id, os.strerror(ctypes.get_errno())))
         if self.crypt:
             crypto.luks_close(b(self.id))
         signals.emit("filesystems", "post_umount", self)
@@ -114,7 +117,7 @@ class DiskPartition:
     def enable(self):
         """Enable mounting of this partition on boot."""
         if self.crypt:
-            raise Exception("Cannot enable encrypted virutal disks")
+            raise errors.InvalidConfigError("Cannot enable encrypted virutal disks")
         f = FstabEntry()
         f.src = self.path
         f.dst = os.path.join("/media", self.id)
@@ -199,7 +202,7 @@ class VirtualDisk:
             os.mkdir(vdisk_dir)
         self.path = str(os.path.join(vdisk_dir, self.id+".img"))
         if os.path.exists(self.path):
-            raise Exception("This virtual disk already exists")
+            raise errors.InvalidConfigError("This virtual disk already exists")
 
         # Create an empty file matching disk size
         signals.emit("filesystems", "pre_add", self)
@@ -222,7 +225,7 @@ class VirtualDisk:
             s = shell("mkfs.ext4 {0}".format(loop.device))
             if s["code"] != 0:
                 excmsg = "Failed to format loop device: {0}"
-                raise Exception(excmsg.format(s["stderr"]))
+                raise errors.OperationFailedError(excmsg.format(s["stderr"]))
             loop.unmount()
             msg = "Virtual disk created successfully"
             nthread.complete(Notification("success", "Filesystems", msg))
@@ -238,7 +241,7 @@ class VirtualDisk:
         :param str passwd: If disk is encrypted, use this passphrase to unlock
         """
         if self.mountpoint and os.path.ismount(self.mountpoint):
-            raise Exception("Virtual disk already mounted")
+            raise errors.InvalidConfigError("Virtual disk already mounted")
         signals.emit("filesystems", "pre_mount", self)
         if not os.path.isdir(os.path.join("/media", self.id)):
             os.makedirs(os.path.join("/media", self.id))
@@ -253,7 +256,8 @@ class VirtualDisk:
             if s != 0:
                 loop.unmount()
                 excmsg = "Failed to decrypt {0} with errno {1}"
-                raise Exception(excmsg.format(self.id, str(s)))
+                raise errors.OperationFailedError(
+                    excmsg.format(self.id, str(s)))
             s = libc.mount(ctypes.c_char_p(b(luks_point)),
                            ctypes.c_char_p(b(mount_point)),
                            ctypes.c_char_p(b(self.fstype)), 0,
@@ -262,11 +266,11 @@ class VirtualDisk:
                 crypto.luks_close(self.id)
                 loop.unmount()
                 excmsg = "Failed to mount {0}: {1}"
-                raise Exception(excmsg.format(self.id,
-                                              os.strerror(ctypes.get_errno())))
+                raise errors.OperationFailedError(
+                    excmsg.format(self.id, os.strerror(ctypes.get_errno())))
         elif self.crypt and not passwd:
             excstr = "Must provide password to decrypt encrypted container"
-            raise Exception(excstr)
+            raise errors.InvalidConfigError(excstr)
         else:
             s = libc.mount(ctypes.c_char_p(b(loop.device)),
                            ctypes.c_char_p(b(mount_point)),
@@ -275,8 +279,8 @@ class VirtualDisk:
             if s == -1:
                 loop.unmount()
                 excstr = "Failed to mount {0}: {1}"
-                raise Exception(excstr.format(self.id,
-                                              os.strerror(ctypes.get_errno())))
+                raise errors.OperationFailedError(
+                    excmsg.format(self.id, os.strerror(ctypes.get_errno())))
         signals.emit("filesystems", "post_mount", self)
         self.mountpoint = mount_point
 
@@ -292,9 +296,9 @@ class VirtualDisk:
                 break
         s = libc.umount2(ctypes.c_char_p(b(self.mountpoint)), 0)
         if s == -1:
-            excstr = "Failed to unmount {0}: {1}"
-            raise Exception(excstr.format(self.id,
-                                          os.strerror(ctypes.get_errno())))
+            excmsg = "Failed to unmount {0}: {1}"
+            raise errors.OperationFailedError(
+                excmsg.format(self.id, os.strerror(ctypes.get_errno())))
         if self.crypt:
             crypto.luks_close(self.id)
         if dev:
@@ -348,19 +352,19 @@ class VirtualDisk:
             loop.unmount()
             os.rename(self.path, os.path.join(vdisk_dir, self.id+".img"))
             excstr = "Failed to encrypt {0} with errno {1}"
-            raise Exception(excstr.format(self.id, str(s)))
+            raise errors.OperationFailedError(excstr.format(self.id, str(s)))
         s = crypto.luks_open(loop.device, self.id, passwd)
         if s != 0:
             loop.unmount()
             excstr = "Failed to decrypt {0} with errno {1}"
-            raise Exception(excstr.format(self.id, str(s)))
+            raise errors.OperationFailedError(excstr.format(self.id, str(s)))
         # Create a filesystem inside the encrypted device
         s = shell("mkfs.ext4 /dev/mapper/{0}".format(self.id))
         crypto.luks_close(self.id)
         loop.unmount()
         if s["code"] != 0:
             excstr = "Failed to format loop device: {0}"
-            raise Exception(excstr.format(s["stderr"]))
+            raise errors.OperationFailedError(excstr.format(s["stderr"]))
         self.crypt = True
         if mount:
             self.mount(passwd)

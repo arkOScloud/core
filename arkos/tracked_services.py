@@ -11,6 +11,7 @@ import miniupnpc
 import random
 
 from arkos import config, logger, policies, signals, storage, security
+from arkos.messages import Notification
 from arkos.utilities import errors, test_port
 
 COMMON_PORTS = [3000, 3306, 5222, 5223, 5232]
@@ -416,11 +417,11 @@ def open_upnp_site(site):
     try:
         test_port(config.get("general", "repo_server"), site.port, domain)
     except:
-        raise errors.SoftFail(
-            "Port {0} and/or domain {1} could not be tested."
-            " Make sure your ports are properly forwarded and"
-            " that your domain is properly set up."
-            .format(site.port, site.domain))
+        msg = ("Port {0} and/or domain {1} could not be tested."
+               " Make sure your ports are properly forwarded and"
+               " that your domain is properly set up.")\
+               .format(site.port, site.domain)
+        Notification("error", "TrackedSvcs", msg).send()
 
 
 def close_upnp_site(site):

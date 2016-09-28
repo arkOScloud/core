@@ -8,7 +8,7 @@ Licensed under GPLv3, see LICENSE.md
 """
 
 from arkos import logger
-from arkos.utilities import random_string
+from arkos.utilities import errors, random_string
 
 
 class Notification(object):
@@ -28,7 +28,7 @@ class Notification(object):
                  id=None, title=None):
         level = level.upper()
         if level not in self.LEVELS:
-            raise Exception("Unrecognized log level specified")
+            raise errors.InvalidConfigError("Unrecognized log level specified")
         id = id or random_string(16)
         self.level = self.LEVELS[level]
         self.comp = comp

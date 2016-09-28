@@ -12,7 +12,7 @@ import ldap
 import ldap.modlist
 
 from arkos import conns, config, signals
-from arkos.utilities import b, shell
+from arkos.utilities import b, errors, shell
 
 
 class Group:
@@ -44,7 +44,8 @@ class Group:
         try:
             ldif = conns.LDAP.search_s(self.ldap_id, ldap.SCOPE_SUBTREE,
                                        "(objectClass=*)", None)
-            raise Exception("A group with this name already exists")
+            emsg = "A group with this name already exists"
+            raise errors.InvalidConfigError(emsg)
         except ldap.NO_SUCH_OBJECT:
             pass
         ldif = {
@@ -65,7 +66,7 @@ class Group:
             ldif = conns.LDAP.search_s(self.ldap_id, ldap.SCOPE_SUBTREE,
                                        "(objectClass=*)", None)
         except ldap.NO_SUCH_OBJECT:
-            raise Exception("This group does not exist")
+            raise errors.InvalidConfigError("This group does not exist")
 
         ldif = ldap.modlist.modifyModlist(
             ldif[0][1], {"memberUid": [b(u) for u in self.users]},

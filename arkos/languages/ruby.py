@@ -9,6 +9,7 @@ Licensed under GPLv3, see LICENSE.md
 
 import os
 
+from arkos import logger
 from arkos.utilities import errors, shell
 
 BINPATH = "/usr/lib/ruby/gems/2.2.0/bin"
@@ -44,9 +45,10 @@ def install_gem(*gems, **kwargs):
         if not any(x == s for s in gemlist) or kwargs.get('force'):
             d = shell("gem install -N --no-user-install {0}".format(x))
             if d["code"] != 0:
-                logmsg = "Gem install of {0} failed.".format(x)
-                raise errors.OperationFailedError(logmsg) \
-                    from Exception(d["stderr"])
+                errmsg = "Gem install of {0} failed.".format(x)
+                logmsg = "Gem install failure details:\n{0}"
+                logger.error("Ruby", logmsg.format(d["stderr"].decode()))
+                raise errors.OperationFailedError(errmsg)
 
 
 def update_gem(*gems, **kwargs):
@@ -63,6 +65,7 @@ def update_gem(*gems, **kwargs):
         if not any(x == s for s in gemlist) or kwargs.get('force'):
             d = shell("gem update -N --no-user-install {0}".format(x))
             if d["code"] != 0:
-                logmsg = "Gem install of {0} failed.".format(x)
-                raise errors.OperationFailedError(logmsg) \
-                    from Exception(d["stderr"])
+                errmsg = "Gem update of {0} failed.".format(x)
+                logmsg = "Gem update failure details:\n{0}"
+                logger.error("Ruby", logmsg.format(d["stderr"].decode()))
+                raise errors.OperationFailedError(errmsg)

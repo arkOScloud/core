@@ -12,7 +12,7 @@ import ldap.modlist
 
 from arkos import config, conns, signals
 from arkos.system import users
-from arkos.utilities import b
+from arkos.utilities import b, errors
 
 
 class Domain:
@@ -43,7 +43,8 @@ class Domain:
         try:
             ldif = conns.LDAP.search_s(self.ldap_id, ldap.SCOPE_SUBTREE,
                                        "(objectClass=*)", None)
-            raise Exception("This domain is already present here")
+            emsg = "This domain is already present here"
+            raise errors.InvalidConfigError(emsg)
         except ldap.NO_SUCH_OBJECT:
             pass
         ldif = {"virtualdomain": [b(self.name)],
@@ -55,7 +56,8 @@ class Domain:
     def remove(self):
         """Delete domain."""
         if self.name in [x.domain for x in users.get()]:
-            raise Exception("A user is still using this domain")
+            emsg = "A user is still using this domain"
+            raise errors.InvalidConfigError(emsg)
         signals.emit("domains", "pre_remove", self)
         conns.LDAP.delete_s(self.ldap_id)
         signals.emit("domains", "post_remove", self)

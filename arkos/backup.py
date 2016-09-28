@@ -15,10 +15,11 @@ import os
 import tarfile
 
 from arkos import version as arkos_version
-from arkos import secrets, config, signals, applications, databases, websites
+from arkos import logger, secrets, config, signals
+from arkos import applications, databases, websites
 from arkos.messages import Notification, NotificationThread
 from arkos.system import systemtime
-from arkos.utilities import random_string, shell
+from arkos.utilities import errors, random_string, shell
 
 
 class BackupController:
@@ -271,8 +272,10 @@ class arkOSBackupCfg(BackupController):
         """Reimplement."""
         s = shell("slapcat -n 1")
         if s["code"] != 0:
-            raise Exception("Could not backup LDAP database. "
-                            "Please check logs for errors.")
+            emsg = ("Could not backup LDAP database. "
+                    "Please check logs for errors.")
+            logger.error("Backup", s["stderr"].decode())
+            raise errors.OperationFailedError(emsg)
         with open("/tmp/ldap.ldif", "wb") as f:
             f.write(s["stdout"])
 
@@ -284,8 +287,10 @@ class arkOSBackupCfg(BackupController):
     def post_restore(self):
         """Reimplement."""
         if not os.path.exists("/tmp/ldap.ldif"):
-            raise Exception("Could not restore LDAP database. "
-                            "Please check logs for errors.")
+            emsg = ("Could not backup LDAP database. "
+                    "Please check logs for errors.")
+            logger.error("Backup", "/tmp/ldap.ldif not found")
+            raise errors.OperationFailedError(emsg)
         with open("/tmp/ldap.ldif", "r") as f:
             ldif = f.read()
         s = shell('ldapadd -D "cn=admin,dc=arkos-servers,dc=org" -w {0}'
@@ -294,8 +299,10 @@ class arkOSBackupCfg(BackupController):
         if os.path.exists("/tmp/ldap.ldif"):
             os.unlink("/tmp/ldap.ldif")
         if s["code"] != 0:
-            raise Exception("Could not restore LDAP database. "
-                            "Please check logs for errors.")
+            emsg = ("Could not restore LDAP database. "
+                    "Please check logs for errors.")
+            logger.error("Backup", s["stderr"].decode())
+            raise errors.OperationFailedError(emsg)
 
 
 def get(backup_location=""):
@@ -399,7 +406,7 @@ def create(id, data=True, nthread=NotificationThread()):
                 controller = x.backup
                 break
     if not controller:
-        raise Exception("No backup controller found")
+        raise errors.InvalidConfigError("No backup controller found")
     return controller.backup(data=data, nthread=nthread)
 
 
@@ -426,7 +433,7 @@ def restore(backup, data=True, nthread=NotificationThread()):
         app = applications.get(backup["pid"])
         controller = app._backup()
     if not controller:
-        raise Exception("No backup controller found")
+        raise errors.InvalidConfigError("No backup controller found")
     b = controller.restore(backup, data, nthread)
     return b
 

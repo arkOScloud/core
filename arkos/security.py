@@ -12,7 +12,7 @@ import os
 
 from arkos import storage, signals
 from arkos.system import network
-from arkos.utilities import shell, cidr_to_netmask
+from arkos.utilities import errors, shell, cidr_to_netmask
 
 jailconf = "/etc/fail2ban/jail.conf"
 filters = "/etc/fail2ban/filter.d"
@@ -122,7 +122,8 @@ def get_jail_config(jcfg=""):
     """
     cfg = configparser.RawConfigParser()
     if not cfg.read(jcfg or jailconf):
-        raise Exception("Fail2Ban config not found or not readable")
+        emsg = "Fail2Ban config not found or not readable"
+        raise errors.OperationFailedError(emsg)
     return cfg
 
 
