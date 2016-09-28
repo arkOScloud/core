@@ -12,4 +12,4 @@ pyldap==2.4.25
 psutil==4.1.0
 miniupnpc==1.9
 gnupg==2.0.2
-supervisor=3.3.1
+supervisor==3.3.1
