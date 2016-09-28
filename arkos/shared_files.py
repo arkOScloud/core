@@ -44,11 +44,11 @@ class SharedFile:
 
     def add(self):
         """Add a shared file reference to cache."""
-        storage.shared_files.add("shared_files", self)
+        storage.files.add("sharedfiles", self)
 
     def delete(self):
         """Delete a shared file reference from cache."""
-        storage.shared_files.remove("shared_files", self)
+        storage.files.remove("sharedfiles", self)
 
     def update_expiry(self, nexpiry):
         """
@@ -92,7 +92,7 @@ class SharedFile:
 
 def get(id_=None):
     """List all shared file objects present in cache storage."""
-    data = storage.shared_files.get("shared_files")
+    data = storage.files.get("sharedfiles")
     to_purge = []
     for x in data:
         if x.is_expired:

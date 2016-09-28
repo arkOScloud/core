@@ -33,7 +33,7 @@ class BackupController:
 
     See ``backup.get()`` for definition of ``Backup`` dict.
     """
-    
+
     def __init__(self, id_, icon, site=None, version=None):
         """
         Initialize the BackupController.
@@ -386,7 +386,7 @@ def create(id_, data=True, nthread=NotificationThread()):
     """
     controller = None
     if id_ == "arkOS":
-        controller = arkOSBackupCfg("arkOS", "fa fa-cog",
+        controller = arkOSBackupCfg("arkOS", "setting",
                                     version=arkos_version)
         return controller.backup()
     app = applications.get(id_)

@@ -46,11 +46,13 @@ class Site:
     """Class representing a Website object."""
 
     def __init__(
-            self, id_="", addr="", port=80, path="", php=False, version="",
-            cert=None, db=None, data_path="", block=[], enabled=False):
+            self, app=None, id_="", domain="", port=80, path="", php=False,
+            version="", cert=None, db=None, data_path="", block=[],
+            enabled=False):
         """
         Initialize the website object.
 
+        :param Application app: Application metadata
         :param str id_: Website name
         :param str addr: Hostname/domain
         :param int port: Port site is served on
@@ -64,6 +66,7 @@ class Site:
         :param bool enabled: Is site enabled through nginx?
         """
         self.id = id_
+        self.app = app
         self.path = path
         self.domain = domain
         self.port = port
@@ -785,7 +788,7 @@ class ReverseProxy(Site):
 
     def __init__(
             self, id_="", name="", path="", domain="", port=80,
-            base_path="", block=[], type="internal"):
+            base_path="", block=[], app=None):
         """
         Initialize the reverse proxy website object.
 
@@ -796,16 +799,16 @@ class ReverseProxy(Site):
         :param int port: Port site is served on
         :param str base_path: Path to app root directory
         :param list block: List of nginx key objects to add to server block
-        :param str type_: Reverse proxy type
+        :param str app: App creating this reverse proxy
         """
         self.id = id_
+        self.app = app
         self.name = name
         self.domain = domain
         self.path = path
         self.port = port
         self.base_path = base_path
         self.block = block
-        self.type = type_
         self.cert = None
         self.installed = False
 
