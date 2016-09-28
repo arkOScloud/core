@@ -33,7 +33,7 @@ class Notification(object):
         self.comp = comp
         self.message = message
         self.cls = cls
-        self.id = id_ or random_string(16)
+        self.id = id_
         self.title = title
         self.thread_id = None
         self.complete = True

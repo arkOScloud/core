@@ -76,47 +76,41 @@ class LoggingControl:
     def debug(self, comp, message, id_=None):
         """Send a message with log level DEBUG."""
         self._log(10, {
-            "id": id_ or random_string(16), "thread_id": None,
-            "cls": "runtime", "comp": comp,
-            "title": None, "message": message
+            "id": id_, "message_id": id_, "cls": "runtime",
+            "comp": comp, "title": None, "message": message
         })
 
     def info(self, comp, message, id_=None):
         """Send a message with log level INFO."""
         self._log(20, {
-            "id": id_ or random_string(16), "thread_id": None,
-            "cls": "runtime", "comp": comp,
-            "title": None, "message": message
+            "id": id_, "message_id": id_, "cls": "runtime",
+            "comp": comp, "title": None, "message": message
         })
 
     def success(self, comp, message, id_=None):
         """Send a message with log level SUCCESS."""
         self._log(25, {
-            "id": id_ or random_string(16), "thread_id": None,
-            "cls": "runtime", "comp": comp,
-            "title": None, "message": message
+            "id": id_, "message_id": id_, "cls": "runtime",
+            "comp": comp, "title": None, "message": message
         })
 
     def warning(self, comp, message, id_=None):
         """Send a message with log level WARNING."""
         self._log(30, {
-            "id": id_ or random_string(16), "thread_id": None,
-            "cls": "runtime", "comp": comp,
-            "title": None, "message": message
+            "id": id_, "message_id": id_, "cls": "runtime",
+            "comp": comp, "title": None, "message": message
         })
 
     def error(self, comp, message, id_=None):
         """Send a message with log level ERROR."""
         self._log(40, {
-            "id": id_ or random_string(16), "thread_id": None,
-            "cls": "runtime", "comp": comp,
-            "title": None, "message": message
+            "id": id_, "message_id": id_, "cls": "runtime",
+            "comp": comp, "title": None, "message": message
         })
 
     def critical(self, comp, message, id_=None):
         """Send a message with log level CRITICAL."""
         self._log(50, {
-            "id": id_ or random_string(16), "thread_id": None,
-            "cls": "runtime", "comp": comp,
-            "title": None, "message": message
+            "id": id_, "message_id": id_, "cls": "runtime",
+            "comp": comp, "title": None, "message": message
         })
