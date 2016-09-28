@@ -447,7 +447,7 @@ def remove(id, time, backup_location=""):
         if x["id"] == id+"/"+time:
             os.unlink(x["path"])
             try:
-                os.unlink(x["path"].split(".")[1]+".meta")
+                os.unlink(x["path"].split(".")[0]+".meta")
             except:
                 pass
 

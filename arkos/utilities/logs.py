@@ -16,9 +16,10 @@ from .utils import random_string
 class StreamFormatter(logging.Formatter):
     def format(self, record):
         if type(record.msg) in [str, bytes]:
-            data = {"id": random_string(16), "thread_id": random_string(16),
-                    "title": None, "message": record.msg, "comp": "Unknown",
-                    "cls": "runtime", "complete": True}
+            id = random_string(16)
+            data = {"id": id, "message_id": id, "title": None,
+                    "message": record.msg, "comp": "Unknown", "cls": "runtime",
+                    "complete": True}
         else:
             data = record.msg.copy()
         levelname = "CRITICAL"
@@ -75,42 +76,48 @@ class LoggingControl:
 
     def debug(self, comp, message, id=None):
         """Send a message with log level DEBUG."""
+        id = id or random_string(16)
         self._log(10, {
-            "id": id or random_string(16), "thread_id": None, "cls": "runtime",
+            "id": id, "message_id": id, "cls": "runtime",
             "comp": comp, "title": None, "message": message
         })
 
     def info(self, comp, message, id=None):
         """Send a message with log level INFO."""
+        id = id or random_string(16)
         self._log(20, {
-            "id": id or random_string(16), "thread_id": None, "cls": "runtime",
+            "id": id, "message_id": id, "cls": "runtime",
             "comp": comp, "title": None, "message": message
         })
 
     def success(self, comp, message, id=None):
         """Send a message with log level SUCCESS."""
+        id = id or random_string(16)
         self._log(25, {
-            "id": id or random_string(16), "thread_id": None, "cls": "runtime",
+            "id": id, "message_id": id, "cls": "runtime",
             "comp": comp, "title": None, "message": message
         })
 
     def warning(self, comp, message, id=None):
         """Send a message with log level WARNING."""
+        id = id or random_string(16)
         self._log(30, {
-            "id": id or random_string(16), "thread_id": None, "cls": "runtime",
+            "id": id, "message_id": id, "cls": "runtime",
             "comp": comp, "title": None, "message": message
         })
 
     def error(self, comp, message, id=None):
         """Send a message with log level ERROR."""
+        id = id or random_string(16)
         self._log(40, {
-            "id": id or random_string(16), "thread_id": None, "cls": "runtime",
+            "id": id, "message_id": id, "cls": "runtime",
             "comp": comp, "title": None, "message": message
         }, exc_info=True)
 
     def critical(self, comp, message, id=None):
         """Send a message with log level CRITICAL."""
+        id = id or random_string(16)
         self._log(50, {
-            "id": id or random_string(16), "thread_id": None, "cls": "runtime",
+            "id": id, "message_id": id, "cls": "runtime",
             "comp": comp, "title": None, "message": message
         })

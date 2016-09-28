@@ -29,18 +29,19 @@ class Notification(object):
         level = level.upper()
         if level not in self.LEVELS:
             raise Exception("Unrecognized log level specified")
+        id = id or random_string(16)
         self.level = self.LEVELS[level]
         self.comp = comp
         self.message = message
         self.cls = cls
-        self.id = id or random_string(16)
+        self.id = id
         self.title = title
-        self.thread_id = None
+        self.message_id = id
         self.complete = True
 
     def send(self):
         data = {
-            "id": self.id, "thread_id": self.thread_id, "cls": self.cls,
+            "id": self.id, "message_id": self.message_id, "cls": self.cls,
             "comp": self.comp, "title": self.title, "message": self.message,
             "complete": self.complete
         }
@@ -57,7 +58,7 @@ class NotificationThread(object):
             self._send(message, complete=False)
 
     def _send(self, message, complete=False):
-        message.thread_id = self.id
+        message.id = self.id
         message.title = self.title or message.title
         message.complete = complete
         message.send()
