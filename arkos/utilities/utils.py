@@ -10,7 +10,6 @@ Licensed under GPLv3, see LICENSE.md
 import bz2
 import base64
 import crypt
-import errors
 import gzip
 import os
 import random
@@ -23,6 +22,8 @@ import tarfile
 import tempfile
 import time
 import zipfile
+
+from .errors import OperationFailedError, InvalidConfigError
 
 
 def b(text):
@@ -169,18 +170,18 @@ def api(url, post=None, method="get", returns="json", headers=[], crit=False):
         req.raise_for_status()
     except requests.exceptions.HTTPError as e:
         if crit:
-            raise errors.OperationFailedError(
+            raise OperationFailedError(
                 (err_str + "HTTP Error {2}").format(
                     method.upper(), url, req.code))
     except requests.exceptions.RequestException as e:
         if crit:
-            raise errors.OperationFailedError(
+            raise OperationFailedError(
                 (err_str + "Server not found or URL malformed."
                            "Please check your Internet settings.").format(
                             method.upper(), url))
     except Exception as e:
         if crit:
-            raise errors.OperationFailedError(
+            raise OperationFailedError(
                 (err_str + "{2}").format(method.upper(), url, e))
 
 
@@ -333,7 +334,7 @@ def extract(pin, pout, delete=False):
         with zipfile.ZipFile(pin, "r") as z:
             z.extractall(pout)
     else:
-        raise errors.InvalidConfigError(
+        raise InvalidConfigError(
             "Not an archive, or unknown archive type")
     if delete:
         os.unlink(pin)
