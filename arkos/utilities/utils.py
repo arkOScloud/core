@@ -10,7 +10,6 @@ Licensed under GPLv3, see LICENSE.md
 import bz2
 import base64
 import crypt
-import errors
 import gzip
 import os
 import random
@@ -23,6 +22,8 @@ import tarfile
 import tempfile
 import time
 import zipfile
+
+from . import errors
 
 
 def b(text):
