@@ -17,10 +17,10 @@ import datetime
 import glob
 import os
 
-from arkos import config, signals, storage, websites, applications
+from arkos import config, signals, storage, websites, applications, logger
 from arkos.messages import Notification, NotificationThread
 from arkos.system import groups
-from arkos.utilities import shell
+from arkos.utilities import errors, shell
 
 
 if not groups.get_system("ssl-cert"):
@@ -186,6 +186,10 @@ class CertificateAuthority:
         self.cert_path = cert_path
         self.key_path = key_path
         self.expiry = expiry
+        self.keytype = keytype
+        self.keylength = keylength
+        self.sha1 = sha1
+        self.md5 = md5
 
     def remove(self):
         """Remove a certificate from disk."""
@@ -369,7 +373,9 @@ def generate_dh_params(path, size=2048):
     """
     s = shell("openssl dhparam {0} -out {1}".format(size, path))
     if s["code"] != 0:
-        raise Exception("Failed to generate Diffie-Hellman parameters")
+        emsg = "Failed to generate Diffie-Hellman parameters"
+        logger.error("Certificates", s["stderr"].decode())
+        raise errors.OperationFailedError(emsg)
     os.chown(path, -1, gid)
     os.chmod(path, 0o750)
 
@@ -391,20 +397,12 @@ def upload_certificate(
     nthread.title = "Uploading TLS certificate"
 
     # Test the certificates are valid
-    try:
-        crt = x509.load_pem_x509_certificate(cert, default_backend())
-    except Exception as e:
-        raise Exception("Could not read certificate file. "
-                        "Please make sure you've selected the proper file.", e)
-    try:
-        ky = serialization.load_pem_private_key(
-            key,
-            password=None,
-            backend=default_backend()
-        )
-    except Exception as e:
-        raise Exception("Could not read private keyfile. "
-                        "Please make sure you've selected the proper file.", e)
+    crt = x509.load_pem_x509_certificate(cert, default_backend())
+    ky = serialization.load_pem_private_key(
+        key,
+        password=None,
+        backend=default_backend()
+    )
     signals.emit("certificates", "pre_add", id_)
 
     # Check to see that we have DH params, if not then do that too

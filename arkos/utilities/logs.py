@@ -16,9 +16,10 @@ from .utils import random_string
 class StreamFormatter(logging.Formatter):
     def format(self, record):
         if type(record.msg) in [str, bytes]:
-            data = {"id": random_string(16), "thread_id": random_string(16),
-                    "title": None, "message": record.msg, "comp": "Unknown",
-                    "cls": "runtime", "complete": True}
+            id_ = random_string(16)
+            data = {"id": id_, "message_id": id_, "title": None,
+                    "message": record.msg, "comp": "Unknown", "cls": "runtime",
+                    "complete": True}
         else:
             data = record.msg.copy()
         levelname = "CRITICAL"

@@ -106,8 +106,7 @@ class App:
         except Exception as e:
             self.loadable = False
             self.error = "Module error: {0}".format(e)
-            raise errors.OperationFailedError(
-                "({0})".format(self.name)) from e
+            Notification("warning", "Apps", self.error)
 
     def verify_dependencies(self, cry):
         """
@@ -182,15 +181,8 @@ class App:
         try:
             self._install(install_deps, load, force, cry, nthread)
         except Exception as e:
-            weberrors = (
-                errors.InvalidConfigError,
-                errors.OperationFailedError
-            )
-            if not isinstance(e, weberrors):
-                raise errors.OperationFailedError(
-                    "({0})".format(self.name), nthread) from e
-            else:
-                raise
+            nthread.complete(Notification("error", "Apps", str(e)))
+            raise
 
     def _install(self, install_deps, load, force, cry, nthread):
         if self.installed and not force:

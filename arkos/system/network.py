@@ -15,7 +15,7 @@ import socket
 import struct
 
 from arkos import signals
-from arkos.utilities import shell, netmask_to_cidr
+from arkos.utilities import errors, shell, netmask_to_cidr
 
 
 class Connection:
@@ -88,7 +88,7 @@ class Connection:
             self.connected = True
             signals.emit("networks", "post_connect", self)
         else:
-            raise Exception("Network connection failed")
+            raise errors.OperationFailedError("Network connection failed")
 
     def disconnect(self):
         """Disconnect from network."""
@@ -98,7 +98,7 @@ class Connection:
             self.connected = False
             signals.emit("networks", "post_disconnect", self)
         else:
-            raise Exception("Network disconnection failed")
+            raise errors.OperationFailedError("Network disconnection failed")
 
     def toggle(self):
         """Toggle network state."""
@@ -113,7 +113,7 @@ class Connection:
         if s["code"] == 0:
             self.enabled = True
         else:
-            raise Exception("Network enable failed")
+            raise errors.OperationFailedError("Network enable failed")
 
     def disable(self):
         """Disable connection on boot."""
@@ -121,7 +121,7 @@ class Connection:
         if s["code"] == 0:
             self.enabled = False
         else:
-            raise Exception("Network disable failed")
+            raise errors.OperationFailedError("Network disable failed")
 
     @property
     def as_dict(self):

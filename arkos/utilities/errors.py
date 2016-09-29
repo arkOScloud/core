@@ -7,8 +7,6 @@ Written by Jacob Cook
 Licensed under GPLv3, see LICENSE.md
 """
 
-from .logs import LoggingControl
-
 
 class Error(Exception):
     """Base class for exceptions."""
@@ -64,8 +62,6 @@ class OperationFailedError(Error):
             .format(info, str(self.__cause__ or ""))
         if nthread:
             nthread.complete(nthread.new("error", "", msg, title=title))
-        else:
-            LoggingControl().error("", msg)
 
     def __str__(self):
         return str(self.__cause__ or self.dmsg)
@@ -80,8 +76,6 @@ class InvalidConfigError(Error):
             .format(info, str(self.__cause__ or ""))
         if nthread:
             nthread.complete(nthread.new("error", "", msg, title=title))
-        else:
-            LoggingControl().error("", msg)
 
     def __str__(self):
         return str(self.__cause__ or self.dmsg)

@@ -15,10 +15,11 @@ import os
 import tarfile
 
 from arkos import version as arkos_version
-from arkos import secrets, config, signals, applications, databases, websites
+from arkos import logger, secrets, config, signals
+from arkos import applications, databases, websites
 from arkos.messages import Notification, NotificationThread
 from arkos.system import systemtime
-from arkos.utilities import random_string, shell
+from arkos.utilities import errors, random_string, shell
 
 
 class BackupController:
@@ -87,7 +88,7 @@ class BackupController:
             backup_location = config.get("backups", "location",
                                          "/var/lib/arkos/backups")
         if self.ctype == "site":
-            self.version = self.site.meta.version
+            self.version = self.site.app.version
         signals.emit("backups", "pre_backup", self)
 
         msg = "Running pre-restore for {0}...".format(self.id)
@@ -127,7 +128,7 @@ class BackupController:
         info = {"pid": self.id, "type": self.ctype, "icon": self.icon,
                 "version": self.version, "time": isotime}
         if self.site:
-            info["site_type"] = self.site.meta.id
+            info["site_type"] = self.site.app.id
         filename = "{0}-{1}.meta".format(self.id, timestamp)
         with open(os.path.join(backup_dir, filename), "w") as f:
             f.write(json.dumps(info))
@@ -147,7 +148,7 @@ class BackupController:
                 "path": path, "icon": self.icon, "type": self.ctype,
                 "time": isotime, "version": self.version,
                 "size": os.path.getsize(path), "is_ready": True,
-                "site_type": self.site.meta.id if self.site else None}
+                "site_type": self.site.app.id if self.site else None}
 
     def restore(self, data, nthread=NotificationThread()):
         """
@@ -271,8 +272,10 @@ class arkOSBackupCfg(BackupController):
         """Reimplement."""
         s = shell("slapcat -n 1")
         if s["code"] != 0:
-            raise Exception("Could not backup LDAP database. "
-                            "Please check logs for errors.")
+            emsg = ("Could not backup LDAP database. "
+                    "Please check logs for errors.")
+            logger.error("Backup", s["stderr"].decode())
+            raise errors.OperationFailedError(emsg)
         with open("/tmp/ldap.ldif", "wb") as f:
             f.write(s["stdout"])
 
@@ -284,8 +287,10 @@ class arkOSBackupCfg(BackupController):
     def post_restore(self):
         """Reimplement."""
         if not os.path.exists("/tmp/ldap.ldif"):
-            raise Exception("Could not restore LDAP database. "
-                            "Please check logs for errors.")
+            emsg = ("Could not backup LDAP database. "
+                    "Please check logs for errors.")
+            logger.error("Backup", "/tmp/ldap.ldif not found")
+            raise errors.OperationFailedError(emsg)
         with open("/tmp/ldap.ldif", "r") as f:
             ldif = f.read()
         s = shell('ldapadd -D "cn=admin,dc=arkos-servers,dc=org" -w {0}'
@@ -294,8 +299,10 @@ class arkOSBackupCfg(BackupController):
         if os.path.exists("/tmp/ldap.ldif"):
             os.unlink("/tmp/ldap.ldif")
         if s["code"] != 0:
-            raise Exception("Could not restore LDAP database. "
-                            "Please check logs for errors.")
+            emsg = ("Could not restore LDAP database. "
+                    "Please check logs for errors.")
+            logger.error("Backup", s["stderr"].decode())
+            raise errors.OperationFailedError(emsg)
 
 
 def get(backup_location=""):
@@ -366,12 +373,12 @@ def get_able():
             able.append({"type": "app", "icon": x.icon, "id": x.id})
     for x in websites.get():
         if not isinstance(x, websites.ReverseProxy):
-            able.append({"type": "site", "icon": x.meta.icon, "id": x.id})
+            able.append({"type": "site", "icon": x.app.icon, "id": x.id})
     for x in get():
         if not x["pid"] in [y["id"] for y in able]:
             able.append({"type": x["type"], "icon": x["icon"], "id": x["pid"]})
     if "arkOS" not in [x["id"] for x in able]:
-        able.append({"type": "app", "icon": "fa fa-cog", "id": "arkOS"})
+        able.append({"type": "app", "icon": "setting", "id": "arkOS"})
     return able
 
 
@@ -399,7 +406,7 @@ def create(id_, data=True, nthread=NotificationThread()):
                 controller = x.backup
                 break
     if not controller:
-        raise Exception("No backup controller found")
+        raise errors.InvalidConfigError("No backup controller found")
     return controller.backup(data=data, nthread=nthread)
 
 
@@ -426,7 +433,7 @@ def restore(backup, data=True, nthread=NotificationThread()):
         app = applications.get(backup["pid"])
         controller = app._backup()
     if not controller:
-        raise Exception("No backup controller found")
+        raise errors.InvalidConfigError("No backup controller found")
     b = controller.restore(backup, data, nthread)
     return b
 
@@ -447,7 +454,7 @@ def remove(id_, time, backup_location=""):
         if x["id"] == id_+"/"+time:
             os.unlink(x["path"])
             try:
-                os.unlink(x["path"].split(".")[1]+".meta")
+                os.unlink(x["path"].split(".")[0]+".meta")
             except:
                 pass
 
@@ -459,9 +466,9 @@ def site_load(site):
     :param Website site: Site to create controller for
     """
     if site.__class__.__name__ != "ReverseProxy":
-        controller = site.meta.get_module("backup") or BackupController
-        site.backup = controller(site.id, site.meta.icon, site,
-                                 site.meta.version)
+        controller = site.app.get_module("backup") or BackupController
+        site.backup = controller(site.id, site.app.icon, site,
+                                 site.app.version)
     else:
         site.backup = None
 

@@ -17,6 +17,8 @@ from . import groups
 from arkos import conns, config, logger, signals
 from arkos.utilities import b, errors, hashpw, shell
 
+comp = "Users"
+
 
 class User:
     """Class for managing arkOS users in LDAP."""
@@ -107,7 +109,7 @@ class User:
                                        "(objectClass=*)", None)
         except ldap.NO_SUCH_OBJECT:
             raise errors.InvalidConfigError(
-                "Roles", "This user does not exist")
+                "Users", "This user does not exist")
 
         for i, x in enumerate(self.mail):
             if not x.endswith(self.domain):

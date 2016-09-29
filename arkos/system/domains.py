@@ -7,11 +7,12 @@ Written by Jacob Cook
 Licensed under GPLv3, see LICENSE.md
 """
 
+import ldap
 import ldap.modlist
 
 from arkos import config, conns, signals
 from arkos.system import users
-from arkos.utilities import b
+from arkos.utilities import b, errors
 
 
 class Domain:
@@ -40,10 +41,11 @@ class Domain:
     def add(self):
         """Add the domain to LDAP."""
         try:
-            conns.LDAP.search_s(self.ldap_id, ldap.SCOPE_SUBTREE,
-                                "(objectClass=*)", None)
-            raise Exception("This domain is already present here")
-        except:
+            ldif = conns.LDAP.search_s(self.ldap_id, ldap.SCOPE_SUBTREE,
+                                       "(objectClass=*)", None)
+            emsg = "This domain is already present here"
+            raise errors.InvalidConfigError(emsg)
+        except ldap.NO_SUCH_OBJECT:
             pass
         ldif = {"virtualdomain": [b(self.name)],
                 "objectClass": [b"mailDomain", b"top"]}
@@ -54,7 +56,8 @@ class Domain:
     def remove(self):
         """Delete domain."""
         if self.name in [x.domain for x in users.get()]:
-            raise Exception("A user is still using this domain")
+            emsg = "A user is still using this domain"
+            raise errors.InvalidConfigError(emsg)
         signals.emit("domains", "pre_remove", self)
         conns.LDAP.delete_s(self.ldap_id)
         signals.emit("domains", "post_remove", self)
@@ -79,14 +82,9 @@ def get(id_=None):
     :rtype: Domain or list thereof
     """
     results = []
-    qset = conns.LDAP.\
-        search_s("ou=domains,{0}"
-                 .format(config.get("general",
-                                    "ldap_rootdn",
-                                    "dc=arkos-servers,dc=org")),
-                 ldap.SCOPE_SUBTREE,
-                 "(virtualdomain=*)",
-                 ["virtualdomain"])
+    qset = conns.LDAP.search_s("ou=domains,{0}".format(
+        config.get("general", "ldap_rootdn", "dc=arkos-servers,dc=org")),
+        ldap.SCOPE_SUBTREE, "(virtualdomain=*)", ["virtualdomain"])
     for x in qset:
         d = Domain(x[1]["virtualdomain"][0].decode(),
                    x[0].split("ou=domains,")[1])

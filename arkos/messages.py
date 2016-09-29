@@ -8,7 +8,7 @@ Licensed under GPLv3, see LICENSE.md
 """
 
 from arkos import logger
-from arkos.utilities import random_string
+from arkos.utilities import errors, random_string
 
 
 class Notification(object):
@@ -28,19 +28,20 @@ class Notification(object):
                  id_=None, title=None):
         level = level.upper()
         if level not in self.LEVELS:
-            raise Exception("Unrecognized log level specified")
+            raise errors.InvalidConfigError("Unrecognized log level specified")
+        id_ = id_ or random_string(16)
         self.level = self.LEVELS[level]
         self.comp = comp
         self.message = message
         self.cls = cls
         self.id = id_
         self.title = title
-        self.thread_id = None
+        self.message_id = id
         self.complete = True
 
     def send(self):
         data = {
-            "id": self.id, "thread_id": self.thread_id, "cls": self.cls,
+            "id": self.id, "message_id": self.message_id, "cls": self.cls,
             "comp": self.comp, "title": self.title, "message": self.message,
             "complete": self.complete
         }
@@ -57,7 +58,7 @@ class NotificationThread(object):
             self._send(message, complete=False)
 
     def _send(self, message, complete=False):
-        message.thread_id = self.id
+        message.id = self.id
         message.title = self.title or message.title
         message.complete = complete
         message.send()
