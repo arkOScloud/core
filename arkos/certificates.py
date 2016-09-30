@@ -12,10 +12,13 @@ from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization, hashes
-from cryptography.hazmat.primitives.asymmetric import dsa, rsa
+from cryptography.hazmat.primitives.asymmetric import dsa, rsa, ec
 import datetime
+from free_tls_certificates import client as leclient
 import glob
 import os
+import shutil
+import time
 
 from arkos import config, signals, storage, websites, applications, logger
 from arkos.messages import Notification, NotificationThread
@@ -26,6 +29,9 @@ from arkos.utilities import errors, shell
 if not groups.get_system("ssl-cert"):
     groups.SystemGroup("ssl-cert").add()
 gid = groups.get_system("ssl-cert").gid
+
+LETSENCRYPT_LIVE = "https://acme-v01.api.letsencrypt.org/directory"
+LETSENCRYPT_STAGING = "https://acme-staging.api.letsencrypt.org/directory"
 
 
 class Certificate:
@@ -49,7 +55,8 @@ class Certificate:
 
     def __init__(
             self, id="", domain="", cert_path="", key_path="", keytype="",
-            keylength=0, assigns=[], expiry=None, sha1="", md5=""):
+            keylength=0, assigns=[], expiry=None, sha1="", md5="",
+            is_acme=False):
         """
         Initialize the Certificate object.
 
@@ -63,6 +70,7 @@ class Certificate:
         :param str expiry: ISO-8601 timestamp of certificate expiry
         :param str sha1: SHA-1 hash
         :param str md5: MD5 hash
+        :param bool is_acme: Is this a Let's Encrypt certificate?
         """
         self.id = id
         self.domain = domain
@@ -74,6 +82,7 @@ class Certificate:
         self.expiry = expiry
         self.sha1 = sha1
         self.md5 = md5
+        self.is_acme = is_acme
 
     def assign(self, assign):
         """
@@ -140,6 +149,27 @@ class Certificate:
             os.unlink(self.cert_path)
         if os.path.exists(self.key_path):
             os.unlink(self.key_path)
+        if self.is_acme:
+            with open("/etc/cron.d/arkos-acme-renew", "r") as f:
+                data = f.readlines()
+            for i, x in enumerate(data):
+                if "free_tls_certificate {0} /etc".format(self.domain) in x:
+                    data.remove(x)
+            with open("/etc/cron.d/arkos-acme-renew", "w") as f:
+                f.writelines(data)
+            for x in websites.get():
+                if x.domain == self.domain:
+                    break
+            else:
+                orig = os.path.join("/etc/nginx/sites-available", self.domain)
+                targ = os.path.join("/etc/nginx/sites-enabled", self.domain)
+                sd = config.get("websites", "site_dir")
+                if os.path.exists(orig):
+                    os.unlink(orig)
+                if os.path.exists(targ):
+                    os.unlink(targ)
+                if os.path.exists(os.path.join(sd, self.domain)):
+                    shutil.rmtree(os.path.join(sd, self.domain))
         storage.certs.remove("certificates", self)
         signals.emit("certificates", "post_remove", self)
 
@@ -155,6 +185,7 @@ class Certificate:
             "expiry": self.expiry,
             "sha1": self.sha1,
             "md5": self.md5,
+            "is_acme": self.is_acme,
             "is_ready": True
         }
 
@@ -279,34 +310,49 @@ def scan():
         os.makedirs(config.get("certificates", "cert_dir"))
     if not os.path.exists(config.get("certificates", "key_dir")):
         os.makedirs(config.get("certificates", "key_dir"))
+
     cert_glob = os.path.join(config.get("certificates", "cert_dir"), "*.crt")
-    for x in glob.glob(cert_glob):
-        id = os.path.splitext(os.path.basename(x))[0]
-        with open(x, "rb") as f:
-            crt = x509.load_pem_x509_certificate(f.read(), default_backend())
-        key_path = os.path.join(config.get("certificates", "key_dir"),
-                                "{0}.key".format(id))
-        with open(key_path, "rb") as f:
-            key = serialization.load_pem_private_key(
-                f.read(),
-                password=None,
-                backend=default_backend()
-            )
-        sha1 = binascii.hexlify(crt.fingerprint(hashes.SHA1())).decode()
-        md5 = binascii.hexlify(crt.fingerprint(hashes.MD5())).decode()
-        sha1 = ":".join([sha1[i:i+2].upper() for i in range(0, len(sha1), 2)])
-        md5 = ":".join([md5[i:i+2].upper() for i in range(0, len(md5), 2)])
-        kt = "RSA" if isinstance(key.public_key(), rsa.RSAPublicKey) else "DSA"
-        common_name = crt.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
-        c = Certificate(id=id, cert_path=x, key_path=key_path,
-                        keytype=kt, keylength=key.key_size,
-                        domain=common_name[0].value,
-                        assigns=assigns.get(id, []),
-                        expiry=crt.not_valid_after,
-                        sha1=sha1, md5=md5)
-        certs.append(c)
+    for cert_path in glob.glob(cert_glob):
+        id = os.path.splitext(os.path.basename(cert_path))[0]
+        key_path = os.path.join(
+            config.get("certificates", "key_dir"), "{0}.key".format(id))
+        certs.append(_scan_a_cert(id, cert_path, key_path, assigns))
+
+    acmedir = config.get(
+        "certificates", "acme_dir", "/etc/arkos/ssl/acme/certs")
+    if not os.path.exists(acmedir):
+        os.makedirs(acmedir)
+
+    le_cert_glob = os.path.join(acmedir, "*/cert.pem")
+    for cert_path in glob.glob(le_cert_glob):
+        basedir = os.path.dirname(cert_path)
+        id = os.path.basename(basedir)
+        key_path = os.path.join(basedir, "privkey.pem")
+        certs.append(_scan_a_cert(id, cert_path, key_path, assigns, True))
     storage.certs.set("certificates", certs)
     return certs
+
+
+def _scan_a_cert(id, cert_path, key_path, assigns, is_acme=False):
+    with open(cert_path, "rb") as f:
+        crt = x509.load_pem_x509_certificate(f.read(), default_backend())
+    with open(key_path, "rb") as f:
+        key = serialization.load_pem_private_key(
+            f.read(),
+            password=None,
+            backend=default_backend()
+        )
+    sha1 = binascii.hexlify(crt.fingerprint(hashes.SHA1())).decode()
+    md5 = binascii.hexlify(crt.fingerprint(hashes.MD5())).decode()
+    sha1 = ":".join([sha1[i:i+2].upper() for i in range(0, len(sha1), 2)])
+    md5 = ":".join([md5[i:i+2].upper() for i in range(0, len(md5), 2)])
+    kt = "RSA" if isinstance(key.public_key(), rsa.RSAPublicKey) else "DSA"
+    common_name = crt.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+    return Certificate(
+        id=id, cert_path=cert_path, key_path=key_path, keytype=kt,
+        keylength=key.key_size, domain=common_name[0].value,
+        assigns=assigns.get(id, []), expiry=crt.not_valid_after, sha1=sha1,
+        md5=md5, is_acme=is_acme)
 
 
 def get_authorities(id=None, force=False):
@@ -453,6 +499,136 @@ def upload_certificate(
     return c
 
 
+def request_acme_certificate(domain, webroot, nthread=NotificationThread()):
+    """
+    Request, validate and save a new ACME certificate from Let's Encrypt CA.
+
+    :param str domain: Domain name to associate with (subject CN)
+    :param str webroot: Path to root of web directory, to place .well-known
+    :param NotificationThread nthread: notification thread to use
+    """
+    try:
+        return _request_acme_certificate(domain, webroot, nthread)
+    except Exception as e:
+        nthread.complete(Notification("error", "Certificates", str(e)))
+        raise
+
+
+def _request_acme_certificate(domain, webroot, nthread):
+    nthread.title = "Requesting ACME certificate"
+    signals.emit("certificates", "pre_add", id)
+    domains = [domain]
+
+    acme_dir = config.get("certificates", "acme_dir", "/etc/arkos/ssl/acme")
+    cert_dir = os.path.join(acme_dir, "certs", domain)
+    cert_path = os.path.join(cert_dir, "cert.pem")
+    key_path = os.path.join(cert_dir, "privkey.pem")
+
+    if not os.path.exists(cert_dir):
+        os.makedirs(cert_dir)
+
+    smsg = "Requesting certificate from Let's Encrypt CA..."
+    nthread.update(Notification("info", "Certificates", smsg))
+    agree_to_tos = None
+    has_written_files = False
+    while True:
+        try:
+            leclient.issue_certificate(
+                domains,
+                acme_dir,
+                acme_server=LETSENCRYPT_STAGING,
+                certificate_file=cert_path,
+                private_key_file=key_path,
+                agree_to_tos_url=agree_to_tos)
+            break
+        except leclient.NeedToAgreeToTOS as e:
+            agree_to_tos = e.url
+            continue
+        except leclient.NeedToTakeAction as e:
+            if not has_written_files:
+                if not os.path.exists(webroot):
+                    os.makedirs(webroot)
+                for x in e.actions:
+                    fn = os.path.join(webroot, x.file_name)
+                    with open(fn, 'w') as f:
+                        f.write(x.contents)
+                has_written_files = True
+                continue
+            else:
+                raise errors.InvalidConfigError(
+                    "Requesting a certificate failed - it doesn't appear your "
+                    "requested domain's DNS is pointing to your server, or "
+                    "there was a port problem. Please check these things and "
+                    "try again.")
+        except leclient.WaitABit as e:
+            while e.until_when > datetime.datetime.now():
+                until = e.until_when - datetime.datetime.now()
+                until_secs = int(round(until.total_seconds()))
+                if until_secs > 300:
+                    raise errors.InvalidConfigError(
+                        "Requesting a certificate failed - LE rate limiting "
+                        "detected, for a period of more than five minutes. "
+                        "Please try again later."
+                    )
+                nthread.update(
+                    Notification(
+                        "warning", "Certificates", "LE rate limiting detected."
+                        " Will reattempt in {0} seconds".format(until_secs))
+                    )
+                time.sleep(until_secs)
+            continue
+        except leclient.InvalidDomainName:
+            raise errors.InvalidConfigError(
+                "Requesting a certificate failed - invalid domain name"
+            )
+        except leclient.RateLimited:
+            raise errors.InvalidConfigError(
+                "Requesting a certificate failed - LE is refusing to issue "
+                "more certificates to you for this domain. Please choose "
+                "another domain or try again another time."
+            )
+
+    os.chown(cert_path, -1, gid)
+    os.chown(key_path, -1, gid)
+    os.chmod(cert_path, 0o750)
+    os.chmod(key_path, 0o750)
+
+    with open(cert_path, "rb") as f:
+        cert = x509.load_pem_x509_certificate(f.read(), default_backend())
+    with open(key_path, "rb") as f:
+        key = serialization.load_pem_private_key(
+            f.read(), password=None, backend=default_backend()
+        )
+    sha1 = binascii.hexlify(cert.fingerprint(hashes.SHA1())).decode()
+    md5 = binascii.hexlify(cert.fingerprint(hashes.MD5())).decode()
+    sha1 = ":".join([sha1[i:i+2].upper() for i in range(0, len(sha1), 2)])
+    md5 = ":".join([md5[i:i+2].upper() for i in range(0, len(md5), 2)])
+    if isinstance(key.public_key(), rsa.RSAPublicKey):
+        ktype = "RSA"
+    elif isinstance(key.public_key(), dsa.DSAPublicKey):
+        ktype = "DSA"
+    elif isinstance(key.public_key(), ec.EllipticCurvePublicKey):
+        ktype = "EC"
+    else:
+        ktype = "Unknown"
+    ksize = key.key_size
+    c = Certificate(domain, domain, cert_path, key_path, ktype, ksize,
+                    [], cert.not_valid_after, sha1, md5, is_acme=True)
+    storage.certs.add("certificates", c)
+
+    with open("/etc/cron.d/arkos-acme-renew", "a") as f:
+        fln = ("30 3 * * * free_tls_certificate {0} {1} {2} {3} {4} "
+               ">> /var/log/acme-renew.log\n")
+        f.write(fln.format(
+            " ".join(domains), key_path, cert_path, webroot, acme_dir
+        ))
+
+    signals.emit("certificates", "post_add", c)
+    msg = "Certificate issued successfully"
+    nthread.complete(Notification("success", "Certificates", msg))
+    return c
+
+
 def generate_certificate(
         id, domain, country, state="", locale="", email="", keytype="RSA",
         keylength=2048, dhparams="/etc/arkos/ssl/dh_params.pem",
@@ -471,6 +647,7 @@ def generate_certificate(
     :param str email: Contact email for user
     :param str keytype: Key type. One of "RSA" or "DSA"
     :param int keylength: Key length. 2048, 4096, etc.
+    :param str dhparams: Path to dh_params file on disk
     :param NotificationThread nthread: notification thread to use
     :returns: Certificate that was generated
     :rtype: Certificate

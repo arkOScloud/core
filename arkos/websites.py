@@ -248,7 +248,11 @@ class Site:
             nginx.Key("server_name", self.domain),
             nginx.Key("root", self.path),
             nginx.Key("index", getattr(self.app, "website_index", None) or
-                      default_index)
+                      default_index),
+            nginx.Location(
+                "/.well-known/acme-challenge/",
+                nginx.Key("root", self.path)
+            )
         )
         if addtoblock:
             server.add(*[x for x in addtoblock])
@@ -321,6 +325,26 @@ class Site:
         """Assign a TLS certificate to this site."""
         self._ssl_enable()
 
+    def add_acme_challenge(self):
+        challenge_path = os.path.join(self.path, ".well-known/acme-challenge/")
+        confpath = os.path.join("/etc/nginx/sites-available/", self.id)
+        block = nginx.loadf(confpath)
+        server = block.server
+        locations = server.filter("Location", "/.well-known/acme-challenge/")
+        if locations:
+            server.remove(*locations)
+        server.add(
+            nginx.Location(
+                "/.well-known/acme-challenge/",
+                nginx.Key("root", self.path)
+            )
+        )
+        nginx.dumpf(block, confpath)
+        if not os.path.exists(challenge_path):
+            os.makedirs(challenge_path)
+        nginx_reload()
+        return challenge_path
+
     def _ssl_enable(self):
         # Get server-preferred ciphers
         if config.get("certificates", "ciphers"):
@@ -347,8 +371,14 @@ class Site:
                 block.add(nginx.Server(
                     nginx.Key("listen", httport),
                     nginx.Key("server_name", self.domain),
-                    nginx.Key("return", "301 https://{0}$request_uri"
-                                        .format(self.domain))
+                    nginx.Location(
+                        "/",
+                        nginx.Key("return", "301 https://$host$request_uri")
+                    ),
+                    nginx.Location(
+                        "/.well-known/acme-challenge/",
+                        nginx.Key("root", self.path)
+                    )
                 ))
                 for x in block.servers:
                     if " ssl" in x.filter("Key", "listen")[0].value:
@@ -487,8 +517,14 @@ class Site:
                 nginx.Key("listen", "80"),
                 nginx.Key("listen", "[::]:80"),
                 nginx.Key("server_name", self.domain),
-                nginx.Key("return", "301 https://{0}$request_uri"
-                                    .format(self.domain))
+                nginx.Location(
+                    "/",
+                    nginx.Key("return", "301 https://$host$request_uri")
+                ),
+                nginx.Location(
+                    "/.well-known/acme-challenge/",
+                    nginx.Key("root", self.path)
+                )
             ))
 
         # If the name was changed...
@@ -776,6 +812,10 @@ class ReverseProxy(Site):
             nginx.Key("listen", "[::]:" + str(self.port)),
             nginx.Key("server_name", self.domain),
             nginx.Key("root", self.base_path or self.path),
+            nginx.Location(
+                "/.well-known/acme-challenge/",
+                nginx.Key("root", self.path)
+            )
         )
         server.add(*[x for x in self.block])
         block.add(server)
@@ -963,3 +1003,37 @@ def php_reload():
         s.restart()
     except services.ActionError:
         pass
+
+
+def create_acme_dummy(domain):
+    """
+    Create a dummy directory to use for serving ACME challenge data.
+
+    This function is used when no website yet exists for the desired domain.
+
+    :param str domain: Domain name to use
+    :returns: Path to directory for challenge data
+    """
+    site_dir = os.path.join(config.get("websites", "site_dir"), domain)
+    challenge_dir = os.path.join(site_dir, ".well-known/acme-challenge")
+    conf = nginx.Conf(
+        nginx.Server(
+            nginx.Key("listen", "80"),
+            nginx.Key("listen", "[::]:80"),
+            nginx.Key("server_name", domain),
+            nginx.Key("root", site_dir),
+            nginx.Location(
+                "/.well-known/acme-challenge/",
+                nginx.Key("root", site_dir)
+            )
+        )
+    )
+    origin = os.path.join("/etc/nginx/sites-available", domain)
+    target = os.path.join("/etc/nginx/sites-enabled", domain)
+    nginx.dumpf(conf, origin)
+    if not os.path.exists(target):
+        os.symlink(origin, target)
+    if not os.path.exists(challenge_dir):
+        os.makedirs(challenge_dir)
+    nginx_reload()
+    return challenge_dir
