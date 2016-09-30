@@ -48,7 +48,7 @@ class RolesTestCase(unittest.TestCase):
         },
         "virtualdomain=localhost,ou=domains,dc=arkos-servers,dc=org": {
             "objectClass": ["mailDomain", "top"],
-            "virtualdomain": ["localhost"]
+            "virtualdomain": [b"localhost"]
         }
     }
 

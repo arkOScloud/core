@@ -469,6 +469,18 @@ def generate_certificate(
     :returns: Certificate that was generated
     :rtype: Certificate
     """
+    try:
+        return _generate_certificate(
+            id, domain, country, state, locale, email, keytype, keylength,
+            dhparams, nthread)
+    except Exception as e:
+        nthread.complete(Notification("error", "Certificates", str(e)))
+        raise
+
+
+def _generate_certificate(
+        id, domain, country, state, locale, email, keytype, keylength,
+        dhparams, nthread):
     nthread.title = "Generating TLS certificate"
 
     signals.emit("certificates", "pre_add", id)
@@ -479,7 +491,7 @@ def generate_certificate(
     if not ca:
         msg = "Generating certificate authority..."
         nthread.update(Notification("info", "Certificates", msg))
-        ca = generate_authority(basehost)
+        ca = generate_authority(basehost, nthread)
     with open(ca.cert_path, "rb") as f:
         ca_cert = x509.load_pem_x509_certificate(f.read(), default_backend())
     with open(ca.key_path, "rb") as f:
@@ -514,7 +526,7 @@ def generate_certificate(
         f.write(key.private_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.TraditionalOpenSSL,
-            encryption_algorithm=serialization.BestAvailableEncryption(),
+            encryption_algorithm=serialization.NoEncryption()
         ))
     subject = x509.Name([
         x509.NameAttribute(NameOID.COUNTRY_NAME, country),
@@ -524,14 +536,15 @@ def generate_certificate(
         x509.NameAttribute(NameOID.COMMON_NAME, domain),
     ])
     cert = x509.CertificateBuilder()
-    cert.subject_name(subject)
-    cert.issuer_name(ca_cert.issuer)
-    cert.public_key(key.public_key())
-    cert.not_valid_before(datetime.datetime.utcnow())
-    cert.not_valid_after(
-        datetime.datetime.utcnow() + datetime.timedelta(years=2)
+    cert = cert.subject_name(subject)
+    cert = cert.issuer_name(ca_cert.issuer)
+    cert = cert.serial_number(int.from_bytes(os.urandom(20), "big") >> 1)
+    cert = cert.public_key(key.public_key())
+    cert = cert.not_valid_before(datetime.datetime.utcnow())
+    cert = cert.not_valid_after(
+        datetime.datetime.utcnow() + datetime.timedelta(days=730)
     )
-    cert.sign(ca_key, hashes.SHA256(), default_backend())
+    cert = cert.sign(ca_key, hashes.SHA256(), default_backend())
     with open(cert_path, "wb") as f:
         f.write(cert.public_bytes(serialization.Encoding.PEM))
 
@@ -543,6 +556,8 @@ def generate_certificate(
     # Create actual certificate object
     sha1 = binascii.hexlify(cert.fingerprint(hashes.SHA1())).decode()
     md5 = binascii.hexlify(cert.fingerprint(hashes.MD5())).decode()
+    sha1 = ":".join([sha1[i:i+2].upper() for i in range(0, len(sha1), 2)])
+    md5 = ":".join([md5[i:i+2].upper() for i in range(0, len(md5), 2)])
     c = Certificate(id, domain, cert_path, key_path, keytype, keylength,
                     [], cert.not_valid_after, sha1, md5)
     storage.certs.add("certificates", c)
@@ -552,7 +567,7 @@ def generate_certificate(
     return c
 
 
-def generate_authority(domain):
+def generate_authority(domain, nthread=NotificationThread()):
     """
     Generate and save a new certificate authority for signing.
 
@@ -560,11 +575,20 @@ def generate_authority(domain):
     :returns: Certificate authority
     :rtype: CertificateAuthority
     """
+    try:
+        return _generate_authority(domain)
+    except Exception as e:
+        nthread.complete(Notification("error", "Certificates", str(e)))
+        raise
+
+
+def _generate_authority(domain):
     ca_cert_dir = config.get("certificates", "ca_cert_dir")
     ca_key_dir = config.get("certificates", "ca_key_dir")
     cert_path = os.path.join(ca_cert_dir, "{0}.pem".format(domain))
     key_path = os.path.join(ca_key_dir, "{0}.key".format(domain))
-    ca = CertificateAuthority(domain, cert_path, key_path)
+    ca = CertificateAuthority(
+        domain, cert_path, key_path, keytype="RSA", keylength=2048)
 
     # Generate private key and create X509 certificate, then set options
     key = rsa.generate_private_key(
@@ -576,37 +600,54 @@ def generate_authority(domain):
         f.write(key.private_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.TraditionalOpenSSL,
-            encryption_algorithm=serialization.BestAvailableEncryption(),
+            encryption_algorithm=serialization.NoEncryption()
         ))
     subject = issuer = x509.Name([
         x509.NameAttribute(NameOID.ORGANIZATION_NAME, u"arkOS Servers"),
         x509.NameAttribute(NameOID.COMMON_NAME, domain)
     ])
     cert = x509.CertificateBuilder()
-    cert.subject_name(subject)
-    cert.issuer_name(issuer)
-    cert.public_key(key.public_key())
-    cert.not_valid_before(datetime.datetime.utcnow())
-    cert.not_valid_after(
-        datetime.datetime.utcnow() + datetime.timedelta(years=5)
+    cert = cert.subject_name(subject)
+    cert = cert.issuer_name(issuer)
+    cert = cert.serial_number(int.from_bytes(os.urandom(20), "big") >> 1)
+    cert = cert.public_key(key.public_key())
+    cert = cert.not_valid_before(datetime.datetime.utcnow())
+    cert = cert.not_valid_after(
+        datetime.datetime.utcnow() + datetime.timedelta(days=1825)
     )
-    cert.add_extension(
+    cert = cert.add_extension(
         x509.BasicConstraints(ca=True, path_length=0),
         critical=True
     )
-    cert.add_extension(
-        x509.KeyUsage(key_cert_sign=True, crl_sign=True),
+    cert = cert.add_extension(
+        x509.KeyUsage(
+            True, False, False, False, False, True, True, False, False),
         critical=True
     )
+<<<<<<< HEAD
     cert.add_extension(
         x509.SubjectKeyIdentifier(cert.public_key()),
+=======
+    cert = cert.add_extension(
+        x509.SubjectKeyIdentifier.from_public_key(key.public_key()),
         critical=False
     )
-    cert.sign(key, hashes.SHA256(), default_backend())
+    cert = cert.add_extension(
+        x509.AuthorityKeyIdentifier.from_issuer_public_key(key.public_key()),
+>>>>>>> c5b4278822af43eaec8fa17f8ec3b36b3f3ee976
+        critical=False
+    )
+    cert = cert.sign(key, hashes.SHA256(), default_backend())
     with open(cert_path, "wb") as f:
         f.write(cert.public_bytes(serialization.Encoding.PEM))
     os.chmod(cert_path, 0o660)
 
     ca.expiry = cert.not_valid_after
+    sha1 = binascii.hexlify(cert.fingerprint(hashes.SHA1())).decode()
+    md5 = binascii.hexlify(cert.fingerprint(hashes.MD5())).decode()
+    sha1 = ":".join([sha1[i:i+2].upper() for i in range(0, len(sha1), 2)])
+    md5 = ":".join([md5[i:i+2].upper() for i in range(0, len(md5), 2)])
+    ca.sha1 = sha1
+    ca.md5 = md5
     storage.certs.add("authorities", ca)
     return ca

@@ -7,7 +7,6 @@ Written by Jacob Cook
 Licensed under GPLv3, see LICENSE.md
 """
 
-import ldap
 import ldap.modlist
 
 from arkos import config, conns, signals
@@ -41,8 +40,8 @@ class Domain:
     def add(self):
         """Add the domain to LDAP."""
         try:
-            ldif = conns.LDAP.search_s(self.ldap_id, ldap.SCOPE_SUBTREE,
-                                       "(objectClass=*)", None)
+            conns.LDAP.search_s(self.ldap_id, ldap.SCOPE_SUBTREE,
+                                "(objectClass=*)", None)
             emsg = "This domain is already present here"
             raise errors.InvalidConfigError(emsg)
         except ldap.NO_SUCH_OBJECT:
@@ -88,7 +87,7 @@ def get(id_=None):
     for x in qset:
         d = Domain(x[1]["virtualdomain"][0].decode(),
                    x[0].split("ou=domains,")[1])
-        if d.name == id:
+        if d.name == id_:
             return d
         results.append(d)
-    return results if id is None else None
+    return results if id_ is None else None
