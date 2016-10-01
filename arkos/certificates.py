@@ -56,13 +56,13 @@ class Certificate:
     """
 
     def __init__(
-            self, id="", domain="", cert_path="", key_path="", keytype="",
+            self, id_="", domain="", cert_path="", key_path="", keytype="",
             keylength=0, assigns=[], expiry=None, sha1="", md5="",
             is_acme=False):
         """
         Initialize the Certificate object.
 
-        :param str id: Certificate name
+        :param str id_: Certificate name
         :param str domain: Domain the certificate is associated to
         :param str cert_path: Path to the certificate file on disk
         :param str key_path: Path to the certificate's key file on disk
@@ -74,7 +74,7 @@ class Certificate:
         :param str md5: MD5 hash
         :param bool is_acme: Is this a Let's Encrypt certificate?
         """
-        self.id = id
+        self.id = id_
         self.domain = domain
         self.cert_path = cert_path
         self.key_path = key_path
@@ -154,7 +154,7 @@ class Certificate:
         if self.is_acme:
             with open("/etc/cron.d/arkos-acme-renew", "r") as f:
                 data = f.readlines()
-            for i, x in enumerate(data):
+            for _, x in enumerate(data):
                 if "free_tls_certificate {0} /etc".format(self.domain) in x:
                     data.remove(x)
             with open("/etc/cron.d/arkos-acme-renew", "w") as f:
@@ -207,12 +207,12 @@ class CertificateAuthority:
     generated in arkOS, allowing client trust for the root domain in question.
     """
 
-    def __init__(self, id="", cert_path="", key_path="", expiry=None,
+    def __init__(self, id_="", cert_path="", key_path="", expiry=None,
                  keytype="", keylength=0, sha1="", md5=""):
         """
         Initialize the certificate authority object.
 
-        :param str id: Authority (and domain) name
+        :param str id_: Authority (and domain) name
         :param str cert_path: Path to the certificate file on disk
         :param str key_path: Path to the certificate's key file on disk
         :param str expiry: ISO-8601 timestamp of certificate expiry
@@ -221,7 +221,7 @@ class CertificateAuthority:
         :param str sha1: SHA-1 hash
         :param str md5: MD5 hash
         """
-        self.id = id
+        self.id = id_
         self.cert_path = cert_path
         self.key_path = key_path
         self.expiry = expiry
@@ -258,7 +258,7 @@ class CertificateAuthority:
         return data
 
 
-def get(id=None, force=False):
+def get(id_=None, force=False):
     """
     Retrieve arkOS certificate data from the system.
 
@@ -267,7 +267,7 @@ def get(id=None, force=False):
     directory is searched, certificates are loaded and verified.
     This is used on first boot.
 
-    :param str id: If present, obtain one certificate that matches this ID
+    :param str id_: If present, obtain one certificate that matches this ID
     :param bool force: Force a rescan (do not rely on cache)
     :return: Certificate(s)
     :rtype: Certificate or list thereof
@@ -275,9 +275,9 @@ def get(id=None, force=False):
     data = storage.certs.get("certificates")
     if not data or force:
         data = scan()
-    if id:
+    if id_:
         for x in data:
-            if x.id == id:
+            if x.id == id_:
                 return x
         return None
     return data
@@ -315,10 +315,10 @@ def scan():
 
     cert_glob = os.path.join(config.get("certificates", "cert_dir"), "*.crt")
     for cert_path in glob.glob(cert_glob):
-        id = os.path.splitext(os.path.basename(cert_path))[0]
+        id_ = os.path.splitext(os.path.basename(cert_path))[0]
         key_path = os.path.join(
             config.get("certificates", "key_dir"), "{0}.key".format(id))
-        certs.append(_scan_a_cert(id, cert_path, key_path, assigns))
+        certs.append(_scan_a_cert(id_, cert_path, key_path, assigns))
 
     acmedir = config.get(
         "certificates", "acme_dir", "/etc/arkos/ssl/acme/certs")
@@ -328,14 +328,14 @@ def scan():
     le_cert_glob = os.path.join(acmedir, "*/cert.pem")
     for cert_path in glob.glob(le_cert_glob):
         basedir = os.path.dirname(cert_path)
-        id = os.path.basename(basedir)
+        id_ = os.path.basename(basedir)
         key_path = os.path.join(basedir, "privkey.pem")
-        certs.append(_scan_a_cert(id, cert_path, key_path, assigns, True))
+        certs.append(_scan_a_cert(id_, cert_path, key_path, assigns, True))
     storage.certs.set("certificates", certs)
     return certs
 
 
-def _scan_a_cert(id, cert_path, key_path, assigns, is_acme=False):
+def _scan_a_cert(id_, cert_path, key_path, assigns, is_acme=False):
     with open(cert_path, "rb") as f:
         crt = x509.load_pem_x509_certificate(f.read(), default_backend())
     with open(key_path, "rb") as f:
@@ -351,13 +351,13 @@ def _scan_a_cert(id, cert_path, key_path, assigns, is_acme=False):
     kt = "RSA" if isinstance(key.public_key(), rsa.RSAPublicKey) else "DSA"
     common_name = crt.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
     return Certificate(
-        id=id, cert_path=cert_path, key_path=key_path, keytype=kt,
+        id_=id_, cert_path=cert_path, key_path=key_path, keytype=kt,
         keylength=key.key_size, domain=common_name[0].value,
-        assigns=assigns.get(id, []), expiry=crt.not_valid_after, sha1=sha1,
+        assigns=assigns.get(id_, []), expiry=crt.not_valid_after, sha1=sha1,
         md5=md5, is_acme=is_acme)
 
 
-def get_authorities(id=None, force=False):
+def get_authorities(id_=None, force=False):
     """
     Retrieve arkOS certificate authority data from the system.
 
@@ -366,7 +366,7 @@ def get_authorities(id=None, force=False):
     directory is searched, certificates are loaded and verified.
     This is used on first boot.
 
-    :param str id: If present, obtain one certificate that matches this ID
+    :param str id_: If present, obtain one certificate that matches this ID
     :param bool force: Force a rescan (do not rely on cache)
     :return: CertificateAuthority(s)
     :rtype: CertificateAuthority or list thereof
@@ -374,9 +374,9 @@ def get_authorities(id=None, force=False):
     data = storage.certs.get("authorities")
     if not data or force:
         data = scan_authorities()
-    if id:
+    if id_:
         for x in data:
-            if x.id == id:
+            if x.id == id_:
                 return x
         return None
     return data
@@ -397,7 +397,7 @@ def scan_authorities():
     if not os.path.exists(ca_key_dir):
         os.makedirs(ca_key_dir)
     for x in glob.glob(os.path.join(ca_cert_dir, "*.pem")):
-        id = os.path.splitext(os.path.split(x)[1])[0]
+        id_ = os.path.splitext(os.path.split(x)[1])[0]
         with open(x, "rb") as f:
             cert = x509.load_pem_x509_certificate(f.read(), default_backend())
         key_path = os.path.join(ca_key_dir, "{0}.key".format(id))
@@ -411,7 +411,7 @@ def scan_authorities():
         sha1 = binascii.hexlify(cert.fingerprint(hashes.SHA1())).decode()
         md5 = binascii.hexlify(cert.fingerprint(hashes.MD5())).decode()
         kt = "RSA" if isinstance(key.public_key(), rsa.RSAPublicKey) else "DSA"
-        ca = CertificateAuthority(id, x, key_path, cert.not_valid_after,
+        ca = CertificateAuthority(id_, x, key_path, cert.not_valid_after,
                                   kt, key.key_size, sha1, md5)
         certs.append(ca)
     storage.certs.set("authorities", certs)
@@ -435,12 +435,12 @@ def generate_dh_params(path, size=2048):
 
 
 def upload_certificate(
-        id, cert, key, chain="", dhparams="/etc/arkos/ssl/dh_params.pem",
+        id_, cert, key, chain="", dhparams="/etc/arkos/ssl/dh_params.pem",
         nthread=NotificationThread()):
     """
     Create and save a new certificate from an external file.
 
-    :param str id: Name to assign certificate
+    :param str id_: Name to assign certificate
     :param str cert: Certificate as string (PEM format)
     :param str key: Key as string (PEM format)
     :param str chain: Chain as string (PEM format)
@@ -457,7 +457,7 @@ def upload_certificate(
         password=None,
         backend=default_backend()
     )
-    signals.emit("certificates", "pre_add", id)
+    signals.emit("certificates", "pre_add", id_)
 
     # Check to see that we have DH params, if not then do that too
     if not os.path.exists(dhparams):
@@ -474,7 +474,7 @@ def upload_certificate(
     md5 = binascii.hexlify(crt.fingerprint(hashes.MD5())).decode()
     kt = "RSA" if isinstance(ky.public_key(), rsa.RSAPublicKey) else "DSA"
     common_name = crt.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
-    c = Certificate(id=id,
+    c = Certificate(id_=id_,
                     cert_path=os.path.join(cert_dir, "{0}.crt".format(id)),
                     key_path=os.path.join(key_dir, "{0}.key".format(id)),
                     keytype=kt, keylength=ky.key_size,
@@ -632,7 +632,7 @@ def _request_acme_certificate(domain, webroot, nthread):
 
 
 def generate_certificate(
-        id, domain, country, state="", locale="", email="", keytype="RSA",
+        id_, domain, country, state="", locale="", email="", keytype="RSA",
         keylength=2048, dhparams="/etc/arkos/ssl/dh_params.pem",
         nthread=NotificationThread()):
     """
@@ -641,7 +641,7 @@ def generate_certificate(
     If this domain has no prior self-signed certificates, a new
     CertificateAuthority is also generated to sign this certificate.
 
-    :param str id: Name to assign certificate
+    :param str id_: Name to assign certificate
     :param str domain: Domain name to associate with (subject CN)
     :param str country: Two-letter country code (e.g. 'US' or 'CA')
     :param str state: State or province
@@ -656,7 +656,7 @@ def generate_certificate(
     """
     try:
         return _generate_certificate(
-            id, domain, country, state, locale, email, keytype, keylength,
+            id_, domain, country, state, locale, email, keytype, keylength,
             dhparams, nthread)
     except Exception as e:
         nthread.complete(Notification("error", "Certificates", str(e)))
@@ -664,7 +664,7 @@ def generate_certificate(
 
 
 def _generate_certificate(
-        id, domain, country, state, locale, email, keytype, keylength,
+        id_, domain, country, state, locale, email, keytype, keylength,
         dhparams, nthread):
     nthread.title = "Generating TLS certificate"
 
@@ -672,7 +672,7 @@ def _generate_certificate(
 
     # Check to see that we have a CA ready; if not, generate one
     basehost = ".".join(domain.split(".")[-2:])
-    ca = get_authorities(id=basehost)
+    ca = get_authorities(id_=basehost)
     if not ca:
         msg = "Generating certificate authority..."
         nthread.update(Notification("info", "Certificates", msg))
@@ -743,7 +743,7 @@ def _generate_certificate(
     md5 = binascii.hexlify(cert.fingerprint(hashes.MD5())).decode()
     sha1 = ":".join([sha1[i:i+2].upper() for i in range(0, len(sha1), 2)])
     md5 = ":".join([md5[i:i+2].upper() for i in range(0, len(md5), 2)])
-    c = Certificate(id, domain, cert_path, key_path, keytype, keylength,
+    c = Certificate(id_, domain, cert_path, key_path, keytype, keylength,
                     [], cert.not_valid_after, sha1, md5)
     storage.certs.add("certificates", c)
     signals.emit("certificates", "post_add", c)
