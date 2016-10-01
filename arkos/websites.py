@@ -259,6 +259,9 @@ class Site:
         block.add(server)
         nginx.dumpf(block, os.path.join("/etc/nginx/sites-available",
                     self.id))
+        challenge_dir = os.path.join(self.path, ".well-known/acme-challenge/")
+        if not os.path.exists(challenge_dir):
+            os.makedirs(challenge_dir)
 
         # Create arkOS metadata file
         meta = configparser.SafeConfigParser()
@@ -287,6 +290,8 @@ class Site:
         nthread.update(Notification("info", "Websites", msg))
         self.installed = True
         storage.sites.add("sites", self)
+        if self.port == 80:
+            cleanup_acme_dummy(self.domain)
         signals.emit("websites", "site_installed", self)
         if enable:
             self.nginx_enable()
@@ -686,6 +691,7 @@ class Site:
         msg = "Running post-removal..."
         nthread.update(Notification("info", "Websites", msg))
         self.post_remove()
+        create_acme_dummy(self.domain)
         storage.sites.remove("sites", self)
         signals.emit("websites", "site_removed", self)
         msg = "{0} site removed successfully".format(self.app.name)
@@ -820,6 +826,9 @@ class ReverseProxy(Site):
         server.add(*[x for x in self.block])
         block.add(server)
         nginx.dumpf(block, os.path.join("/etc/nginx/sites-available", self.id))
+        challenge_dir = os.path.join(self.path, ".well-known/acme-challenge/")
+        if not os.path.exists(challenge_dir):
+            os.makedirs(challenge_dir)
         meta = configparser.SafeConfigParser()
         ssl = self.cert.id if getattr(self, "cert", None) else "None"
         meta.add_section("website")
@@ -1014,7 +1023,7 @@ def create_acme_dummy(domain):
     :param str domain: Domain name to use
     :returns: Path to directory for challenge data
     """
-    site_dir = os.path.join(config.get("websites", "site_dir"), domain)
+    site_dir = os.path.join(config.get("websites", "site_dir"), "acme-"+domain)
     challenge_dir = os.path.join(site_dir, ".well-known/acme-challenge")
     conf = nginx.Conf(
         nginx.Server(
@@ -1028,8 +1037,8 @@ def create_acme_dummy(domain):
             )
         )
     )
-    origin = os.path.join("/etc/nginx/sites-available", domain)
-    target = os.path.join("/etc/nginx/sites-enabled", domain)
+    origin = os.path.join("/etc/nginx/sites-available", "acme-"+domain)
+    target = os.path.join("/etc/nginx/sites-enabled", "acme-"+domain)
     nginx.dumpf(conf, origin)
     if not os.path.exists(target):
         os.symlink(origin, target)
@@ -1037,3 +1046,24 @@ def create_acme_dummy(domain):
         os.makedirs(challenge_dir)
     nginx_reload()
     return challenge_dir
+
+
+def cleanup_acme_dummy(domain):
+    """
+    Clean up a previously-created dummy directory for ACME validation.
+
+    :param str domain: Domain name to use
+    """
+    site_dir = os.path.join(config.get("websites", "site_dir"), "acme-"+domain)
+    origin = os.path.join("/etc/nginx/sites-available", "acme-"+domain)
+    target = os.path.join("/etc/nginx/sites-enabled", "acme-"+domain)
+    found = False
+    if os.path.exists(site_dir):
+        shutil.rmtree(site_dir)
+    if os.path.exists(origin):
+        os.unlink(origin)
+    if os.path.exists(target):
+        os.unlink(target)
+        found = True
+    if found:
+        nginx_reload()
