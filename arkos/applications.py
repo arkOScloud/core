@@ -362,9 +362,9 @@ def get(id_=None, type_=None, loadable=None, installed=None,
     data = storage.apps.get("applications")
     if not data or force:
         data = scan(verify, cry)
-    if id:
+    if id_:
         return next(filter(lambda x: x.id == id_, data), None)
-    if type:
+    if type_:
         data = list(filter(lambda x: x.type == type_, data))
     if loadable:
         data = list(filter(lambda x: x.loadable == loadable, data))
@@ -495,7 +495,7 @@ def get_dependent(id_, op):
     """
     Return list of all apps to install or remove based on specified operation.
 
-    :param str id: ID for arkOS app to check
+    :param str id_: ID for arkOS app to check
     :param str op: ``install`` or ``remove``
     :returns: list of arkOS app IDs
     :rtype: list
@@ -524,7 +524,7 @@ def _install(id_, load=True, cry=True):
     """
     Utility function to download and install arkOS app packages.
 
-    :param str id: ID of arkOS app to install
+    :param str id_: ID of arkOS app to install
     :param bool load: Load the app after install?
     :param bool cry: Raise exception on dependency install failure?
     """
@@ -540,9 +540,9 @@ def _install(id_, load=True, cry=True):
         t.extractall(app_dir)
     os.unlink(path)
     # Read the app's metadata and create an object
-    with open(os.path.join(app_dir, id, "manifest.json")) as f:
+    with open(os.path.join(app_dir, id_, "manifest.json")) as f:
         data = json.loads(f.read())
-    app = get(id)
+    app = get(id_)
     for x in data:
         setattr(app, x, data[x])
     app.upgradable = ""
