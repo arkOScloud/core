@@ -8,7 +8,6 @@ Licensed under GPLv3, see LICENSE.md
 """
 
 import grp
-import ldap
 import ldap.modlist
 
 from arkos import conns, config, signals
@@ -42,8 +41,8 @@ class Group:
     def add(self):
         """Add the group to LDAP."""
         try:
-            ldif = conns.LDAP.search_s(self.ldap_id, ldap.SCOPE_SUBTREE,
-                                       "(objectClass=*)", None)
+            conns.LDAP.search_s(self.ldap_id, ldap.SCOPE_SUBTREE,
+                                "(objectClass=*)", None)
             emsg = "A group with this name already exists"
             raise errors.InvalidConfigError(emsg)
         except ldap.NO_SUCH_OBJECT:
