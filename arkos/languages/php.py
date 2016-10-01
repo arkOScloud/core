@@ -46,17 +46,23 @@ def verify_composer():
         raise errors.OperationFailedError(logmsg)
 
 
-def composer_install(path):
+def composer_install(path, flags={}, env={}):
     """
     Install a PHP application bundle via Composer.
 
     :param str path: path to app directory
+    :param dict flags: command line flags to pass to Composer
+    :param dict env: command line environment variables
     """
     verify_composer()
     cwd = os.getcwd()
     os.chdir(path)
     shell("composer self-update")
-    s = shell("composer install")
+    cmdflags = []
+    for x in flags:
+        flg = "-{0}".format(x) if len(x) == 1 else "--{0}".format(x)
+        cmdflags.append("{0}={1}".format(flg, flags[x]) if flags[x] else flg)
+    s = shell("composer install {0}".format(" ".join(cmdflags)), env=env)
     os.chdir(cwd)
     if s["code"] != 0:
         errmsg = "Composer install of {0} failed.".format(path)

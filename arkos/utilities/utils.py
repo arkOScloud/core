@@ -204,7 +204,7 @@ def shell(c, stdin=None, env={}):
     p = subprocess.Popen(shlex.split(c), stderr=subprocess.PIPE,
                          stdout=subprocess.PIPE, stdin=subprocess.PIPE,
                          env=environ)
-    data = p.communicate(stdin)
+    data = p.communicate(b(stdin) if stdin else None)
     return {"code": p.returncode, "stdout": data[0],
             "stderr": data[1]}
 

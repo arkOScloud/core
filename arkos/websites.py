@@ -139,6 +139,7 @@ class Site:
                 "Invalid source archive format in {0}".format(self.app.id))
 
         msg = "Running pre-installation..."
+        uid, gid = users.get_system("http").uid, groups.get_system("http").gid
         nthread.update(Notification("info", "Websites", msg))
 
         # Call website type's pre-install hook
@@ -166,6 +167,9 @@ class Site:
                 svc = services.get(mgr.meta.database_service)
                 svc.restart()
             self.db = mgr.add_db(self.id)
+            if hasattr(self.db, "path"):
+                os.chmod(self.db.path, 0o660)
+                os.chown(self.db.path, -1, gid)
             # If multiuser DB type, create user
             if mgr.meta.database_multiuser:
                 dbpasswd = random_string(16)
@@ -211,7 +215,6 @@ class Site:
             os.remove(pkg_path)
 
         # Set proper starting permissions on source directory
-        uid, gid = users.get_system("http").uid, groups.get_system("http").gid
         os.chmod(self.path, 0o755)
         os.chown(self.path, uid, gid)
         for r, d, f in os.walk(self.path):
@@ -241,12 +244,16 @@ class Site:
         if extra_vars.get("addtoblock"):
             addtoblock += nginx.loads(extra_vars.get("addtoblock"), False)
         default_index = "index."+("php" if self.php else "html")
+        if self.app.website_root:
+            webroot = os.path.join(self.path, self.app.website_root)
+        else:
+            webroot = self.path
         block = nginx.Conf()
         server = nginx.Server(
             nginx.Key("listen", str(self.port)),
             nginx.Key("listen", "[::]:" + str(self.port)),
             nginx.Key("server_name", self.domain),
-            nginx.Key("root", self.path),
+            nginx.Key("root", webroot),
             nginx.Key("index", getattr(self.app, "website_index", None) or
                       default_index),
             nginx.Location(
@@ -535,13 +542,7 @@ class Site:
         # If the name was changed...
         if newname and self.id != newname:
             # rename the folder and files...
-            if self.path.endswith("_site"):
-                self.path = os.path.join(site_dir, newname, "_site")
-            elif self.path.endswith("htdocs"):
-                self.path = os.path.join(site_dir, newname, "htdocs")
-            else:
-                self.path = os.path.join(site_dir, newname)
-            self.path = self.path
+            self.path = os.path.join(site_dir, newname)
             if os.path.exists(self.path):
                 shutil.rmtree(self.path)
             self.nginx_disable(reload=False)
@@ -565,8 +566,12 @@ class Site:
                 listen.value = "[::]:" + str(port)
             else:
                 listen.value = str(port)
+        if self.app.website_root:
+            webroot = os.path.join(self.path, self.app.website_root)
+        else:
+            webroot = self.path
         server.filter("Key", "server_name")[0].value = self.domain
-        server.filter("Key", "root")[0].value = self.path
+        server.filter("Key", "root")[0].value = webroot
         server.filter("Key", "index")[0].value = "index.php" \
             if getattr(self, "php", False) else "index.html"
         nginx.dumpf(block, os.path.join("/etc/nginx/sites-available", self.id))
@@ -662,11 +667,7 @@ class Site:
         # Remove source directories
         msg = "Cleaning directories..."
         nthread.update(Notification("info", "Websites", msg))
-        if self.path.endswith("_site"):
-            shutil.rmtree(self.path.split("/_site")[0])
-        elif self.path.endswith("htdocs"):
-            shutil.rmtree(self.path.split("/htdocs")[0])
-        elif os.path.islink(self.path):
+        if os.path.islink(self.path):
             os.unlink(self.path)
         else:
             shutil.rmtree(self.path)
