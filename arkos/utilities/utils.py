@@ -26,7 +26,6 @@ import zipfile
 from . import errors
 
 
-
 def b(text):
     """Less-ugly way of converting unicode to bytestring."""
     return text.encode("utf-8")

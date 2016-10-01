@@ -27,6 +27,9 @@ if not groups.get_system("ssl-cert"):
     groups.SystemGroup("ssl-cert").add()
 gid = groups.get_system("ssl-cert").gid
 
+LETSENCRYPT_LIVE = "https://acme-v01.api.letsencrypt.org/directory"
+LETSENCRYPT_STAGING = "https://acme-staging.api.letsencrypt.org/directory"
+
 
 class Certificate:
     """
@@ -624,17 +627,12 @@ def _generate_authority(domain):
             True, False, False, False, False, True, True, False, False),
         critical=True
     )
-<<<<<<< HEAD
-    cert.add_extension(
-        x509.SubjectKeyIdentifier(cert.public_key()),
-=======
     cert = cert.add_extension(
         x509.SubjectKeyIdentifier.from_public_key(key.public_key()),
         critical=False
     )
     cert = cert.add_extension(
         x509.AuthorityKeyIdentifier.from_issuer_public_key(key.public_key()),
->>>>>>> c5b4278822af43eaec8fa17f8ec3b36b3f3ee976
         critical=False
     )
     cert = cert.sign(key, hashes.SHA256(), default_backend())
