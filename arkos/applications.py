@@ -73,13 +73,19 @@ class App:
                 classes = inspect.getmembers(submod, inspect.isclass)
                 mgr = None
                 for y in classes:
-                    if y[0] in ["DatabaseManager", "Site", "BackupController"]:
+                    if y[0] in [
+                            "DatabaseManager", "Sharer", "Site",
+                            "BackupController"]:
                         mgr = y[1]
                         break
                 if module == "database":
                     for y in classes:
                         if issubclass(y[1], mgr) and y[1] != mgr:
                             setattr(self, "_database_mgr", y[1])
+                elif module == "fileshare":
+                    for y in classes:
+                        if issubclass(y[1], mgr) and y[1] != mgr:
+                            setattr(self, "_share_mgr", y[1])
                 elif module == "website":
                     for y in classes:
                         if issubclass(y[1], mgr) and y[1] != mgr:
@@ -106,7 +112,12 @@ class App:
         except Exception as e:
             self.loadable = False
             self.error = "Module error: {0}".format(e)
-            Notification("warning", "Apps", self.error)
+            logger.debug("Apps", str(e))
+            Notification(
+                "warning", "Apps", "Could not load {0}: {1}".format(
+                    self.name, self.error
+                )
+            ).send()
 
     def verify_dependencies(self, cry):
         """
@@ -163,6 +174,7 @@ class App:
                 verify = False
                 if cry:
                     raise AppDependencyError(x, "system")
+                break
         self.loadable = verify
         self.error = error
         return verify
@@ -337,7 +349,7 @@ class AppDependencyError(errors.Error):
         self.type = dtype
 
     def __str__(self):
-        return (self.dep, self.type)
+        return "Could not install {1} app {0}".format(self.dep, self.type)
 
 
 def get(id=None, type=None, loadable=None, installed=None,
@@ -424,7 +436,7 @@ def scan(verify=True, cry=True):
             if app.id == y[1]["id"]:
                 app.assets = y[1]["assets"]
                 available_apps[y[0]]["installed"] = True
-        app.load(cry)
+        app.load(verify, cry)
         apps.append(app)
 
     # Convert available apps payload to objects

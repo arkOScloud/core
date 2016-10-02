@@ -7,7 +7,7 @@ Written by Jacob Cook
 Licensed under GPLv3, see LICENSE.md
 """
 
-from arkos import storage, signals, applications
+from arkos import logger, storage, signals, applications
 
 
 class Sharer:
@@ -27,7 +27,7 @@ class Sharer:
         :param str icon: FontAwesome icon class
         """
         self.id = id
-        self.name = name
+        self.name = name or self.name
         self.icon = icon
 
     def get_shares(self):
@@ -38,7 +38,8 @@ class Sharer:
         """Return sharer metadata as dict."""
         return {
             "id": self.id,
-            "name": self.name
+            "name": self.name,
+            "icon": self.icon
         }
 
     @property
@@ -86,12 +87,13 @@ class Share:
         """Return share metadata as dict."""
         return {
             "id": self.id,
-            "type": self.manager.id,
+            "share_type": self.manager.id,
             "comment": self.comment,
             "path": self.path,
             "valid_users": self.valid_users,
             "public": self.public,
-            "read_only": self.readonly
+            "read_only": self.readonly,
+            "is_ready": True
         }
 
     @property
@@ -103,15 +105,20 @@ class Share:
 class Mount:
     """Represents a file share mount object."""
 
-    def __init__(self, id="", path="", network_path="", readonly=False,
-                 is_mounted=False, manager=None):
+    def __init__(self, path="", network_path="", readonly=False,
+                 username="", password="", is_mounted=False, manager=None):
         """Initialize."""
-        self.id = id
         self.path = path
         self.network_path = network_path
         self.readonly = readonly
         self.is_mounted = is_mounted
         self.manager = manager
+        self.username = username
+        self.password = password
+
+    @property
+    def id(self):
+        """Reimplement this with the generated mount ID."""
 
     def mount(self):
         """Reimplement this with actions to mount a share."""
@@ -130,7 +137,7 @@ class Mount:
         """Unmount a file share."""
         signals.emit("shares", "pre_umount", self)
         self.umount()
-        storage.shares.add("mounts", self)
+        storage.shares.remove("mounts", self)
         signals.emit("shares", "post_umount", self)
 
     @property
@@ -138,11 +145,12 @@ class Mount:
         """Return mount metadata as dict."""
         return {
             "id": self.id,
-            "type": self.manager.id,
+            "share_type": self.manager.id,
             "path": self.path,
             "network_path": self.network_path,
             "is_mounted": self.is_mounted,
-            "read_only": self.readonly
+            "read_only": self.readonly,
+            "is_ready": True
         }
 
     @property
@@ -160,7 +168,9 @@ def get_shares(id=None, type=None):
     :return: Share(s)
     :rtype: Share or list thereof
     """
-    data = scan_shares()
+    data = storage.shares.get("shares")
+    if not data:
+        data = scan_shares()
     if id or type:
         tlist = []
         for x in data:
@@ -185,8 +195,11 @@ def scan_shares():
     for x in get_sharers():
         try:
             shares += x.get_shares()
-        except:
-            continue
+        except Exception as e:
+            logger.warning(
+                "Sharers", "Could not get shares for {0}".format(x.name)
+            )
+            logger.critical("Sharers", str(e), exc_info=True)
     storage.shares.set("shares", shares)
     return shares
 
@@ -200,7 +213,9 @@ def get_mounts(id=None, type=None):
     :return: Mount(s)
     :rtype: Mount or list thereof
     """
-    data = scan_mounts()
+    data = storage.shares.get("mounts")
+    if not data:
+        data = scan_mounts()
     if id or type:
         tlist = []
         for x in data:
@@ -260,6 +275,6 @@ def scan_sharers():
     mgrs = []
     for x in applications.get(type="fileshare"):
         if x.installed and hasattr(x, "_share_mgr"):
-            mgrs.append(x._share_mgr(id=x.id, name=x.name, meta=x))
+            mgrs.append(x._share_mgr(id=x.id, icon=x.icon))
     storage.shares.set("sharers", mgrs)
     return mgrs
