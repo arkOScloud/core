@@ -309,7 +309,7 @@ def initialize_upnp(svcs):
                                      port, pf.format(port), '')
             except Exception as e:
                 msg = "Failed to register {0} with uPnP IGD: {1}"\
-                    .format(port, str(e))
+                      .format(port, str(e))
                 logger.warning("TrackedSvcs", msg)
 
 

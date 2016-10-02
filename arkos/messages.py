@@ -36,7 +36,7 @@ class Notification(object):
         self.cls = cls
         self.id = id_
         self.title = title
-        self.message_id = id
+        self.message_id = id_
         self.complete = True
 
     def send(self):

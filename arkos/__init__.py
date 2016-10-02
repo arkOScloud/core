@@ -22,7 +22,6 @@ policies = Config("policies.json")
 storage = StorageControl()
 conns = ConnectionsManager()
 logger = LoggingControl()
-notify = LoggingControl("notify")
 
 
 def init(config_path="/etc/arkos/settings.json",
