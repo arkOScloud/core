@@ -19,7 +19,7 @@ class StorageControl:
         self.points = Storage(["points"])
         self.policies = Storage(["policies"])
         self.files = Storage(["sharedfiles"])
-        self.shares = Storage(["sharers"])
+        self.shares = Storage(["shares", "mounts", "sharers"])
         self.signals = Storage(["listeners"])
         self.sites = Storage(["sites"])
         self.updates = Storage(["updates"])
@@ -44,8 +44,8 @@ class Storage:
         :param str stype: Storage subtype
         :param item: Object to store
         """
-        storage = getattr(self, stype)
-        storage.append(item)
+        s = getattr(self, stype)
+        s.append(item)
 
     def set(self, stype, items):
         """
@@ -66,13 +66,13 @@ class Storage:
         :param str id: Object's ID property
         :returns: object or list of objects
         """
-        storage = getattr(self, stype)
+        s = getattr(self, stype)
         if id_:
-            for x in storage:
+            for x in s:
                 if id_ == x.id:
                     return x
             return None
-        return storage
+        return s
 
     def get_keyed(self, stype, id_=None):
         """
@@ -81,8 +81,8 @@ class Storage:
         :param str stype: Storage subtype
         """
         items = {}
-        storage = getattr(self, stype)
-        for x in storage:
+        s = getattr(self, stype)
+        for x in s:
             items[x.id] = x
         return items
 
@@ -93,11 +93,11 @@ class Storage:
         :param str stype: Storage subtype
         :param item: Object
         """
-        storage = getattr(self, stype)
+        s = getattr(self, stype)
         if type(item) == str:
-            for x in storage:
+            for x in s:
                 if item == x.id:
-                    storage.remove(x)
+                    s.remove(x)
                     return
-        elif item in storage:
-            storage.remove(item)
+        elif item in s:
+            s.remove(item)

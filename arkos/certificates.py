@@ -19,7 +19,6 @@ import datetime
 from free_tls_certificates import client as leclient
 import glob
 import os
-import shutil
 import time
 
 from arkos import config, signals, storage, websites, applications, logger
@@ -159,19 +158,7 @@ class Certificate:
                     data.remove(x)
             with open("/etc/cron.d/arkos-acme-renew", "w") as f:
                 f.writelines(data)
-            for x in websites.get():
-                if x.domain == self.domain:
-                    break
-            else:
-                orig = os.path.join("/etc/nginx/sites-available", self.domain)
-                targ = os.path.join("/etc/nginx/sites-enabled", self.domain)
-                sd = config.get("websites", "site_dir")
-                if os.path.exists(orig):
-                    os.unlink(orig)
-                if os.path.exists(targ):
-                    os.unlink(targ)
-                if os.path.exists(os.path.join(sd, self.domain)):
-                    shutil.rmtree(os.path.join(sd, self.domain))
+            websites.cleanup_acme_dummy(self.domain)
         storage.certs.remove("certificates", self)
         signals.emit("certificates", "post_remove", self)
 
@@ -501,7 +488,7 @@ def upload_certificate(
     return c
 
 
-def request_acme_certificate(domain, webroot, nthread=NotificationThread()):
+def request_acme_certificate(domain, webroot="", nthread=NotificationThread()):
     """
     Request, validate and save a new ACME certificate from Let's Encrypt CA.
 
@@ -528,6 +515,15 @@ def _request_acme_certificate(domain, webroot, nthread):
 
     if not os.path.exists(cert_dir):
         os.makedirs(cert_dir)
+
+    if not webroot:
+        sites = websites.get()
+        for x in sites:
+            if x.port in [80, 443] and x.domain == domain:
+                webroot = x.add_acme_challenge()
+                break
+        else:
+            webroot = websites.create_acme_dummy(domain)
 
     smsg = "Requesting certificate from Let's Encrypt CA..."
     nthread.update(Notification("info", "Certificates", smsg))

@@ -51,7 +51,7 @@ def initial_scans():
     """Setup initial scans for all arkOS objects."""
     from arkos import applications, certificates, databases, websites
     from arkos import tracked_services
-    applications.scan()
+    applications.scan(cry=False)
     certificates.scan()
     databases.scan()
     websites.scan()
