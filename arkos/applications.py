@@ -15,13 +15,14 @@ import pacman
 import shutil
 import tarfile
 
-from distutils.spawn import find_executable
-
 from arkos import config, logger, storage, signals, tracked_services
 from arkos.messages import Notification, NotificationThread
 from arkos.system import services
-from arkos.languages import python
-from arkos.utilities import api, errors
+from arkos.languages import python, ruby
+from arkos.utilities import api, compare_versions, errors
+
+
+SYS_INSTALLED, PY_INSTALLED, RB_INSTALLED = [], [], []
 
 
 class App:
@@ -49,7 +50,7 @@ class App:
         """
         return getattr(self, "_{0}".format(mod_type), None)
 
-    def load(self, verify=True, cry=True):
+    def load(self, verify=True, cry=True, installed={}):
         """
         Load an application and associated metadata into the running process.
 
@@ -59,7 +60,7 @@ class App:
         try:
             signals.emit("apps", "pre_load", self)
             if verify:
-                self.verify_dependencies(cry)
+                self.verify_dependencies(cry, installed)
 
             # Load the application module into Python
             app_dir = config.get("apps", "app_dir")
@@ -119,7 +120,7 @@ class App:
                 )
             ).send()
 
-    def verify_dependencies(self, cry):
+    def verify_dependencies(self, cry, installed):
         """
         Verify that the associated dependencies are all properly installed.
 
@@ -130,51 +131,89 @@ class App:
         :returns: True if all verify checks passed
         :rtype: bool
         """
-        verify, error, to_pacman = True, "", []
+        verify, error = True, ""
         # If dependency isn't installed, add it to "to install" list
         # If it can't be installed, mark the app as not loadable and say why
+        if not installed:
+            pacman.refresh()
+            installed["sys"] = pacman.get_installed()
+            installed["py"] = python.get_installed()
+            installed["rb"] = ruby.get_installed()
         for dep in self.dependencies:
             if dep["type"] == "system":
-                if (dep["binary"] and not find_executable(dep["binary"])) \
-                        or not pacman.is_installed(dep["package"]):
-                    to_pacman.append(dep["package"])
+                pack = next(
+                    filter(lambda x: x["id"] == dep["package"],
+                           installed["sys"]),
+                    None
+                )
+                invalid_ver = False
+                if pack and dep.get("version"):
+                    invalid_ver = compare_versions(
+                        pack["version"], "lt", dep["version"]
+                    )
+                if not pack or invalid_ver:
+                    try:
+                        pacman.install(dep["package"])
+                    except:
+                        error = "Couldn't install {0}".format(dep["package"])
+                        verify = False
+                        if cry:
+                            raise AppDependencyError(dep["package"], "system")
                     if dep.get("internal"):
                         error = "Restart required"
                         verify = False
             if dep["type"] == "python":
-                to_pip = ""
-                if dep["module"]:
+                pack = next(
+                    filter(lambda x: x["id"] == dep["package"],
+                           installed["py"]),
+                    None
+                )
+                invalid_ver = False
+                if pack and dep.get("version"):
+                    invalid_ver = compare_versions(
+                        pack["version"], "lt", dep["version"]
+                    )
+                if not pack or invalid_ver:
                     try:
-                        __import__(dep["module"])
-                    except ImportError:
-                        to_pip = dep["package"]
-                else:
-                    if not python.is_installed(dep["package"]):
-                        to_pip = dep["package"]
-                if to_pip:
-                    try:
-                        python.install(to_pip)
+                        python.install(
+                            dep["package"],
+                            version=dep.get("version")
+                        )
                     except:
-                        error = "Couldn't install {0}".format(to_pip)
+                        error = "Couldn't install {0}".format(dep["package"])
                         verify = False
                         if cry:
-                            raise AppDependencyError(to_pip, "python")
+                            raise AppDependencyError(dep["package"], "python")
                     finally:
                         if dep.get("internal"):
                             error = "Restart required"
                             verify = False
-        # Execute the "to install" list actions
-        if to_pacman:
-            pacman.refresh()
-        for x in to_pacman:
-            try:
-                pacman.install(x)
-            except:
-                error = "Couldn't install {0}".format(x)
-                verify = False
-                if cry:
-                    raise AppDependencyError(x, "system")
-                break
+            if dep["type"] == "ruby":
+                pack = next(
+                    filter(lambda x: x["id"] == dep["package"],
+                           installed["rb"]),
+                    None
+                )
+                invalid_ver = False
+                if pack and dep.get("version"):
+                    invalid_ver = compare_versions(
+                        pack["version"], "lt", dep["version"]
+                    )
+                if not pack or invalid_ver:
+                    try:
+                        ruby.install(
+                            dep["package"],
+                            version=dep.get("version")
+                        )
+                    except:
+                        error = "Couldn't install {0}".format(dep["package"])
+                        verify = False
+                        if cry:
+                            raise AppDependencyError(dep["package"], "ruby")
+                    finally:
+                        if dep.get("internal"):
+                            error = "Restart required"
+                            verify = False
         self.loadable = verify
         self.error = error
         return verify
@@ -403,6 +442,13 @@ def scan(verify=True, cry=True):
     if not os.path.exists(app_dir):
         os.makedirs(app_dir)
 
+    pacman.refresh()
+    inst_list = {
+        "sys": pacman.get_installed(),
+        "py": python.get_installed(),
+        "rb": ruby.get_installed()
+    }
+
     # Get paths for installed apps, metadata for available ones
     installed_apps = [x for x in os.listdir(app_dir) if not x.startswith(".")]
     api_url = "https://{0}/api/v1/apps"
@@ -436,7 +482,7 @@ def scan(verify=True, cry=True):
             if app.id == y[1]["id"]:
                 app.assets = y[1]["assets"]
                 available_apps[y[0]]["installed"] = True
-        app.load(verify, cry)
+        app.load(verify=verify, cry=cry, installed=inst_list)
         apps.append(app)
 
     # Convert available apps payload to objects
@@ -557,4 +603,4 @@ def _install(id, load=True, cry=True):
     app.upgradable = ""
     app.installed = True
     if load:
-        app.load(cry)
+        app.load(cry=cry)

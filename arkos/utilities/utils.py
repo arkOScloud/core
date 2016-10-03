@@ -14,6 +14,7 @@ import gzip
 import os
 import random
 import requests
+import semantic_version
 import shlex
 import socket
 import string
@@ -46,6 +47,38 @@ def is_binary(chunk):
         (ratio1 > 0.3 and ratio2 < 0.05) or
         (ratio1 > 0.8 and ratio2 > 0.8)
     )
+
+
+def compare_versions(v1, op, v2):
+    """
+    Compare two versions.
+
+    Return True if the comparison is valid. Return False if it isn't. Return
+    None if one of the versions cannot be coerced.
+
+    `op` choices: gt, gte, lt, lte, eq
+    """
+    if type(v1) == bytes:
+        v1 = v1.decode()
+    if type(v2) == bytes:
+        v2 = v2.decode()
+    try:
+        v1 = semantic_version.Version.coerce(v1)
+        v2 = semantic_version.Version.coerce(v2)
+    except ValueError:
+        return None
+    if op == "gt":
+        return v1 > v2
+    elif op == "gte":
+        return v1 >= v2
+    elif op == "lt":
+        return v1 < v2
+    elif op == "lte":
+        return v1 <= v2
+    elif op == "eq":
+        return v1 == v2
+    elif op == "ne":
+        return v1 != v2
 
 
 def cidr_to_netmask(cidr):

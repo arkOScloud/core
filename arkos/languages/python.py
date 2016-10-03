@@ -11,16 +11,18 @@ from arkos import logger
 from arkos.utilities import errors, shell
 
 
-def install(*mods):
+def install(pkg, version=None):
     """
     Install a set of Python packages from PyPI.
 
-    :param *mods: packages to install
+    :param str pkg: package to install
+    :param str version: If present, install this specific version
     """
-    mods = " ".join(x for x in mods)
-    s = shell("pip install {0}".format(mods))
+    if version:
+        pkg = pkg + "==" + version
+    s = shell("pip install {0}".format(pkg))
     if s["code"] != 0:
-        errmsg = "PyPI install of {0} failed.".format(mods)
+        errmsg = "PyPI install of {0} failed.".format(pkg)
         logmsg = "PyPI install failure details:\n{0}"
         logger.error("Python", logmsg.format(s["stderr"].decode()))
         raise errors.OperationFailedError(errmsg)
@@ -48,8 +50,19 @@ def is_installed(name):
     :returns: True if package is installed
     :rtype: bool
     """
-    s = shell("pip freeze")
-    for x in s["stdout"].split("\n"):
-        if name.lower() in x.split("==")[0].lower():
-            return True
+    if name.lower() in (x["id"].lower() for x in get_installed()):
+        return True
     return False
+
+
+def get_installed():
+    """
+    Get all installed Python packages.
+
+    Returns in format `{"id": "package_name", "version": "1.0.0"}`.
+    """
+    s = shell("pip freeze")
+    return [
+        {"id": x.split(b"==")[0], "version": x.split(b"==")[1]}
+        for x in s["stdout"].split(b"\n") if x.split()
+    ]
