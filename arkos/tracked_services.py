@@ -58,12 +58,23 @@ class SecurityPolicy:
 
         :param bool fw: Regenerate the firewall after save?
         """
-        policies.set(self.type, self.id, self.policy)
+        if self.type == "custom":
+            for x in policies.get_all("custom"):
+                if self.id == x["id"]:
+                    policies.remove_list("custom", x)
+                    break
+            policies.append(
+                "custom",
+                {"id": self.id, "name": self.name, "icon": self.icon,
+                 "ports": self.ports, "policy": self.policy}
+            )
+        else:
+            policies.set(self.type, self.id, self.policy)
         policies.save()
-        if config.get("general", "firewall", True) and fw:
-            security.regenerate_firewall(get())
         if not storage.policies.get("policies", self.id):
             storage.policies.add("policies", self)
+        if config.get("general", "firewall", True) and fw:
+            security.regenerate_firewall(get())
 
     def remove(self, fw=True):
         """
@@ -73,11 +84,17 @@ class SecurityPolicy:
 
         :param bool fw: Regenerate the firewall after save?
         """
-        policies.remove(self.type, self.id)
+        if self.type == "custom":
+            for x in policies.get_all("custom"):
+                if self.id == x["id"]:
+                    policies.remove_list("custom", x)
+                    break
+        else:
+            policies.remove(self.type, self.id)
         policies.save()
+        storage.policies.remove("policies", self)
         if config.get("general", "firewall", True) and fw:
             security.regenerate_firewall(get())
-        storage.policies.remove("policies", self)
 
     @property
     def as_dict(self):
