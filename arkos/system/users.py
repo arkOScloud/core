@@ -18,8 +18,6 @@ from . import groups
 from arkos import conns, config, logger, signals
 from arkos.utilities import b, errors, hashpw, shell
 
-comp = "Users"
-
 
 class User:
     """Class for managing arkOS users in LDAP."""
@@ -95,7 +93,7 @@ class User:
         msg = "Setting user modes: {0}".format(", ".join(modes))
         logger.debug("Roles", msg)
         self.update_adminsudo()
-        signals.emit("users", "post_add", self)
+        signals.emit("users", "post_add", {"user": self, "passwd": passwd})
 
     def update(self, newpasswd=""):
         """
@@ -130,7 +128,9 @@ class User:
         nldif = ldap.modlist.modifyModlist(ldif, attrs, ignore_oldexistent=1)
         conns.LDAP.modify_s(self.ldap_id, nldif)
         self.update_adminsudo()
-        signals.emit("users", "post_update", self)
+        signals.emit(
+            "users", "post_update", {"user": self, "passwd": newpasswd}
+        )
 
     def update_adminsudo(self):
         """Update the user's admin and sudo group settings in LDAP."""
