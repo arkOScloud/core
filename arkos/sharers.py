@@ -276,6 +276,6 @@ def scan_sharers():
     mgrs = []
     for x in applications.get(type="fileshare"):
         if x.installed and hasattr(x, "_share_mgr"):
-            mgrs.append(x._share_mgr(id=x.id, icon=x.icon))
+            mgrs.append(x._share_mgr(id_=x.id, icon=x.icon))
     storage.shares.set("sharers", mgrs)
     return mgrs

@@ -253,7 +253,7 @@ def get_interfaces(id_=None):
             itype = "ethernet"
         else:
             itype = "unknown"
-        i = Interface(id=x, itype=itype)
+        i = Interface(id_=x, itype=itype)
         # Get the total bytes in and out for this interface
         data = psutil.net_io_counters(pernic=True)
         data = data[x] if type(data) == dict else data

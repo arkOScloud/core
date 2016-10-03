@@ -468,7 +468,7 @@ def get(id_=None):
             except:
                 fstype = "Unknown"
             try:
-                dev = DiskPartition(id=p.path.split("/")[-1], path=p.path,
+                dev = DiskPartition(id_=p.path.split("/")[-1], path=p.path,
                                     mountpoint=mps.get(p.path) or None,
                                     size=int(p.getSize("B")), fstype=fstype,
                                     enabled=p.path in fstab,
@@ -495,7 +495,7 @@ def get(id_=None):
             continue
         dname = os.path.splitext(os.path.split(x)[1])[0]
         luks_point = "/dev/mapper/{0}".format(dname)
-        dev = VirtualDisk(id=dname, path=x, size=os.path.getsize(x),
+        dev = VirtualDisk(id_=dname, path=x, size=os.path.getsize(x),
                           mountpoint=mps.get(x) or mps.get(luks_point) or None,
                           enabled=x in fstab, crypt=x.endswith(".crypt"))
         if id_ == dev.id:

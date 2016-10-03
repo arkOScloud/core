@@ -943,7 +943,7 @@ def scan():
             # If it's a regular website, initialize its class, metadata, etc
             if not app or not app.loadable or not app.installed:
                 continue
-            site = app._website(id=meta.get("website", "id"))
+            site = app._website(id_=meta.get("website", "id"))
             site.app = app
             site.data_path = (meta.get("website", "data_path") or "") \
                 if meta.has_option("website", "data_path") else ""
@@ -951,7 +951,7 @@ def scan():
                 if meta.has_option("website", "dbengine") else None
         else:
             # If it's a reverse proxy, follow a simplified procedure
-            site = ReverseProxy(id=meta.get("website", "id"))
+            site = ReverseProxy(id_=meta.get("website", "id"))
             site.name = meta.get("website", "name")
             site.app = app
         certname = meta.get("website", "ssl", fallback="None")
