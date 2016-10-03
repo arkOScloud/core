@@ -1045,6 +1045,10 @@ def create_acme_dummy(domain):
         os.symlink(origin, target)
     if not os.path.exists(challenge_dir):
         os.makedirs(challenge_dir)
+    tracked_services.register(
+        "acme", domain, domain + "(ACME Validation)", "globe", [('tcp', 80)],
+        2
+    )
     nginx_reload()
     return challenge_dir
 
@@ -1066,5 +1070,6 @@ def cleanup_acme_dummy(domain):
     if os.path.exists(target):
         os.unlink(target)
         found = True
+    tracked_services.deregister("acme", domain)
     if found:
         nginx_reload()

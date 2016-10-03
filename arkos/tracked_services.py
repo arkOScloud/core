@@ -7,6 +7,7 @@ Written by Jacob Cook
 Licensed under GPLv3, see LICENSE.md
 """
 
+import glob
 import miniupnpc
 import random
 
@@ -380,6 +381,7 @@ def initialize():
     port = [("tcp", int(config.get("genesis", "port")))]
     pol = SecurityPolicy("arkos", "arkos", "System Management (Genesis/APIs)",
                          "server", port, policy)
+    storage.policies.add("policies", pol)
 
     # uPNP
     policy = policies.get("arkos", "upnp", 1)
@@ -388,7 +390,15 @@ def initialize():
     if config.get("general", "enable_upnp", True):
         storage.policies.add("policies", pol)
 
-    storage.policies.add("policies", pol)
+    # ACME dummies
+    for x in glob.glob("/etc/nginx/sites-enabled/acme-*"):
+        acme_name = x.split("/etc/nginx/sites-enabled/acme-")[1]
+        pol = SecurityPolicy(
+            "acme", acme_name, "{0} (ACME Validation)".format(acme_name),
+            "globe", [('tcp', 80)], 2
+        )
+        storage.policies.add("policies", pol)
+
     for x in policies.get_all("custom"):
         pol = SecurityPolicy("custom", x["id"], x["name"], x["icon"],
                              x["ports"], x["policy"])
