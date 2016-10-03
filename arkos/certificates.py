@@ -664,7 +664,7 @@ def _generate_certificate(
         dhparams, nthread):
     nthread.title = "Generating TLS certificate"
 
-    signals.emit("certificates", "pre_add", id)
+    signals.emit("certificates", "pre_add", id_)
 
     # Check to see that we have a CA ready; if not, generate one
     basehost = ".".join(domain.split(".")[-2:])

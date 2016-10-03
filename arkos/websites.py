@@ -908,7 +908,7 @@ def get(id_=None, type_=None, force=False):
         type_list = []
         for site in sites:
             isRP = (type == "ReverseProxy" and isinstance(site, ReverseProxy))
-            if site.id == id:
+            if site.id == id_:
                 return site
             elif (type and isRP) or (type and site.app.id == type):
                 type_list.append(site)
