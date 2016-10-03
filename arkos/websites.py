@@ -16,7 +16,7 @@ import shutil
 import tarfile
 import zipfile
 
-from arkos import applications, config, databases, signals, storage
+from arkos import applications, config, databases, signals, storage, logger
 from arkos import tracked_services
 from arkos.messages import Notification, NotificationThread
 from arkos.languages import php
@@ -244,7 +244,7 @@ class Site:
         if extra_vars.get("addtoblock"):
             addtoblock += nginx.loads(extra_vars.get("addtoblock"), False)
         default_index = "index."+("php" if self.php else "html")
-        if self.app.website_root:
+        if hasattr(self.app, "website_root"):
             webroot = os.path.join(self.path, self.app.website_root)
         else:
             webroot = self.path
@@ -274,7 +274,7 @@ class Site:
         meta = configparser.SafeConfigParser()
         meta.add_section("website")
         meta.set("website", "id", self.id)
-        meta.set("website", "type", self.app.id)
+        meta.set("website", "app", self.app.id)
         meta.set("website", "ssl", self.cert.id if getattr(self, "cert", None)
                             else "None")
         meta.set("website", "version", self.version or "None")
@@ -736,30 +736,30 @@ class ReverseProxy(Site):
     """
 
     def __init__(
-            self, id="", name="", path="", domain="", port=80,
-            base_path="", block=[], app=None):
+            self, id="", path="", base_path="", domain="", port=80, block=[],
+            app=None, enabled=False):
         """
         Initialize the reverse proxy website object.
 
         :param str id: arkOS app ID
-        :param str name: App name
         :param str path: Path to website root directory
+        :param str base_path: Path to app root directory
         :param str domain: Hostname/domain
         :param int port: Port site is served on
-        :param str base_path: Path to app root directory
         :param list block: List of nginx key objects to add to server block
         :param str app: App creating this reverse proxy
+        :param bool enabled: Is site enabled in nginx?
         """
         self.id = id
         self.app = app
-        self.name = name
         self.domain = domain
         self.path = path
         self.port = port
-        self.base_path = base_path
         self.block = block
         self.cert = None
         self.installed = False
+        self.enabled = enabled
+        self.base_path = base_path
 
     def install(self, extra_vars={}, enable=True, nthread=None):
         """
@@ -769,6 +769,8 @@ class ReverseProxy(Site):
         :param bool enable: Enable the site in nginx on install?
         :param message message: Message object to update with status
         """
+        if not nthread:
+            nthread = NotificationThread()
         try:
             self._install(extra_vars, enable, nthread)
         except Exception as e:
@@ -781,10 +783,9 @@ class ReverseProxy(Site):
         path = (self.path or os.path.join(site_dir, self.id))
         self.path = path
 
-        try:
-            os.makedirs(self.path)
-        except:
-            pass
+        if os.path.isdir(self.path):
+            shutil.rmtree(self.path)
+        os.makedirs(self.path)
 
         # If extra data is passed in, set up the serverblock accordingly
         uwsgi_block = [nginx.Location(extra_vars.get("lregex", "/"),
@@ -835,7 +836,6 @@ class ReverseProxy(Site):
         meta.add_section("website")
         meta.set("website", "id", self.id)
         meta.set("website", "app", self.app.id if self.app else "None")
-        meta.set("website", "name", self.name)
         meta.set("website", "version", "None")
         meta.set("website", "ssl", ssl)
         with open(os.path.join(self.path, ".arkos"), "w") as f:
@@ -935,11 +935,9 @@ def scan():
 
         # Create the proper type of website object
         app = None
-        site_type = meta.get("website", "type")
-        if site_type == "ReverseProxy":
-            site_type = meta.get("website", "id")
-        app = applications.get(site_type)
-        if app.type == "website":
+        app_type = meta.get("website", "app")
+        app = applications.get(app_type)
+        if app and app.type == "website":
             # If it's a regular website, initialize its class, metadata, etc
             if not app or not app.loadable or not app.installed:
                 continue
@@ -949,11 +947,17 @@ def scan():
                 if meta.has_option("website", "data_path") else ""
             site.db = databases.get(site.id) \
                 if meta.has_option("website", "dbengine") else None
-        else:
+        elif app:
             # If it's a reverse proxy, follow a simplified procedure
             site = ReverseProxy(id=meta.get("website", "id"))
-            site.name = meta.get("website", "name")
             site.app = app
+        else:
+            # Unknown website type.
+            logger.debug(
+                "Websites", "Unknown website found and ignoring, id {0}"
+                .format(meta.get("website", "id"))
+            )
+            continue
         certname = meta.get("website", "ssl", fallback="None")
         site.cert = certificates.get(certname) if certname != "None" else None
         if site.cert:
