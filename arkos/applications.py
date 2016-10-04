@@ -112,8 +112,7 @@ class App:
             signals.emit("apps", "post_load", self)
         except Exception as e:
             self.loadable = False
-            self.error = "Module error: {0}".format(e)
-            logger.debug("Apps", str(e))
+            self.error = str(e)
             Notification(
                 "warning", "Apps", "Could not load {0}: {1}".format(
                     self.name, self.error
