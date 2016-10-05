@@ -120,7 +120,7 @@ class DiskPartition:
         f = FstabEntry()
         f.src = self.path
         f.dst = os.path.join("/media", self.id)
-        f.uuid = get_partition_uuidby_name(self.path)
+        f.uuid = get_partition_uuid_by_name(self.path)
         f.fs_type = "ext4"
         f.options = "defaults"
         f.dump_p = 0
@@ -577,7 +577,7 @@ def get_fstab():
             e.src = get_partition_name_by_uuid(e.uuid)
         else:
             e.src = s[0]
-            e.uuid = get_partition_uuidby_name(e.src)
+            e.uuid = get_partition_uuid_by_name(e.src)
         try:
             e.dst = s[1]
             e.fs_type = s[2]
@@ -607,7 +607,7 @@ def save_fstab_entry(e, remove=False):
         f.writelines(lines)
 
 
-def get_partition_uuidby_name(p):
+def get_partition_uuid_by_name(p):
     """Get a partition's UUID from its device name."""
     return shell("blkid -o value -s UUID " + p)["stdout"].split(b"\n")[0]
 

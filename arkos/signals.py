@@ -20,6 +20,7 @@ class Listener:
     or for making sure certain elements are established after loading a
     necessary component.
     """
+
     def __init__(self, by, id, sig, func):
         """
         Initialize the signal listener.
