@@ -51,13 +51,13 @@ class Sharer:
 class Share:
     """Represents a file share object."""
 
-    def __init__(self, id="", comment="", path="", validusers=[],
+    def __init__(self, id="", comment="", path="", valid_users=[],
                  public=True, readonly=False, manager=None):
         """Initialize."""
         self.id = id
         self.comment = comment
         self.path = path
-        self.validusers = validusers
+        self.valid_users = valid_users
         self.public = public
         self.readonly = readonly
         self.manager = manager
@@ -90,7 +90,7 @@ class Share:
             "share_type": self.manager.id,
             "comment": self.comment,
             "path": self.path,
-            "validusers": self.validusers,
+            "valid_users": self.valid_users,
             "public": self.public,
             "read_only": self.readonly,
             "is_ready": True

@@ -312,7 +312,7 @@ def get(backup_location=""):
     ``Backup`` dicts are in the following format (example):
 
         {
-          "icon": "fa fa-globe",
+          "icon": "globe",
           "id": "testghost/20150317124530",
           "is_ready": true,
           "path": "/var/lib/arkos/backups/testghost/testghost-xxx.tar.gz",

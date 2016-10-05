@@ -340,7 +340,7 @@ def _scan_a_cert(id, cert_path, key_path, assigns, is_acme=False):
     return Certificate(
         id=id, cert_path=cert_path, key_path=key_path, keytype=kt,
         keylength=key.key_size, domain=common_name[0].value,
-        assigns=assigns.get(id, []), expiry=crt.not_validafter, sha1=sha1,
+        assigns=assigns.get(id, []), expiry=crt.not_valid_after, sha1=sha1,
         md5=md5, is_acme=is_acme)
 
 
@@ -398,7 +398,7 @@ def scan_authorities():
         sha1 = binascii.hexlify(cert.fingerprint(hashes.SHA1())).decode()
         md5 = binascii.hexlify(cert.fingerprint(hashes.MD5())).decode()
         kt = "RSA" if isinstance(key.public_key(), rsa.RSAPublicKey) else "DSA"
-        ca = CertificateAuthority(id, x, key_path, cert.not_validafter,
+        ca = CertificateAuthority(id, x, key_path, cert.not_valid_after,
                                   kt, key.key_size, sha1, md5)
         certs.append(ca)
     storage.certs.set("authorities", certs)
@@ -465,7 +465,7 @@ def upload_certificate(
                     cert_path=os.path.join(cert_dir, "{0}.crt".format(id)),
                     key_path=os.path.join(key_dir, "{0}.key".format(id)),
                     keytype=kt, keylength=ky.key_size,
-                    domain=common_name, expiry=crt.not_validafter,
+                    domain=common_name, expiry=crt.not_valid_after,
                     sha1=sha1, md5=md5)
 
     # Save certificate, key and chainfile (if applicable) to files
@@ -611,7 +611,7 @@ def _request_acme_certificate(domain, webroot, nthread):
         ktype = "Unknown"
     ksize = key.key_size
     c = Certificate(domain, domain, cert_path, key_path, ktype, ksize,
-                    [], cert.not_validafter, sha1, md5, is_acme=True)
+                    [], cert.not_valid_after, sha1, md5, is_acme=True)
     storage.certs.add("certificates", c)
 
     with open("/etc/cron.d/arkos-acme-renew", "a") as f:
@@ -722,7 +722,7 @@ def _generate_certificate(
     cert = cert.serial_number(int.from_bytes(os.urandom(20), "big") >> 1)
     cert = cert.public_key(key.public_key())
     cert = cert.not_validbefore(datetime.datetime.utcnow())
-    cert = cert.not_validafter(
+    cert = cert.not_valid_after(
         datetime.datetime.utcnow() + datetime.timedelta(days=730)
     )
     cert = cert.sign(ca_key, hashes.SHA256(), default_backend())
@@ -740,7 +740,7 @@ def _generate_certificate(
     sha1 = ":".join([sha1[i:i+2].upper() for i in range(0, len(sha1), 2)])
     md5 = ":".join([md5[i:i+2].upper() for i in range(0, len(md5), 2)])
     c = Certificate(id, domain, cert_path, key_path, keytype, keylength,
-                    [], cert.not_validafter, sha1, md5)
+                    [], cert.not_valid_after, sha1, md5)
     storage.certs.add("certificates", c)
     signals.emit("certificates", "post_add", c)
     msg = "Certificate generated successfully"
@@ -793,7 +793,7 @@ def _generate_authority(domain):
     cert = cert.serial_number(int.from_bytes(os.urandom(20), "big") >> 1)
     cert = cert.public_key(key.public_key())
     cert = cert.not_validbefore(datetime.datetime.utcnow())
-    cert = cert.not_validafter(
+    cert = cert.not_valid_after(
         datetime.datetime.utcnow() + datetime.timedelta(days=1825)
     )
     cert = cert.add_extension(
@@ -818,7 +818,7 @@ def _generate_authority(domain):
         f.write(cert.public_bytes(serialization.Encoding.PEM))
     os.chmod(cert_path, 0o660)
 
-    ca.expiry = cert.not_validafter
+    ca.expiry = cert.not_valid_after
     sha1 = binascii.hexlify(cert.fingerprint(hashes.SHA1())).decode()
     md5 = binascii.hexlify(cert.fingerprint(hashes.MD5())).decode()
     sha1 = ":".join([sha1[i:i+2].upper() for i in range(0, len(sha1), 2)])
