@@ -16,12 +16,13 @@ import shutil
 import tarfile
 import zipfile
 
-from arkos import applications, config, databases, signals, storage
+from arkos import applications, config, databases, signals, storage, logger
 from arkos import tracked_services
 from arkos.messages import Notification, NotificationThread
 from arkos.languages import php
 from arkos.system import users, groups, services
 from arkos.utilities import download, errors, random_string
+
 
 # If no cipher preferences set, use the default ones
 # As per Mozilla recommendations, but substituting 3DES for RC4
@@ -54,7 +55,7 @@ class Site:
 
         :param Application app: Application metadata
         :param str id: Website name
-        :param str addr: Hostname/domain
+        :param str domain: Hostname/domain
         :param int port: Port site is served on
         :param str path: Path to site root directory
         :param bool php: Does this site use PHP?
@@ -86,7 +87,6 @@ class Site:
         """
         Install site, including prep and app recipes.
 
-        :param Application meta: Application metadata
         :param dict extra_vars: Extra form variables as provided by client
         :param bool enable: Enable the site in nginx on install?
         :param message message: Message object to update with status
@@ -154,8 +154,7 @@ class Site:
             self.app.selected_dbengine = self.app.database_engines[0]
 
         # Create DB and/or DB user as necessary
-        stage = "Database"
-        if getattr(self.meta, "selected_dbengine", None):
+        if getattr(self.app, "selected_dbengine", None):
             msg = "Creating database..."
             nthread.update(Notification("info", "Websites", msg))
             mgr = databases.get_managers(self.app.selected_dbengine)
@@ -187,7 +186,9 @@ class Site:
         msg = "Downloading website source..."
         nthread.update(Notification("info", "Websites", msg))
         if self.app.download_url and ending == ".git":
-            git.Repo.clone_from(self.app.download_url, self.path)
+            g = git.Repo.clone_from(self.app.download_url, self.path)
+            if hasattr(self.app, "download_at_tag"):
+                g.checkout(self.app.download_git_tag)
         elif self.app.download_url:
             download(self.app.download_url, file=pkg_path, crit=True)
 
@@ -245,7 +246,7 @@ class Site:
         if extra_vars.get("addtoblock"):
             addtoblock += nginx.loads(extra_vars.get("addtoblock"), False)
         default_index = "index."+("php" if self.php else "html")
-        if self.app.website_root:
+        if hasattr(self.app, "website_root"):
             webroot = os.path.join(self.path, self.app.website_root)
         else:
             webroot = self.path
@@ -275,7 +276,7 @@ class Site:
         meta = configparser.SafeConfigParser()
         meta.add_section("website")
         meta.set("website", "id", self.id)
-        meta.set("website", "type", self.app.id)
+        meta.set("website", "app", self.app.id)
         meta.set("website", "ssl", self.cert.id if getattr(self, "cert", None)
                             else "None")
         meta.set("website", "version", self.version or "None")
@@ -737,30 +738,30 @@ class ReverseProxy(Site):
     """
 
     def __init__(
-            self, id="", name="", path="", domain="", port=80,
-            base_path="", block=[], app=None):
+            self, id="", path="", base_path="", domain="", port=80, block=[],
+            app=None, enabled=False):
         """
         Initialize the reverse proxy website object.
 
         :param str id: arkOS app ID
-        :param str name: App name
         :param str path: Path to website root directory
+        :param str base_path: Path to app root directory
         :param str domain: Hostname/domain
         :param int port: Port site is served on
-        :param str base_path: Path to app root directory
         :param list block: List of nginx key objects to add to server block
         :param str app: App creating this reverse proxy
+        :param bool enabled: Is site enabled in nginx?
         """
         self.id = id
         self.app = app
-        self.name = name
         self.domain = domain
         self.path = path
         self.port = port
-        self.base_path = base_path
         self.block = block
         self.cert = None
         self.installed = False
+        self.enabled = enabled
+        self.base_path = base_path
 
     def install(self, extra_vars={}, enable=True, nthread=None):
         """
@@ -770,6 +771,8 @@ class ReverseProxy(Site):
         :param bool enable: Enable the site in nginx on install?
         :param message message: Message object to update with status
         """
+        if not nthread:
+            nthread = NotificationThread()
         try:
             self._install(extra_vars, enable, nthread)
         except Exception as e:
@@ -782,10 +785,9 @@ class ReverseProxy(Site):
         path = (self.path or os.path.join(site_dir, self.id))
         self.path = path
 
-        try:
-            os.makedirs(self.path)
-        except:
-            pass
+        if os.path.isdir(self.path):
+            shutil.rmtree(self.path)
+        os.makedirs(self.path)
 
         # If extra data is passed in, set up the serverblock accordingly
         uwsgi_block = [nginx.Location(extra_vars.get("lregex", "/"),
@@ -835,7 +837,6 @@ class ReverseProxy(Site):
         ssl = self.cert.id if getattr(self, "cert", None) else "None"
         meta.add_section("website")
         meta.set("website", "id", self.id)
-        meta.set("website", "name", self.name)
         meta.set("website", "version", "None")
         meta.set("website", "ssl", ssl)
         with open(os.path.join(self.path, ".arkos"), "w") as f:
@@ -887,7 +888,7 @@ class ReverseProxy(Site):
         return self.as_dict
 
 
-def get(id=None, type_=None, force=False):
+def get(id=None, type=None, force=False):
     """
     Retrieve website data from the system.
 
@@ -896,7 +897,7 @@ def get(id=None, type_=None, force=False):
     are loaded and verified. This is used on first boot.
 
     :param str id: If present, obtain one site that matches this ID
-    :param str type_: Filter by ``website``, ``reverseproxy``, etc
+    :param str type: Filter by ``website``, ``reverseproxy``, etc
     :param bool force: Force a rescan (do not rely on cache)
     :return: Website(s)
     :rtype: Website or list thereof
@@ -904,7 +905,7 @@ def get(id=None, type_=None, force=False):
     sites = storage.sites.get("sites")
     if not sites or force:
         sites = scan()
-    if id or type_:
+    if id or type:
         type_list = []
         for site in sites:
             isRP = (type == "ReverseProxy" and isinstance(site, ReverseProxy))
@@ -935,11 +936,9 @@ def scan():
 
         # Create the proper type of website object
         app = None
-        site_type = meta.get("website", "type")
-        if site_type == "ReverseProxy":
-            site_type = meta.get("website", "id")
-        app = applications.get(site_type)
-        if app.type == "website":
+        app_type = meta.get("website", "app")
+        app = applications.get(app_type)
+        if app and app.type == "website":
             # If it's a regular website, initialize its class, metadata, etc
             if not app or not app.loadable or not app.installed:
                 continue
@@ -949,11 +948,17 @@ def scan():
                 if meta.has_option("website", "data_path") else ""
             site.db = databases.get(site.id) \
                 if meta.has_option("website", "dbengine") else None
-        else:
+        elif app:
             # If it's a reverse proxy, follow a simplified procedure
             site = ReverseProxy(id=meta.get("website", "id"))
-            site.name = meta.get("website", "name")
             site.app = app
+        else:
+            # Unknown website type.
+            logger.debug(
+                "Websites", "Unknown website found and ignoring, id {0}"
+                .format(meta.get("website", "id"))
+            )
+            continue
         certname = meta.get("website", "ssl", fallback="None")
         site.cert = certificates.get(certname) if certname != "None" else None
         if site.cert:
@@ -1045,6 +1050,10 @@ def create_acme_dummy(domain):
         os.symlink(origin, target)
     if not os.path.exists(challenge_dir):
         os.makedirs(challenge_dir)
+    tracked_services.register(
+        "acme", domain, domain + "(ACME Validation)", "globe", [('tcp', 80)],
+        2
+    )
     nginx_reload()
     return challenge_dir
 
@@ -1066,5 +1075,6 @@ def cleanup_acme_dummy(domain):
     if os.path.exists(target):
         os.unlink(target)
         found = True
+    tracked_services.deregister("acme", domain)
     if found:
         nginx_reload()

@@ -135,6 +135,22 @@ class Config:
             self.config[section] = {}
             self.config[section][key] = [value]
 
+    def remove_list(self, section, key, value=None):
+        """
+        Remove and return a value from a list-type key.
+
+        :param str section: Section name
+        :param str key: Key name
+        :param str value: Value to remove from list
+        """
+        if value is None:
+            if section not in self.config:
+                return
+            return self.config[section].remove(key)
+        elif section in self.config:
+            return self.config[section][key].remove(value)
+        return
+
     def remove(self, section, key):
         """
         Remove a key from the config.

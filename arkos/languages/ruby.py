@@ -8,11 +8,12 @@ Licensed under GPLv3, see LICENSE.md
 """
 
 import os
+import re
 
 from arkos import logger
 from arkos.utilities import errors, shell
 
-BINPATH = "/usr/lib/ruby/gems/2.2.0/bin"
+BINPATH = "/usr/lib/ruby/gems/2.3.0/bin"
 
 
 def verify_path():
@@ -31,41 +32,52 @@ def verify_path():
         f.writelines(profile)
 
 
-def install_gem(*gems, **kwargs):
+def install(gem, version=None, update=False):
     """
-    Install a set of Ruby gems to the system.
+    Install a Ruby gem to the system.
 
-    If ``force`` is present in kwargs and is True, force reinstall of the gem.
-
-    :param *gems: gems to install
-    """
-    verify_path()
-    gemlist = shell("gem list")["stdout"].split(b"\n")
-    for x in gems:
-        if not any(x == s for s in gemlist) or kwargs.get('force'):
-            d = shell("gem install -N --no-user-install {0}".format(x))
-            if d["code"] != 0:
-                errmsg = "Gem install of {0} failed.".format(x)
-                logmsg = "Gem install failure details:\n{0}"
-                logger.error("Ruby", logmsg.format(d["stderr"].decode()))
-                raise errors.OperationFailedError(errmsg)
-
-
-def update_gem(*gems, **kwargs):
-    """
-    Update a set of presently-installed Ruby gems.
-
-    If ``force`` is present in kwargs and is True, force reinstall of the gem.
-
-    :param *gems: gems to install
+    :param str gem: Gem name
+    :param str version: If present, install this specific version
+    :param bool update: If true, force an update
     """
     verify_path()
-    gemlist = shell("gem list")["stdout"].split("\n")
+    if version:
+        gem = gem + ":" + version
+    s = shell("gem {0} -N --no-user-install {0}".format(
+        "update" if update else "install", gem
+    ))
+    if s["code"] != 0:
+        errmsg = "Gem install of {0} failed.".format(gem)
+        logmsg = "Gem install failure details:\n{0}"
+        logger.error("Ruby", logmsg.format(s["stderr"].decode()))
+        raise errors.OperationFailedError(errmsg)
+
+
+def is_installed(name):
+    """
+    Check if a Ruby gem is installed or not.
+
+    :param str name: Name of package
+    :returns: True if gem is installed
+    :rtype: bool
+    """
+    if name.lower() in (x["id"].lower() for x in get_installed()):
+        return True
+    return False
+
+
+def get_installed():
+    """
+    Get all installed Ruby gems.
+
+    Returns in format `{"id": "gem_name", "version": "1.0.0"}`.
+    """
+    data = []
+    gems = shell("gem list")["stdout"].split(b"\n")
     for x in gems:
-        if not any(x == s for s in gemlist) or kwargs.get('force'):
-            d = shell("gem update -N --no-user-install {0}".format(x))
-            if d["code"] != 0:
-                errmsg = "Gem update of {0} failed.".format(x)
-                logmsg = "Gem update failure details:\n{0}"
-                logger.error("Ruby", logmsg.format(d["stderr"].decode()))
-                raise errors.OperationFailedError(errmsg)
+        if not x.split():
+            continue
+        gem = re.search(r"^(.*) \((.*)\)$", x.decode()).group(1, 2)
+        gem = {"id": gem[0], "version": gem[1]}
+        data.append(gem)
+    return data
