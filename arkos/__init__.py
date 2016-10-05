@@ -8,7 +8,6 @@ Licensed under GPLv3, see LICENSE.md
 """
 
 from arkos.config import Config
-from arkos.storage import StorageControl
 from arkos.utilities import test_dns
 from arkos.utilities.logs import LoggingControl
 from arkos.connections import ConnectionsManager
@@ -16,12 +15,20 @@ from arkos.utilities import detect_architecture
 
 version = "0.8.0"
 
-config = Config("settings.json")
-secrets = Config("secrets.json")
-policies = Config("policies.json")
-storage = StorageControl()
-conns = ConnectionsManager()
-logger = LoggingControl()
+
+class StorageControl:
+    """The primary controller for all Storage classes."""
+    TYPES = [
+        "applications", "websites", "certificates", "certificate_authorities",
+        "databases", "database_users", "database_engines", "updates",
+        "policies", "shared_files", "shares", "mounts", "share_engines",
+        "signals"
+    ]
+
+    def __init__(self):
+        """Initialize arkOS storage."""
+        for x in self.TYPES:
+            setattr(self, x, {})
 
 
 def init(config_path="/etc/arkos/settings.json",
@@ -57,3 +64,11 @@ def initial_scans():
     tracked_services.initialize()
     if config.get("general", "enable_upnp", True):
         tracked_services.initialize_upnp(tracked_services.get())
+
+
+config = Config("settings.json")
+secrets = Config("secrets.json")
+policies = Config("policies.json")
+storage = StorageControl()
+conns = ConnectionsManager()
+logger = LoggingControl()

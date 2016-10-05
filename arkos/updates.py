@@ -40,7 +40,7 @@ def check_updates():
             data = {"id": x["id"], "name": x["name"], "date": x["date"],
                     "info": x["info"], "tasks": u}
             updates.append(data)
-    storage.updates.set("updates", updates)
+    storage.updates = {x.id: x for x in updates}
     return updates
 
 
@@ -52,13 +52,13 @@ def install_updates(nthread=NotificationThread()):
     """
     nthread.title = "Installing updates"
 
-    updates = storage.updates.get("updates")
+    updates = storage.updates
     if not updates:
         return
     signals.emit("updates", "pre_install")
     amount = len(updates)
     responses, ids = [], []
-    for z in enumerate(updates):
+    for z in enumerate(updates.values()):
         msg = "{0} of {1}...".format(z[0] + 1, amount)
         nthread.update(Notification("info", "Updates", msg))
         for x in sorted(z[1]["tasks"], key=lambda y: y["step"]):

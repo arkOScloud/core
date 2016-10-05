@@ -39,7 +39,7 @@ class Database:
         """
         signals.emit("databases", "pre_add", self)
         self.add_db()
-        storage.dbs.add("databases", self)
+        storage.databases[self.id] = self
         signals.emit("databases", "post_add", self)
 
     def add_db(self):
@@ -55,7 +55,8 @@ class Database:
         """
         signals.emit("databases", "pre_remove", self)
         self.remove_db()
-        storage.dbs.remove("databases", self)
+        if self.id in storage.databases:
+            del storage.databases[self.id]
         signals.emit("databases", "post_remove", self)
 
     def remove_db(self):
@@ -113,7 +114,7 @@ class DatabaseUser:
         """
         signals.emit("databases", "pre_user_add", self)
         self.add_user(passwd)
-        storage.dbs.add("users", self)
+        storage.database_users[self.id] = self
         signals.emit("databases", "post_user_add", self)
 
     def add_user(self):
@@ -129,7 +130,8 @@ class DatabaseUser:
         """
         signals.emit("databases", "pre_user_remove", self)
         self.remove_user()
-        storage.dbs.remove("users", self)
+        if self.id in storage.database_users:
+            del storage.database_users[self.id]
         signals.emit("databases", "post_user_remove", self)
 
     def remove_user(self):
@@ -235,18 +237,13 @@ def get(id=None, type=None):
     :return: Database(s)
     :rtype: Database or list thereof
     """
-    data = scan()
-    if id or type:
-        tlist = []
-        for x in data:
-            if x.id == id:
-                return x
-            elif x.manager.id == type:
-                tlist.append(x)
-        if tlist:
-            return tlist
-        return None
-    return data
+    scan()
+    data = storage.databases
+    if id:
+        return data.get(id)
+    if type:
+        return filter(lambda x: x.manager.id == type, data.values())
+    return data.values()
 
 
 def scan():
@@ -256,17 +253,17 @@ def scan():
     :return: Database(s)
     :rtype: Database or list thereof
     """
-    dbs = []
+    storage.databases.clear()
     for x in get_managers():
         try:
-            dbs += x.get_dbs()
+            for y in x.get_dbs():
+                storage.databases[y.id] = y
         except:
             continue
-    storage.dbs.set("databases", dbs)
-    return dbs
+    return storage.databases
 
 
-def get_user(id=None, type=None):
+def get_users(id=None, type=None):
     """
     Retrieve a list of all database users registered with arkOS.
 
@@ -275,18 +272,13 @@ def get_user(id=None, type=None):
     :return: DatabaseUser(s)
     :rtype: DatabaseUser or list thereof
     """
-    data = scan_users()
-    if id or type:
-        tlist = []
-        for x in data:
-            if x.id == id:
-                return x
-            elif x.manager.id == type:
-                tlist.append(x)
-        if tlist:
-            return tlist
-        return None
-    return data
+    scan_users()
+    data = storage.database_users
+    if id:
+        return data.get(id)
+    if type:
+        return filter(lambda x: x.manager.id == type, data.values())
+    return data.values()
 
 
 def scan_users():
@@ -296,14 +288,14 @@ def scan_users():
     :return: DatabaseUser(s)
     :rtype: DatabaseUser or list thereof
     """
-    users = []
+    storage.database_users.clear()
     for x in get_managers():
         try:
-            users += x.get_users()
+            for y in x.get_users():
+                storage.database_users[y.id] = y
         except:
             continue
-    storage.dbs.set("users", users)
-    return users
+    return storage.database_users
 
 
 def get_managers(id=None):
@@ -314,15 +306,12 @@ def get_managers(id=None):
     :return: DatabaseManager(s)
     :rtype: DatabaseManager or list thereof
     """
-    data = storage.dbs.get("managers")
+    data = storage.database_engines
     if not data:
         data = scan_managers()
     if id:
-        for x in data:
-            if x.id == id:
-                return x
-        return None
-    return data
+        return data.get(id)
+    return data.values()
 
 
 def scan_managers():
@@ -332,9 +321,9 @@ def scan_managers():
     :return: DatabaseManager(s)
     :rtype: DatabaseManager or list thereof
     """
-    mgrs = []
+    storage.database_engines.clear()
     for x in applications.get(type="database"):
         if x.installed and hasattr(x, "_database_mgr"):
-            mgrs.append(x._database_mgr(id=x.id, name=x.name, meta=x))
-    storage.dbs.set("managers", mgrs)
-    return mgrs
+            storage.database_engines[x.id] = \
+                x._database_mgr(id=x.id, name=x.name, meta=x)
+    return storage.database_engines

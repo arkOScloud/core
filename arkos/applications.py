@@ -22,9 +22,6 @@ from arkos.languages import python, ruby
 from arkos.utilities import api, compare_versions, errors
 
 
-SYS_INSTALLED, PY_INSTALLED, RB_INSTALLED = [], [], []
-
-
 class App:
     """Class representing an arkOS Application."""
 
@@ -409,18 +406,18 @@ def get(id=None, type=None, loadable=None, installed=None,
     :return: Application(s)
     :rtype: Application or list thereof
     """
-    data = storage.apps.get("applications")
+    data = storage.applications
     if not data or force:
         data = scan(verify, cry)
     if id:
-        return next(filter(lambda x: x.id == id, data), None)
+        return data.get(id)
     if type:
-        data = list(filter(lambda x: x.type == type, data))
+        return filter(lambda x: x.type == type, data.values())
     if loadable:
-        data = list(filter(lambda x: x.loadable == loadable, data))
+        return filter(lambda x: x.loadable == loadable, data.values())
     if installed:
-        data = list(filter(lambda x: x.installed == installed, data))
-    return data
+        return filter(lambda x: x.installed == installed, data.values())
+    return data.values()
 
 
 def scan(verify=True, cry=True):
@@ -437,7 +434,6 @@ def scan(verify=True, cry=True):
     """
     signals.emit("apps", "pre_scan")
     app_dir = config.get("apps", "app_dir")
-    apps = []
     if not os.path.exists(app_dir):
         os.makedirs(app_dir)
 
@@ -482,21 +478,19 @@ def scan(verify=True, cry=True):
                 app.assets = y[1]["assets"]
                 available_apps[y[0]]["installed"] = True
         app.load(verify=verify, cry=cry, installed=inst_list)
-        apps.append(app)
+        storage.applications[app.id] = app
 
     # Convert available apps payload to objects
     for x in available_apps:
         if not x.get("installed"):
             app = App(**x)
             app.installed = False
-            apps.append(app)
-
-    storage.apps.set("applications", apps)
+            storage.applications[app.id] = app
 
     if verify:
         verify_app_dependencies()
     signals.emit("apps", "post_scan")
-    return storage.apps.get("applications")
+    return storage.applications
 
 
 def verify_app_dependencies():
@@ -505,13 +499,13 @@ def verify_app_dependencies():
 
     Assigns ``loadable`` and ``error`` properties to all apps in the cache.
     """
-    apps = [x for x in storage.apps.get("applications") if x.installed]
-    for x in apps:
+    for x in filter(lambda x: x.installed, storage.applications.values()):
         for dep in x.dependencies:
             # For each app-type dependency in all installed apps...
             if dep["type"] == "app":
                 # If the needed app isn't yet installed, put a fail message
-                if not dep["package"] in [y.id for y in apps]:
+                pre_app = storage.applications.get(dep["package"])
+                if not pre_app or not pre_app.installed:
                     x.loadable = False
                     x.error = "Depends on {0}, which is not installed"\
                               .format(dep["name"])
@@ -521,14 +515,15 @@ def verify_app_dependencies():
                     logger.debug("Apps", error_str)
                     # Cascade this fail message to all apps in dependency chain
                     for z in get_dependent(x.id, "remove"):
-                        z = storage.apps.get("applications", z)
+                        z = storage.applications.get(z)
+                        if not z:
+                            continue
                         z.loadable = False
                         error_str = "Depends on {0}, which cannot be loaded "\
                                     "because {1} is not installed"
                         z.error = error_str.format(x.name, dep["name"])
                 # Also put fail msg if the app we depended on failed to load
-                elif not storage.apps.get("applications", dep["package"])\
-                        .loadable:
+                elif not pre_app.loadable:
                     x.loadable = False
                     x.error = "Depends on {0}, which also failed"\
                               .format(dep["name"])
@@ -538,7 +533,9 @@ def verify_app_dependencies():
                     logger.debug("Apps", error_str)
                     # Cascade this fail message to all apps in dependency chain
                     for z in get_dependent(x.id, "remove"):
-                        z = storage.apps.get("applications", z)
+                        z = storage.applications.get(z)
+                        if not z:
+                            continue
                         z.loadable = False
                         error_str = "Depends on {0}, which cannot be loaded"\
                                     " because {1} failed to load"
@@ -555,20 +552,19 @@ def get_dependent(id, op):
     :rtype: list
     """
     metoo = []
-    apps = storage.apps.get("applications")
-    installed = [x.id for x in apps if x.installed]
     # If any apps depend on me, flag them to be removed also
     if op == "remove":
-        for app in apps:
+        for app in storage.applications.values():
             for dep in app.dependencies:
                 if dep["type"] == "app" and dep["package"] == id:
                     metoo.append(app)
                     metoo += get_dependent(app.id, "remove")
     # If I need any other apps to install, flag them to be installed also
     elif op == "install":
-        app = next(x for x in apps if x.id == id)
-        for dep in app.dependencies:
-            if dep["type"] == "app" and dep["package"] not in installed:
+        app = storage.applications.get(id)
+        for dep in filter(lambda x: x["type"] == "app", app.dependencies):
+            pre_app = storage.applications.get(dep["package"])
+            if not pre_app or not pre_app.installed:
                 metoo.append(dep["package"])
                 metoo += get_dependent(dep["package"], "install")
     return metoo

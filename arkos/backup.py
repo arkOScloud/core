@@ -199,8 +199,9 @@ class BackupController:
                 os.unlink(sql_path)
                 if dbmgr.meta.database_multiuser:
                     dbpasswd = random_string(16)
-                    if databases.get_user(sitename):
-                        databases.get_user(sitename).remove()
+                    dbuser = databases.get_users(sitename)
+                    if dbuser:
+                        dbuser.remove()
                     db_user = dbmgr.add_user(sitename, dbpasswd)
                     db_user.chperm("grant", db)
 

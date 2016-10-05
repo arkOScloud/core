@@ -71,8 +71,7 @@ class SecurityPolicy:
         else:
             policies.set(self.type, self.id, self.policy)
         policies.save()
-        if not storage.policies.get("policies", self.id):
-            storage.policies.add("policies", self)
+        storage.policies[self.id] = self
         if config.get("general", "firewall", True) and fw:
             security.regenerate_firewall(get())
 
@@ -92,7 +91,8 @@ class SecurityPolicy:
         else:
             policies.remove(self.type, self.id)
         policies.save()
-        storage.policies.remove("policies", self)
+        if self.id in storage.policies:
+            del storage.policies[self.id]
         if config.get("general", "firewall", True) and fw:
             security.regenerate_firewall(get())
 
@@ -134,18 +134,12 @@ def get(id=None, type=None):
     :param str id: App or website ID
     :param str type: Filter by type ('website', 'app', etc)
     """
-    data = storage.policies.get("policies")
-    if id or type:
-        tlist = []
-        for x in data:
-            if x.id == id:
-                return x
-            elif x.type == type:
-                tlist.append(x)
-        if tlist:
-            return tlist
-        return []
-    return data
+    data = storage.policies
+    if id:
+        return data.get(id)
+    if type:
+        return filter(lambda x: x.type == type, data.values())
+    return data.values()
 
 
 def register(type, id, name, icon, ports, domain=None, policy=0,
@@ -178,11 +172,6 @@ def register(type, id, name, icon, ports, domain=None, policy=0,
     """
     if not policy:
         policy = policies.get(type, id, default_policy)
-    pget = get(type=type)
-    if pget:
-        for x in pget:
-            if x.id == id:
-                storage.policies.remove("policies", x)
     svc = SecurityPolicy(type, id, name, icon, ports, policy, domain)
     svc.save(fw)
 
@@ -398,14 +387,14 @@ def initialize():
     port = [("tcp", int(config.get("genesis", "port")))]
     pol = SecurityPolicy("arkos", "arkos", "System Management (Genesis/APIs)",
                          "server", port, policy)
-    storage.policies.add("policies", pol)
+    storage.policies[pol.id] = pol
 
     # uPNP
     policy = policies.get("arkos", "upnp", 1)
     pol = SecurityPolicy("arkos", "upnp", "uPnP Firewall Comms",
                          "server", [("udp", 1900)], policy)
     if config.get("general", "enable_upnp", True):
-        storage.policies.add("policies", pol)
+        storage.policies[pol.id] = pol
 
     # ACME dummies
     for x in glob.glob("/etc/nginx/sites-enabled/acme-*"):
@@ -414,12 +403,12 @@ def initialize():
             "acme", acme_name, "{0} (ACME Validation)".format(acme_name),
             "globe", [('tcp', 80)], 2
         )
-        storage.policies.add("policies", pol)
+        storage.policies[pol.id] = pol
 
     for x in policies.get_all("custom"):
         pol = SecurityPolicy("custom", x["id"], x["name"], x["icon"],
                              x["ports"], x["policy"])
-        storage.policies.add("policies", pol)
+        storage.policies[pol.id] = pol
 
 
 def register_website(site):

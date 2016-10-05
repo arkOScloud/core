@@ -13,7 +13,7 @@ import xmlrpc.client
 
 
 from .utilities import errors
-from dbus import SystemBus, Interface
+from pydbus import SystemBus
 
 
 class ConnectionsManager:
@@ -29,24 +29,23 @@ class ConnectionsManager:
         self.config = config
         self.secrets = secrets
         self.DBus = SystemBus()
-        self.SystemD = self.SystemDConnect("/org/freedesktop/systemd1",
-                                           "org.freedesktop.systemd1.Manager")
+        self.SystemD = self.DBus.get('org.freedesktop.systemd1')
         self.LDAP = ldap_connect(config=config, passwd=secrets.get("ldap"))
         self.Supervisor = supervisor_connect()
 
-    def SystemDConnect(self, path, interface):
+    def SystemDGet(self, path, interface):
         """
         Initialize a DBus interface to a systemd resource.
 
         :param str path: Path to systemd object
         :param str interface: Name of resource
-        :returns: DBus ``Interface``
+        :returns: DBus handler
         """
         try:
-            systemd = self.DBus.get_object("org.freedesktop.systemd1", path)
+            item = self.DBus.get(path, interface)
+            return item
         except Exception as e:
             raise errors.ConnectionError("SystemD") from e
-        return Interface(systemd, dbus_interface=interface)
 
 
 def ldap_connect(
