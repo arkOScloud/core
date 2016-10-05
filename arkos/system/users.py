@@ -188,7 +188,7 @@ class User:
             if b(self.ldap_id) not in data:
                 return False
             return True
-        except ldap.INVALidCREDENTIALS:
+        except ldap.INVALID_CREDENTIALS:
             return False
 
     def delete(self, delete_home=True):
