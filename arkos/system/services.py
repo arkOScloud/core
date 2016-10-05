@@ -263,11 +263,11 @@ class Service:
         return self.as_dict
 
 
-def get(id_=None):
+def get(id=None):
     """
     Get all service objects. If ID is specified, returns just one service.
 
-    :param str id_: Service ID to fetch
+    :param str id: Service ID to fetch
     :returns: Service(s)
     :rtype: Service or list thereof
     """
@@ -313,7 +313,7 @@ def get(id_=None):
 
     # Match up loaded services with their unit files and show state
     for unit in files:
-        if id_ == unit:
+        if id == unit:
             return files[unit]
         if unit.endswith("@"):
             continue
@@ -338,10 +338,10 @@ def get(id_=None):
             if not x.endswith("disabled") else "stopped"
         s = Service(name, "supervisor", status, not x.endswith("disabled"),
                     cfg)
-        if id_ == s.name:
+        if id == s.name:
             return s
         svcs.append(s)
-    return sorted(svcs, key=lambda s: s.name) if not id_ else None
+    return sorted(svcs, key=lambda s: s.name) if not id else None
 
 
 def supervisor_ping():

@@ -72,11 +72,11 @@ class Domain:
         return self.as_dict
 
 
-def get(id_=None):
+def get(id=None):
     """
     Get all domains.
 
-    :param str id_: domain name to fetch
+    :param str id: domain name to fetch
     :returns: Domain(s)
     :rtype: Domain or list thereof
     """
@@ -87,7 +87,7 @@ def get(id_=None):
     for x in qset:
         d = Domain(x[1]["virtualdomain"][0].decode(),
                    x[0].split("ou=domains,")[1])
-        if d.name == id_:
+        if d.name == id:
             return d
         results.append(d)
-    return results if id_ is None else None
+    return results if id is None else None

@@ -21,16 +21,16 @@ from arkos.utilities import errors, shell, netmask_to_cidr
 class Connection:
     """Class to represent a network connection."""
 
-    def __init__(self, id_="", connected=False, enabled=False, config={}):
+    def __init__(self, id="", connected=False, enabled=False, config={}):
         """
         Initialize the network connection object.
 
-        :param str id_: network name
+        :param str id: network name
         :param bool connected: Is network connected?
         :param bool enabled: Should network connect on boot?
         :param dict config: Netctl config lines as dict
         """
-        self.id = id_
+        self.id = id
         self.connected = connected
         self.enabled = enabled
         self.config = config
@@ -143,18 +143,18 @@ class Connection:
 class Interface:
     """Class to represent a network connection."""
 
-    def __init__(self, id_="", itype="", up=False, ip=[], rx=0, tx=0):
+    def __init__(self, id="", itype="", up=False, ip=[], rx=0, tx=0):
         """
         Initialize the network interface object.
 
-        :param str id_: network interface name
+        :param str id: network interface name
         :param str itype: interface type ("ethernet", "wireless", etc)
         :param bool up: Is interface up?
         :param list ip: list of IP addresses assigned to this interface
         :param int rx: Number of bytes received
         :param int tx: Number of bytes sent
         """
-        self.id = id_
+        self.id = id
         self.itype = itype
         self.up = up
         self.ip = ip
@@ -195,11 +195,11 @@ class Interface:
         return self.as_dict
 
 
-def get_connections(id_=None, iface=None):
+def get_connections(id=None, iface=None):
     """
     Get list of network connections.
 
-    :param str id_: Filter by network connection name
+    :param str id: Filter by network connection name
 
     :param str iface: Filter by network interface name
     :returns: Connection(s)
@@ -221,18 +221,18 @@ def get_connections(id_=None, iface=None):
             parse = x.split("=")
             to_trans = dict.fromkeys(map(ord, "()\"\"\n"), None)
             c.config[parse[0].lower()] = parse[1].translate(to_trans)
-        if id_ == c.id:
+        if id == c.id:
             return c
         if not iface or c.config.get("interface") == iface:
             conns.append(c)
-    return conns if not id_ else None
+    return conns if not id else None
 
 
-def get_interfaces(id_=None):
+def get_interfaces(id=None):
     """
     Get list of network interfaces.
 
-    :param str id_: Filter by network interface name
+    :param str id: Filter by network interface name
     :returns: Interface(s)
     :rtype: Interface or list thereof
     """
@@ -253,7 +253,7 @@ def get_interfaces(id_=None):
             itype = "ethernet"
         else:
             itype = "unknown"
-        i = Interface(id_=x, itype=itype)
+        i = Interface(id=x, itype=itype)
         # Get the total bytes in and out for this interface
         data = psutil.net_io_counters(pernic=True)
         data = data[x] if type(data) == dict else data
@@ -272,7 +272,7 @@ def get_interfaces(id_=None):
         up = flags & 1
         s.close()
         i.up = up == 1
-        if id_ == i.id:
+        if id == i.id:
             return i
         ifaces.append(i)
     return ifaces if not id else None

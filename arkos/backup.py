@@ -35,16 +35,16 @@ class BackupController:
     See ``backup.get()`` for definition of ``Backup`` dict.
     """
 
-    def __init__(self, id_, icon, site=None, version=None):
+    def __init__(self, id, icon, site=None, version=None):
         """
         Initialize the BackupController.
 
-        :param str id_: Application or website ID
+        :param str id: Application or website ID
         :param str icon: FontAwesome icon ID
         :param Website site: Website object for this controller (if any)
         :param str version: Version of the app/website at the time of backup
         """
-        self.id = id_
+        self.id = id
         self.icon = icon
         self.ctype = "site" if site else "app"
         self.site = site
@@ -382,27 +382,27 @@ def get_able():
     return able
 
 
-def create(id_, data=True, nthread=NotificationThread()):
+def create(id, data=True, nthread=NotificationThread()):
     """
     Convenience function to create a backup.
 
-    :param str id_: ID of associated app (or website) to backup
+    :param str id: ID of associated app (or website) to backup
     :param bool data: Backup app data also?
     :returns: Backup info
     :rtype: Backup
     """
     controller = None
-    if id_ == "arkOS":
+    if id == "arkOS":
         controller = arkOSBackupCfg("arkOS", "setting",
                                     version=arkos_version)
         return controller.backup()
-    app = applications.get(id_)
+    app = applications.get(id)
     if app and app.type != "website" and hasattr(app, "_backup"):
         controller = app._backup(app.id, app.icon, version=app.version)
     else:
         sites = websites.get()
         for x in sites:
-            if x.id == id_:
+            if x.id == id:
                 controller = x.backup
                 break
     if not controller:
@@ -438,11 +438,11 @@ def restore(backup, data=True, nthread=NotificationThread()):
     return b
 
 
-def remove(id_, time, backup_location=""):
+def remove(id, time, backup_location=""):
     """
     Remove a backup.
 
-    :param str id_: arkOS app/site ID
+    :param str id: arkOS app/site ID
     :param str time: Backup timestamp
     :param str backup_location: Location (instead of arkOS default)
     """
@@ -451,7 +451,7 @@ def remove(id_, time, backup_location=""):
                                      "/var/lib/arkos/backups")
     backups = get()
     for x in backups:
-        if x["id"] == id_+"/"+time:
+        if x["id"] == id+"/"+time:
             os.unlink(x["path"])
             try:
                 os.unlink(x["path"].split(".")[0]+".meta")

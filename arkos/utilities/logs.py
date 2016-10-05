@@ -16,8 +16,8 @@ from .utils import random_string
 class StreamFormatter(logging.Formatter):
     def format(self, record):
         if type(record.msg) in [str, bytes]:
-            id_ = random_string(16)
-            data = {"id": id_, "message_id": id_, "title": None,
+            id = random_string(16)
+            data = {"id": id, "message_id": id, "title": None,
                     "message": record.msg, "comp": "Unknown", "cls": "runtime",
                     "complete": True}
         else:
@@ -74,44 +74,44 @@ class LoggingControl:
     def _log(self, level, mobj, exc_info=False):
         self.logger.log(level, mobj, exc_info=exc_info)
 
-    def debug(self, comp, message, id_=None):
+    def debug(self, comp, message, id=None):
         """Send a message with log level DEBUG."""
         self._log(10, {
-            "id": id_, "message_id": id_, "cls": "runtime",
+            "id": id, "message_id": id, "cls": "runtime",
             "comp": comp, "title": None, "message": message
         })
 
-    def info(self, comp, message, id_=None):
+    def info(self, comp, message, id=None):
         """Send a message with log level INFO."""
         self._log(20, {
-            "id": id_, "message_id": id_, "cls": "runtime",
+            "id": id, "message_id": id, "cls": "runtime",
             "comp": comp, "title": None, "message": message
         })
 
-    def success(self, comp, message, id_=None):
+    def success(self, comp, message, id=None):
         """Send a message with log level SUCCESS."""
         self._log(25, {
-            "id": id_, "message_id": id_, "cls": "runtime",
+            "id": id, "message_id": id, "cls": "runtime",
             "comp": comp, "title": None, "message": message
         })
 
-    def warning(self, comp, message, id_=None):
+    def warning(self, comp, message, id=None):
         """Send a message with log level WARNING."""
         self._log(30, {
-            "id": id_, "message_id": id_, "cls": "runtime",
+            "id": id, "message_id": id, "cls": "runtime",
             "comp": comp, "title": None, "message": message
         })
 
-    def error(self, comp, message, id_=None):
+    def error(self, comp, message, id=None):
         """Send a message with log level ERROR."""
         self._log(40, {
-            "id": id_, "message_id": id_, "cls": "runtime",
+            "id": id, "message_id": id, "cls": "runtime",
             "comp": comp, "title": None, "message": message
         })
 
-    def critical(self, comp, message, id_=None):
+    def critical(self, comp, message, id=None):
         """Send a message with log level CRITICAL."""
         self._log(50, {
-            "id": id_, "message_id": id_, "cls": "runtime",
+            "id": id, "message_id": id, "cls": "runtime",
             "comp": comp, "title": None, "message": message
         })

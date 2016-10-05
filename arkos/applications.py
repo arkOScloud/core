@@ -352,7 +352,7 @@ class AppDependencyError(errors.Error):
         return "Could not install {1} app {0}".format(self.dep, self.type)
 
 
-def get(id_=None, type_=None, loadable=None, installed=None,
+def get(id=None, type_=None, loadable=None, installed=None,
         verify=True, force=False, cry=True):
     """
     Retrieve arkOS application data from the system.
@@ -361,7 +361,7 @@ def get(id_=None, type_=None, loadable=None, installed=None,
     metadata stored there. If not (or ``force`` is set), the app directory is
     searched, modules are loaded and verified. This is used on first boot.
 
-    :param str id_: If present, obtain one app that matches this ID
+    :param str id: If present, obtain one app that matches this ID
     :param str type_: Filter by ``app``, ``website``, ``database``, etc
     :param bool loadable: Filter by loadable (True) or not loadable (False)
     :param bool installed: Filter by installed (True) or uninstalled (False)
@@ -374,8 +374,8 @@ def get(id_=None, type_=None, loadable=None, installed=None,
     data = storage.apps.get("applications")
     if not data or force:
         data = scan(verify, cry)
-    if id_:
-        return next(filter(lambda x: x.id == id_, data), None)
+    if id:
+        return next(filter(lambda x: x.id == id, data), None)
     if type_:
         data = list(filter(lambda x: x.type == type_, data))
     if loadable:
@@ -503,11 +503,11 @@ def verify_app_dependencies():
                         z.error = error_str.format(x.name, dep["name"])
 
 
-def get_dependent(id_, op):
+def get_dependent(id, op):
     """
     Return list of all apps to install or remove based on specified operation.
 
-    :param str id_: ID for arkOS app to check
+    :param str id: ID for arkOS app to check
     :param str op: ``install`` or ``remove``
     :returns: list of arkOS app IDs
     :rtype: list
@@ -519,12 +519,12 @@ def get_dependent(id_, op):
     if op == "remove":
         for app in apps:
             for dep in app.dependencies:
-                if dep["type"] == "app" and dep["package"] == id_:
+                if dep["type"] == "app" and dep["package"] == id:
                     metoo.append(app)
                     metoo += get_dependent(app.id, "remove")
     # If I need any other apps to install, flag them to be installed also
     elif op == "install":
-        app = next(x for x in apps if x.id == id_)
+        app = next(x for x in apps if x.id == id)
         for dep in app.dependencies:
             if dep["type"] == "app" and dep["package"] not in installed:
                 metoo.append(dep["package"])
@@ -532,29 +532,29 @@ def get_dependent(id_, op):
     return metoo
 
 
-def _install(id_, load=True, cry=True):
+def _install(id, load=True, cry=True):
     """
     Utility function to download and install arkOS app packages.
 
-    :param str id_: ID of arkOS app to install
+    :param str id: ID of arkOS app to install
     :param bool load: Load the app after install?
     :param bool cry: Raise exception on dependency install failure?
     """
     app_dir = config.get("apps", "app_dir")
     # Download and extract the app source package
     api_url = "https://{0}/api/v1/apps/{1}"
-    data = api(api_url.format(config.get("general", "repo_server"), id_),
+    data = api(api_url.format(config.get("general", "repo_server"), id),
                returns="raw", crit=True)
-    path = os.path.join(app_dir, "{0}.tar.gz".format(id_))
+    path = os.path.join(app_dir, "{0}.tar.gz".format(id))
     with open(path, "wb") as f:
         f.write(data)
     with tarfile.open(path, "r:gz") as t:
         t.extractall(app_dir)
     os.unlink(path)
     # Read the app's metadata and create an object
-    with open(os.path.join(app_dir, id_, "manifest.json")) as f:
+    with open(os.path.join(app_dir, id, "manifest.json")) as f:
         data = json.loads(f.read())
-    app = get(id_)
+    app = get(id)
     for x in data:
         setattr(app, x, data[x])
     app.upgradable = ""

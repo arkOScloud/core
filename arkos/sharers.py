@@ -18,15 +18,15 @@ class Sharer:
     network, or instead to be a sync client for devices on the Internet.
     """
 
-    def __init__(self, id_="", name="", icon=""):
+    def __init__(self, id="", name="", icon=""):
         """
         Initialize the sharer object.
 
-        :param str id_: File sharing service ID
+        :param str id: File sharing service ID
         :param str name: File sharing service display name
         :param str icon: FontAwesome icon class
         """
-        self.id = id_
+        self.id = id
         self.name = name or self.name
         self.icon = icon
 
@@ -51,13 +51,13 @@ class Sharer:
 class Share:
     """Represents a file share object."""
 
-    def __init__(self, id_="", comment="", path="", valid_users=[],
+    def __init__(self, id="", comment="", path="", validusers=[],
                  public=True, readonly=False, manager=None):
         """Initialize."""
-        self.id = id_
+        self.id = id
         self.comment = comment
         self.path = path
-        self.valid_users = valid_users
+        self.validusers = validusers
         self.public = public
         self.readonly = readonly
         self.manager = manager
@@ -90,7 +90,7 @@ class Share:
             "share_type": self.manager.id,
             "comment": self.comment,
             "path": self.path,
-            "valid_users": self.valid_users,
+            "validusers": self.validusers,
             "public": self.public,
             "read_only": self.readonly,
             "is_ready": True
@@ -108,7 +108,7 @@ class Mount:
     def __init__(self, path="", network_path="", readonly=False,
                  username="", password="", is_mounted=False, manager=None):
         """Initialize."""
-        self.id = id_
+        self.id = id
         self.path = path
         self.network_path = network_path
         self.readonly = readonly
@@ -160,11 +160,11 @@ class Mount:
         return self.as_dict
 
 
-def get_shares(id_=None, type_=None):
+def get_shares(id=None, type_=None):
     """
     Retrieve a list of all file shares registered with arkOS.
 
-    :param str id_: If present, obtain one share that matches this ID
+    :param str id: If present, obtain one share that matches this ID
     :param str type_: Filter by ``fs-samba``, ``fs-afp``, etc
     :return: Share(s)
     :rtype: Share or list thereof
@@ -172,10 +172,10 @@ def get_shares(id_=None, type_=None):
     data = storage.shares.get("shares")
     if not data:
         data = scan_shares()
-    if id_ or type_:
+    if id or type_:
         tlist = []
         for x in data:
-            if x.id == id_:
+            if x.id == id:
                 return x
             elif x.manager.id == type_:
                 tlist.append(x)
@@ -205,11 +205,11 @@ def scan_shares():
     return shares
 
 
-def get_mounts(id_=None, type_=None):
+def get_mounts(id=None, type_=None):
     """
     Retrieve a list of all file share mounts registered with arkOS.
 
-    :param str id_: If present, obtain one mount that matches this ID
+    :param str id: If present, obtain one mount that matches this ID
     :param str type_: Filter by ``fs-samba``, ``fs-afp``, etc
     :return: Mount(s)
     :rtype: Mount or list thereof
@@ -217,10 +217,10 @@ def get_mounts(id_=None, type_=None):
     data = storage.shares.get("mounts")
     if not data:
         data = scan_mounts()
-    if id_ or type_:
+    if id or type_:
         tlist = []
         for x in data:
-            if x.id == id_:
+            if x.id == id:
                 return x
             elif x.manager.id == type_:
                 tlist.append(x)
@@ -247,7 +247,7 @@ def scan_mounts():
     return mounts
 
 
-def get_sharers(id_=None):
+def get_sharers(id=None):
     """
     Retrieve a list of all file share systems registered with arkOS.
 
@@ -258,9 +258,9 @@ def get_sharers(id_=None):
     data = storage.shares.get("sharers")
     if not data:
         data = scan_sharers()
-    if id_:
+    if id:
         for x in data:
-            if x.id == id_:
+            if x.id == id:
                 return x
         return None
     return data
@@ -276,6 +276,6 @@ def scan_sharers():
     mgrs = []
     for x in applications.get(type="fileshare"):
         if x.installed and hasattr(x, "_share_mgr"):
-            mgrs.append(x._share_mgr(id_=x.id, icon=x.icon))
+            mgrs.append(x._share_mgr(id=x.id, icon=x.icon))
     storage.shares.set("sharers", mgrs)
     return mgrs

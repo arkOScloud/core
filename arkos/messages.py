@@ -25,18 +25,18 @@ class Notification(object):
     }
 
     def __init__(self, level, comp, message, cls="notify",
-                 id_=None, title=None):
+                 id=None, title=None):
         level = level.upper()
         if level not in self.LEVELS:
             raise errors.InvalidConfigError("Unrecognized log level specified")
-        id_ = id_ or random_string(16)
+        id = id or random_string(16)
         self.level = self.LEVELS[level]
         self.comp = comp
         self.message = message
         self.cls = cls
-        self.id = id_
+        self.id = id
         self.title = title
-        self.message_id = id_
+        self.message_id = id
         self.complete = True
 
     def send(self):
@@ -51,8 +51,8 @@ class Notification(object):
 class NotificationThread(object):
     """A thread of Notifications bound together, keeping the same context."""
 
-    def __init__(self, id_=None, title=None, message=None):
-        self.id = id_ or random_string(16)
+    def __init__(self, id=None, title=None, message=None):
+        self.id = id or random_string(16)
         self.title = title
         if message:
             self._send(message, complete=False)
@@ -64,9 +64,9 @@ class NotificationThread(object):
         message.send()
 
     def new(self, level, comp, message, cls="notify",
-            id_=None, title=None):
+            id=None, title=None):
         return Notification(level, comp, message, cls,
-                            id_ or random_string(16), title)
+                            id or random_string(16), title)
 
     def update(self, *messages):
         for message in messages:

@@ -23,6 +23,6 @@ __all__ = [
     "FstabEntry",
     "get_fstab",
     "save_fstab_entry",
-    "get_partition_uuid_by_name",
+    "get_partition_uuidby_name",
     "get_partition_name_by_uuid"
 ]

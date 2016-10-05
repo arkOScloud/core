@@ -56,7 +56,7 @@ class Storage:
         """
         setattr(self, stype, items)
 
-    def get(self, stype, id_=None):
+    def get(self, stype, id=None):
         """
         Retrieve an object (or objects) from storage.
 
@@ -67,14 +67,14 @@ class Storage:
         :returns: object or list of objects
         """
         s = getattr(self, stype)
-        if id_:
+        if id:
             for x in s:
-                if id_ == x.id:
+                if id == x.id:
                     return x
             return None
         return s
 
-    def get_keyed(self, stype, id_=None):
+    def get_keyed(self, stype, id=None):
         """
         Retrieve objects from storage, via a dictionary keyed by object ID.
 

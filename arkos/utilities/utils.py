@@ -89,10 +89,10 @@ def test_port(server, port, host=None):
     :returns: True if port test was successful
     """
     timer = 5
-    id_ = random_string(16)
+    id = random_string(16)
     pfile = os.path.join(os.path.dirname(__file__), "test-port.py")
-    p = subprocess.Popen(["python", pfile, str(port), id_])
-    data = {"id": id_, "port": port, "host": host or ""}
+    p = subprocess.Popen(["python", pfile, str(port), id])
+    data = {"id": id, "port": port, "host": host or ""}
     requests.post("https://" + server + "/api/v1/echo", data=data)
     while timer > 0:
         p.poll()

@@ -24,15 +24,15 @@ class SharedFile:
     shared files is done through Kraken.
     """
 
-    def __init__(self, id_, path, expires=0):
+    def __init__(self, id, path, expires=0):
         """
         Initialize the shared file.
 
-        :param str id_: shared file ID
+        :param str id: shared file ID
         :param str path: path to file on disk
         :param int expires: Unix timestamp for expiry date/time; 0 for never
         """
-        self.id = id_
+        self.id = id
         self.path = path
         self.expires = expires
         self.fetch_count = 0
@@ -90,7 +90,7 @@ class SharedFile:
         return data
 
 
-def get(id_=None):
+def get(id=None):
     """List all shared file objects present in cache storage."""
     data = storage.files.get("sharedfiles")
     to_purge = []
@@ -99,9 +99,9 @@ def get(id_=None):
             to_purge.append(x)
     for x in to_purge:
         x.delete()
-    if id_:
+    if id:
         for x in data:
-            if x.id == id_:
+            if x.id == id:
                 return x
         return None
     return data

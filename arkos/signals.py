@@ -20,16 +20,16 @@ class Listener:
     or for making sure certain elements are established after loading a
     necessary component.
     """
-    def __init__(self, by, id_, sig, func):
+    def __init__(self, by, id, sig, func):
         """
         Initialize the signal listener.
 
         :param str by: the name of the module that registered this listener
-        :param str id_: identifier for this listener
+        :param str id: identifier for this listener
         :param str sig: signal ID to listen for
         :param func func: hook function to execute
         """
-        self.id = id_
+        self.id = id
         self.by = by
         self.sig = sig
         self.func = func
@@ -51,31 +51,31 @@ class Listener:
                 raise
 
 
-def add(by, id_, sig, func):
+def add(by, id, sig, func):
     """
     Register a new listener with the system.
 
     :param str by: the name of the module that registered this listener
-    :param str id_: identifier for this listener
+    :param str id: identifier for this listener
     :param str sig: signal ID to listen for
     :param func func: hook function to execute
     """
-    l = Listener(by, id_, sig, func)
+    l = Listener(by, id, sig, func)
     storage.signals.add("listeners", l)
 
 
-def emit(id_, sig, data=None, crit=True):
+def emit(id, sig, data=None, crit=True):
     """
     Emit a signal.
 
-    :param str id_: name of the module emitting this signal
+    :param str id: name of the module emitting this signal
     :param str sig: signal ID
     :param data: parameter to pass to hook function (if necessary)
     :param bool crit: Raise hook function exceptions?
     """
     s = storage.signals.get("listeners")
     for x in s:
-        if x.id == id_ and x.sig == sig:
+        if x.id == id and x.sig == sig:
             x.trigger(data, crit)
 
 

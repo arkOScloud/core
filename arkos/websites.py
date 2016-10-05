@@ -46,14 +46,14 @@ class Site:
     """Class representing a Website object."""
 
     def __init__(
-            self, app=None, id_="", domain="", port=80, path="", php=False,
+            self, app=None, id="", domain="", port=80, path="", php=False,
             version="", cert=None, db=None, data_path="", block=[],
             enabled=False):
         """
         Initialize the website object.
 
         :param Application app: Application metadata
-        :param str id_: Website name
+        :param str id: Website name
         :param str addr: Hostname/domain
         :param int port: Port site is served on
         :param str path: Path to site root directory
@@ -65,7 +65,7 @@ class Site:
         :param list block: List of nginx key objects to add to server block
         :param bool enabled: Is site enabled through nginx?
         """
-        self.id = id_
+        self.id = id
         self.app = app
         self.path = path
         self.domain = domain
@@ -737,12 +737,12 @@ class ReverseProxy(Site):
     """
 
     def __init__(
-            self, id_="", name="", path="", domain="", port=80,
+            self, id="", name="", path="", domain="", port=80,
             base_path="", block=[], app=None):
         """
         Initialize the reverse proxy website object.
 
-        :param str id_: arkOS app ID
+        :param str id: arkOS app ID
         :param str name: App name
         :param str path: Path to website root directory
         :param str domain: Hostname/domain
@@ -751,7 +751,7 @@ class ReverseProxy(Site):
         :param list block: List of nginx key objects to add to server block
         :param str app: App creating this reverse proxy
         """
-        self.id = id_
+        self.id = id
         self.app = app
         self.name = name
         self.domain = domain
@@ -887,7 +887,7 @@ class ReverseProxy(Site):
         return self.as_dict
 
 
-def get(id_=None, type_=None, force=False):
+def get(id=None, type_=None, force=False):
     """
     Retrieve website data from the system.
 
@@ -895,7 +895,7 @@ def get(id_=None, type_=None, force=False):
     there. If not (or ``force`` is set), the app directory is searched, modules
     are loaded and verified. This is used on first boot.
 
-    :param str id_: If present, obtain one site that matches this ID
+    :param str id: If present, obtain one site that matches this ID
     :param str type_: Filter by ``website``, ``reverseproxy``, etc
     :param bool force: Force a rescan (do not rely on cache)
     :return: Website(s)
@@ -904,11 +904,11 @@ def get(id_=None, type_=None, force=False):
     sites = storage.sites.get("sites")
     if not sites or force:
         sites = scan()
-    if id_ or type_:
+    if id or type_:
         type_list = []
         for site in sites:
             isRP = (type == "ReverseProxy" and isinstance(site, ReverseProxy))
-            if site.id == id_:
+            if site.id == id:
                 return site
             elif (type and isRP) or (type and site.app.id == type):
                 type_list.append(site)
@@ -943,7 +943,7 @@ def scan():
             # If it's a regular website, initialize its class, metadata, etc
             if not app or not app.loadable or not app.installed:
                 continue
-            site = app._website(id_=meta.get("website", "id"))
+            site = app._website(id=meta.get("website", "id"))
             site.app = app
             site.data_path = (meta.get("website", "data_path") or "") \
                 if meta.has_option("website", "data_path") else ""
@@ -951,7 +951,7 @@ def scan():
                 if meta.has_option("website", "dbengine") else None
         else:
             # If it's a reverse proxy, follow a simplified procedure
-            site = ReverseProxy(id_=meta.get("website", "id"))
+            site = ReverseProxy(id=meta.get("website", "id"))
             site.name = meta.get("website", "name")
             site.app = app
         certname = meta.get("website", "ssl", fallback="None")

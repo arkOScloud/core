@@ -76,7 +76,7 @@ def ldap_connect(
 
     try:
         c.simple_bind_s("{0},{1}".format(dn, rootdn), passwd)
-    except ldap.INVALID_CREDENTIALS:
+    except ldap.INVALidCREDENTIALS:
         raise ConnectionServiceError("LDAP", "Invalid username/password")
     except Exception as e:
         raise ConnectionServiceError("LDAP") from e
