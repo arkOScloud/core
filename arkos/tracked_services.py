@@ -28,7 +28,7 @@ class SecurityPolicy:
     (iptables) on regeneration or app update.
     """
 
-    def __init__(self, type_="", id="", name="", icon="", ports=[],
+    def __init__(self, type="", id="", name="", icon="", ports=[],
                  policy=2, addr=None):
         """
         Initialize the policy object.
@@ -36,7 +36,7 @@ class SecurityPolicy:
         To create a new policy or to see more info about these parameters,
         see ``tracked_services.register()`` below.
 
-        :param str type_: Policy type ('website', 'app', etc)
+        :param str type: Policy type ('website', 'app', etc)
         :param str id: Website or app ID
         :param str name: Display name to use in Security settings pane
         :param str icon: FontAwesome icon class name
@@ -44,7 +44,7 @@ class SecurityPolicy:
         :param int policy: Policy identifier
         :param str addr: Address and port (for websites)
         """
-        self.type = type_
+        self.type = type
         self.id = id
         self.name = name
         self.icon = icon
@@ -127,20 +127,20 @@ class PortConflictError(errors.Error):
                 "please choose another")
 
 
-def get(id=None, type_=None):
+def get(id=None, type=None):
     """
     Get all security policies from cache storage.
 
     :param str id: App or website ID
-    :param str type_: Filter by type ('website', 'app', etc)
+    :param str type: Filter by type ('website', 'app', etc)
     """
     data = storage.policies.get("policies")
-    if id or type_:
+    if id or type:
         tlist = []
         for x in data:
             if x.id == id:
                 return x
-            elif x.type == type_:
+            elif x.type == type:
                 tlist.append(x)
         if tlist:
             return tlist
@@ -148,7 +148,7 @@ def get(id=None, type_=None):
     return data
 
 
-def register(type_, id, name, icon, ports, domain=None, policy=0,
+def register(type, id, name, icon, ports, domain=None, policy=0,
              default_policy=2, fw=True):
     """
     Register a new security policy with the system.
@@ -166,7 +166,7 @@ def register(type_, id, name, icon, ports, domain=None, policy=0,
     Addresses should be provided for websites, because multiple websites can
     be served from the same port (SNI) as long as the address is different.
 
-    :param str type_: Policy type ('website', 'app', etc)
+    :param str type: Policy type ('website', 'app', etc)
     :param str id: Website or app ID
     :param str name: Display name to use in Security settings pane
     :param str icon: FontAwesome icon class name
@@ -177,17 +177,17 @@ def register(type_, id, name, icon, ports, domain=None, policy=0,
     :param bool fw: Regenerate the firewall after save?
     """
     if not policy:
-        policy = policies.get(type_, id, default_policy)
-    pget = get(type_=type_)
+        policy = policies.get(type, id, default_policy)
+    pget = get(type=type)
     if pget:
         for x in pget:
             if x.id == id:
                 storage.policies.remove("policies", x)
-    svc = SecurityPolicy(type_, id, name, icon, ports, policy, domain)
+    svc = SecurityPolicy(type, id, name, icon, ports, policy, domain)
     svc.save(fw)
 
 
-def deregister(type_, id="", fw=True):
+def deregister(type, id="", fw=True):
     """
     Deregister a security policy.
 

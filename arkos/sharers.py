@@ -160,24 +160,24 @@ class Mount:
         return self.as_dict
 
 
-def get_shares(id=None, type_=None):
+def get_shares(id=None, type=None):
     """
     Retrieve a list of all file shares registered with arkOS.
 
     :param str id: If present, obtain one share that matches this ID
-    :param str type_: Filter by ``fs-samba``, ``fs-afp``, etc
+    :param str type: Filter by ``fs-samba``, ``fs-afp``, etc
     :return: Share(s)
     :rtype: Share or list thereof
     """
     data = storage.shares.get("shares")
     if not data:
         data = scan_shares()
-    if id or type_:
+    if id or type:
         tlist = []
         for x in data:
             if x.id == id:
                 return x
-            elif x.manager.id == type_:
+            elif x.manager.id == type:
                 tlist.append(x)
         if tlist:
             return tlist
@@ -205,24 +205,24 @@ def scan_shares():
     return shares
 
 
-def get_mounts(id=None, type_=None):
+def get_mounts(id=None, type=None):
     """
     Retrieve a list of all file share mounts registered with arkOS.
 
     :param str id: If present, obtain one mount that matches this ID
-    :param str type_: Filter by ``fs-samba``, ``fs-afp``, etc
+    :param str type: Filter by ``fs-samba``, ``fs-afp``, etc
     :return: Mount(s)
     :rtype: Mount or list thereof
     """
     data = storage.shares.get("mounts")
     if not data:
         data = scan_mounts()
-    if id or type_:
+    if id or type:
         tlist = []
         for x in data:
             if x.id == id:
                 return x
-            elif x.manager.id == type_:
+            elif x.manager.id == type:
                 tlist.append(x)
         if tlist:
             return tlist

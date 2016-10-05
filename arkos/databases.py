@@ -226,22 +226,22 @@ class DatabaseManager:
         return self.as_dict
 
 
-def get(id=None, type_=None):
+def get(id=None, type=None):
     """
     Retrieve a list of all databases registered with arkOS.
 
     :param str id: If present, obtain one database that matches this ID
-    :param str type_: Filter by ``mariadb``, ``sqlite3``, etc
+    :param str type: Filter by ``mariadb``, ``sqlite3``, etc
     :return: Database(s)
     :rtype: Database or list thereof
     """
     data = scan()
-    if id or type_:
+    if id or type:
         tlist = []
         for x in data:
             if x.id == id:
                 return x
-            elif x.manager.id == type_:
+            elif x.manager.id == type:
                 tlist.append(x)
         if tlist:
             return tlist
@@ -266,7 +266,7 @@ def scan():
     return dbs
 
 
-def get_user(id=None, type_=None):
+def get_user(id=None, type=None):
     """
     Retrieve a list of all database users registered with arkOS.
 
@@ -276,12 +276,12 @@ def get_user(id=None, type_=None):
     :rtype: DatabaseUser or list thereof
     """
     data = scan_users()
-    if id or type_:
+    if id or type:
         tlist = []
         for x in data:
             if x.id == id:
                 return x
-            elif x.manager.id == type_:
+            elif x.manager.id == type:
                 tlist.append(x)
         if tlist:
             return tlist
@@ -334,7 +334,7 @@ def scan_managers():
     :rtype: DatabaseManager or list thereof
     """
     mgrs = []
-    for x in applications.get(type_="database"):
+    for x in applications.get(type="database"):
         if x.installed and hasattr(x, "_database_mgr"):
             mgrs.append(x._database_mgr(id=x.id, name=x.name, meta=x))
     storage.dbs.set("managers", mgrs)

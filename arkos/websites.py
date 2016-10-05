@@ -906,15 +906,15 @@ def get(id=None, type=None, force=False):
     if not sites or force:
         sites = scan()
     if id or type:
-        type_list = []
+        typelist = []
         for site in sites:
             isRP = (type == "ReverseProxy" and isinstance(site, ReverseProxy))
             if site.id == id:
                 return site
             elif (type and isRP) or (type and site.app.id == type):
-                type_list.append(site)
-        if type_list:
-            return type_list
+                typelist.append(site)
+        if typelist:
+            return typelist
         return None
     return sites
 

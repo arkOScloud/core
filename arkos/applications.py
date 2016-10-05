@@ -390,7 +390,7 @@ class AppDependencyError(errors.Error):
         return "Could not install {1} app {0}".format(self.dep, self.type)
 
 
-def get(id=None, type_=None, loadable=None, installed=None,
+def get(id=None, type=None, loadable=None, installed=None,
         verify=True, force=False, cry=True):
     """
     Retrieve arkOS application data from the system.
@@ -400,7 +400,7 @@ def get(id=None, type_=None, loadable=None, installed=None,
     searched, modules are loaded and verified. This is used on first boot.
 
     :param str id: If present, obtain one app that matches this ID
-    :param str type_: Filter by ``app``, ``website``, ``database``, etc
+    :param str type: Filter by ``app``, ``website``, ``database``, etc
     :param bool loadable: Filter by loadable (True) or not loadable (False)
     :param bool installed: Filter by installed (True) or uninstalled (False)
     :param bool verify: Verify app dependencies as the apps are scanned
@@ -414,8 +414,8 @@ def get(id=None, type_=None, loadable=None, installed=None,
         data = scan(verify, cry)
     if id:
         return next(filter(lambda x: x.id == id, data), None)
-    if type_:
-        data = list(filter(lambda x: x.type == type_, data))
+    if type:
+        data = list(filter(lambda x: x.type == type, data))
     if loadable:
         data = list(filter(lambda x: x.loadable == loadable, data))
     if installed:
