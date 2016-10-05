@@ -837,6 +837,7 @@ class ReverseProxy(Site):
         ssl = self.cert.id if getattr(self, "cert", None) else "None"
         meta.add_section("website")
         meta.set("website", "id", self.id)
+        meta.set("website", "app", self.app.id if self.app else "None")
         meta.set("website", "version", "None")
         meta.set("website", "ssl", ssl)
         with open(os.path.join(self.path, ".arkos"), "w") as f:
@@ -906,15 +907,15 @@ def get(id=None, type=None, force=False):
     if not sites or force:
         sites = scan()
     if id or type:
-        typelist = []
+        type_list = []
         for site in sites:
             isRP = (type == "ReverseProxy" and isinstance(site, ReverseProxy))
             if site.id == id:
                 return site
             elif (type and isRP) or (type and site.app.id == type):
-                typelist.append(site)
-        if typelist:
-            return typelist
+                type_list.append(site)
+        if type_list:
+            return type_list
         return None
     return sites
 

@@ -76,12 +76,14 @@ class LoggingControl:
 
     def debug(self, comp, message, id=None):
         """Send a message with log level DEBUG."""
+        id = id or random_string(16)
         self._log(10, {
             "id": id, "message_id": id, "cls": "runtime",
             "comp": comp, "title": None, "message": message
         })
 
     def info(self, comp, message, id=None):
+        id = id or random_string(16)
         """Send a message with log level INFO."""
         self._log(20, {
             "id": id, "message_id": id, "cls": "runtime",
@@ -89,6 +91,7 @@ class LoggingControl:
         })
 
     def success(self, comp, message, id=None):
+        id = id or random_string(16)
         """Send a message with log level SUCCESS."""
         self._log(25, {
             "id": id, "message_id": id, "cls": "runtime",
@@ -96,6 +99,7 @@ class LoggingControl:
         })
 
     def warning(self, comp, message, id=None):
+        id = id or random_string(16)
         """Send a message with log level WARNING."""
         self._log(30, {
             "id": id, "message_id": id, "cls": "runtime",
@@ -104,12 +108,14 @@ class LoggingControl:
 
     def error(self, comp, message, id=None):
         """Send a message with log level ERROR."""
+        id = id or random_string(16)
         self._log(40, {
             "id": id, "message_id": id, "cls": "runtime",
             "comp": comp, "title": None, "message": message
-        })
+        }, exc_info=True)
 
     def critical(self, comp, message, id=None):
+        id = id or random_string(16)
         """Send a message with log level CRITICAL."""
         self._log(50, {
             "id": id, "message_id": id, "cls": "runtime",

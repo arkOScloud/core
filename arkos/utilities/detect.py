@@ -9,8 +9,6 @@ Licensed under GPLv3, see LICENSE.md
 
 import platform
 
-EMPTY_STRING = ""
-
 
 def detect_architecture():
     """Detect system architecture and board type."""

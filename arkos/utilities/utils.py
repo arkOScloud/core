@@ -298,7 +298,7 @@ def b64_to_path(b64):
     return base64.b64decode(str(b64).replace("*", "="), altchars="+-").decode()
 
 
-def compress(pin, pout="", format_="tgz"):
+def compress(pin, pout="", format="tgz"):
     """
     Recursively compress a provided directory.
 
@@ -306,7 +306,7 @@ def compress(pin, pout="", format_="tgz"):
     :param str pout: full path to save archive to
     :param str format: "tgz" or "zip"
     """
-    if format_ == "tgz":
+    if format == "tgz":
         pout = tempfile.mkstemp(".tar.gz")[1] if not pout else pout
         a = tarfile.open(pout, "w:gz")
         if os.path.isdir(pin):
@@ -318,7 +318,7 @@ def compress(pin, pout="", format_="tgz"):
         else:
             a.add(x)
         a.close()
-    elif format_ == "zip":
+    elif format == "zip":
         pout = tempfile.mkstemp(".zip")[1] if not pout else pout
         a = zipfile.ZipFile(pout, "w")
         if os.path.isdir(pin):

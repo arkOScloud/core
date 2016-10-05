@@ -231,7 +231,7 @@ def is_open_port(port, domain=None, ignore_common=False):
     be served from the same port (SNI) as long as the address is different.
 
     :param int port: Port number to check
-    :param str addr: Address to check (for websites)
+    :param str param str domain: Address to check (for websites)
     :param bool ignore_common: Don't return False for commonly used ports?
     :returns: True if port is open
     :rtype bool:
