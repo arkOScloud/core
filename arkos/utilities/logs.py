@@ -60,13 +60,14 @@ class LoggingControl:
         self.logger = logger or logging.getLogger("arkos")
         logging.addLevelName(25, "SUCCESS")
 
-    def add_stream_logger(self, debug=False):
+    def add_stream_logger(
+            self, st="{asctime} [{cls}] [{levelname}] {comp}: {message}",
+            debug=False):
         """Create a new stream logger."""
         self.logger.handlers = []
         stdout = logging.StreamHandler()
         self.logger.setLevel(logging.DEBUG)
         stdout.setLevel(logging.DEBUG if debug else logging.INFO)
-        st = "{asctime} [{cls}] [{levelname}] {comp}: {message}"
         dformatter = StreamFormatter(st)
         stdout.setFormatter(dformatter)
         self.logger.addHandler(stdout)

@@ -72,14 +72,15 @@ class Share:
         """Add a file share."""
         signals.emit("shares", "pre_add", self)
         self.add_share()
-        storage.shares.add("shares", self)
+        storage.shares[self.id] = self
         signals.emit("shares", "post_add", self)
 
     def remove(self, *args, **kwargs):
         """Remove a file share."""
         signals.emit("shares", "pre_remove", self)
         self.remove_share()
-        storage.shares.add("shares", self)
+        if self.id in storage.shares:
+            del storage.shares[self.id]
         signals.emit("shares", "post_remove", self)
 
     @property
@@ -131,14 +132,15 @@ class Mount:
         """Mount a file share."""
         signals.emit("shares", "pre_mount", self)
         self.mount()
-        storage.shares.add("mounts", self)
+        storage.mounts[self.id] = self
         signals.emit("shares", "post_mount", self)
 
     def remove(self, *args, **kwargs):
         """Unmount a file share."""
         signals.emit("shares", "pre_umount", self)
         self.umount()
-        storage.shares.remove("mounts", self)
+        if self.id in storage.mounts:
+            del storage.mounts[self.id]
         signals.emit("shares", "post_umount", self)
 
     @property
@@ -169,20 +171,14 @@ def get_shares(id=None, type=None):
     :return: Share(s)
     :rtype: Share or list thereof
     """
-    data = storage.shares.get("shares")
+    data = storage.shares
     if not data:
         data = scan_shares()
-    if id or type:
-        tlist = []
-        for x in data:
-            if x.id == id:
-                return x
-            elif x.manager.id == type:
-                tlist.append(x)
-        if tlist:
-            return tlist
-        return None
-    return data
+    if id:
+        return data.get(id)
+    if type:
+        return filter(lambda x: x.manager.id == type, data.values())
+    return data.values()
 
 
 def scan_shares():
@@ -192,17 +188,17 @@ def scan_shares():
     :return: Share(s)
     :rtype: Share or list thereof
     """
-    shares = []
+    storage.shares.clear()
     for x in get_sharers():
         try:
-            shares += x.get_shares()
+            for y in x.get_shares():
+                storage.shares[y.id] = y
         except Exception as e:
             logger.warning(
                 "Sharers", "Could not get shares for {0}".format(x.name)
             )
-            logger.critical("Sharers", str(e), exc_info=True)
-    storage.shares.set("shares", shares)
-    return shares
+            logger.debug("Sharers", str(e))
+    return storage.shares
 
 
 def get_mounts(id=None, type=None):
@@ -214,20 +210,14 @@ def get_mounts(id=None, type=None):
     :return: Mount(s)
     :rtype: Mount or list thereof
     """
-    data = storage.shares.get("mounts")
+    data = storage.mounts
     if not data:
         data = scan_mounts()
-    if id or type:
-        tlist = []
-        for x in data:
-            if x.id == id:
-                return x
-            elif x.manager.id == type:
-                tlist.append(x)
-        if tlist:
-            return tlist
-        return None
-    return data
+    if id:
+        return data.get(id)
+    if type:
+        return filter(lambda x: x.manager.id == type, data.values())
+    return data.values()
 
 
 def scan_mounts():
@@ -237,14 +227,14 @@ def scan_mounts():
     :return: Mount(s)
     :rtype: Mount or list thereof
     """
-    mounts = []
+    storage.mounts.clear()
     for x in get_sharers():
         try:
-            mounts += x.get_mounts()
+            for y in x.get_mounts():
+                storage.mounts[y.id] = y
         except:
             continue
-    storage.shares.set("mounts", mounts)
-    return mounts
+    return storage.mounts
 
 
 def get_sharers(id=None):
@@ -255,15 +245,12 @@ def get_sharers(id=None):
     :return: Sharer(s)
     :rtype: Sharer or list thereof
     """
-    data = storage.shares.get("sharers")
+    data = storage.share_engines
     if not data:
         data = scan_sharers()
     if id:
-        for x in data:
-            if x.id == id:
-                return x
-        return None
-    return data
+        return data.get(id)
+    return data.values()
 
 
 def scan_sharers():
@@ -273,9 +260,8 @@ def scan_sharers():
     :return: Sharer(s)
     :rtype: Sharer or list thereof
     """
-    mgrs = []
+    storage.share_engines.clear()
     for x in applications.get(type="fileshare"):
         if x.installed and hasattr(x, "_share_mgr"):
-            mgrs.append(x._share_mgr(id=x.id, icon=x.icon))
-    storage.shares.set("sharers", mgrs)
-    return mgrs
+            storage.share_engines[x.id] = x._share_mgr(id=x.id, icon=x.icon)
+    return storage.share_engines

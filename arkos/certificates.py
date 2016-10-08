@@ -159,7 +159,8 @@ class Certificate:
             with open("/etc/cron.d/arkos-acme-renew", "w") as f:
                 f.writelines(data)
             websites.cleanup_acme_dummy(self.domain)
-        storage.certs.remove("certificates", self)
+        if self.id in storage.certificates:
+            del storage.certificates[self.id]
         signals.emit("certificates", "post_remove", self)
 
     @property
@@ -223,7 +224,8 @@ class CertificateAuthority:
             os.unlink(self.cert_path)
         if os.path.exists(self.key_path):
             os.unlink(self.key_path)
-        storage.certs.remove("authorities", self)
+        if self.id in storage.certificate_authorities:
+            del storage.certificate_authorities[self.id]
 
     @property
     def as_dict(self):
@@ -259,15 +261,12 @@ def get(id=None, force=False):
     :return: Certificate(s)
     :rtype: Certificate or list thereof
     """
-    data = storage.certs.get("certificates")
+    data = storage.certificates
     if not data or force:
         data = scan()
     if id:
-        for x in data:
-            if x.id == id:
-                return x
-        return None
-    return data
+        return data.get(id)
+    return data.values()
 
 
 def scan():
@@ -277,7 +276,7 @@ def scan():
     :return: list of Certificate objects
     :rtype: list
     """
-    certs, assigns = [], {}
+    assigns = {}
     if config.get("genesis", "ssl"):
         gen_cert = config.get("genesis", "cert_file", "")
         ssl = os.path.splitext(os.path.basename(gen_cert))[0]
@@ -300,12 +299,15 @@ def scan():
     if not os.path.exists(config.get("certificates", "key_dir")):
         os.makedirs(config.get("certificates", "key_dir"))
 
+    storage.certificates.clear()
+
     cert_glob = os.path.join(config.get("certificates", "cert_dir"), "*.crt")
     for cert_path in glob.glob(cert_glob):
         id = os.path.splitext(os.path.basename(cert_path))[0]
         key_path = os.path.join(
             config.get("certificates", "key_dir"), "{0}.key".format(id))
-        certs.append(_scan_a_cert(id, cert_path, key_path, assigns))
+        storage.certificates[id] = \
+            _scan_a_cert(id, cert_path, key_path, assigns)
 
     acmedir = config.get(
         "certificates", "acme_dir", "/etc/arkos/ssl/acme/certs")
@@ -317,9 +319,9 @@ def scan():
         basedir = os.path.dirname(cert_path)
         id = os.path.basename(basedir)
         key_path = os.path.join(basedir, "privkey.pem")
-        certs.append(_scan_a_cert(id, cert_path, key_path, assigns, True))
-    storage.certs.set("certificates", certs)
-    return certs
+        storage.certificates[id] = \
+            _scan_a_cert(id, cert_path, key_path, assigns, True)
+    return storage.certificates
 
 
 def _scan_a_cert(id, cert_path, key_path, assigns, is_acme=False):
@@ -358,15 +360,12 @@ def get_authorities(id=None, force=False):
     :return: CertificateAuthority(s)
     :rtype: CertificateAuthority or list thereof
     """
-    data = storage.certs.get("authorities")
+    data = storage.certificate_authorities
     if not data or force:
         data = scan_authorities()
     if id:
-        for x in data:
-            if x.id == id:
-                return x
-        return None
-    return data
+        return data.get(id)
+    return data.values()
 
 
 def scan_authorities():
@@ -376,7 +375,7 @@ def scan_authorities():
     :return: list of CertificateAuthority objects
     :rtype: list
     """
-    certs = []
+    storage.certificate_authorities.clear()
     ca_cert_dir = config.get("certificates", "ca_cert_dir")
     ca_key_dir = config.get("certificates", "ca_key_dir")
     if not os.path.exists(ca_cert_dir):
@@ -400,9 +399,8 @@ def scan_authorities():
         kt = "RSA" if isinstance(key.public_key(), rsa.RSAPublicKey) else "DSA"
         ca = CertificateAuthority(id, x, key_path, cert.not_valid_after,
                                   kt, key.key_size, sha1, md5)
-        certs.append(ca)
-    storage.certs.set("authorities", certs)
-    return certs
+        storage.certificate_authorities[id] = ca
+    return storage.certificate_authorities
 
 
 def generate_dh_params(path, size=2048):
@@ -481,7 +479,7 @@ def upload_certificate(
     os.chmod(c.cert_path, 0o660)
     os.chown(c.key_path, -1, gid)
     os.chmod(c.key_path, 0o660)
-    storage.certs.add("certificates", c)
+    storage.certificates[c.id] = c
     signals.emit("certificates", "post_add", c)
     msg = "Certificate imported successfully"
     nthread.complete(Notification("success", "Certificates", msg))
@@ -534,7 +532,7 @@ def _request_acme_certificate(domain, webroot, nthread):
             leclient.issue_certificate(
                 domains,
                 acme_dir,
-                acme_server=LETSENCRYPT_STAGING,
+                acme_server=LETSENCRYPT_LIVE,
                 certificate_file=cert_path,
                 private_key_file=key_path,
                 agree_to_tos_url=agree_to_tos)
@@ -612,7 +610,7 @@ def _request_acme_certificate(domain, webroot, nthread):
     ksize = key.key_size
     c = Certificate(domain, domain, cert_path, key_path, ktype, ksize,
                     [], cert.not_valid_after, sha1, md5, is_acme=True)
-    storage.certs.add("certificates", c)
+    storage.certificates[c.id] = c
 
     with open("/etc/cron.d/arkos-acme-renew", "a") as f:
         fln = ("30 3 * * * free_tls_certificate {0} {1} {2} {3} {4} "
@@ -741,7 +739,7 @@ def _generate_certificate(
     md5 = ":".join([md5[i:i+2].upper() for i in range(0, len(md5), 2)])
     c = Certificate(id, domain, cert_path, key_path, keytype, keylength,
                     [], cert.not_valid_after, sha1, md5)
-    storage.certs.add("certificates", c)
+    storage.certificates[c.id] = c
     signals.emit("certificates", "post_add", c)
     msg = "Certificate generated successfully"
     nthread.complete(Notification("success", "Certificates", msg))
@@ -825,5 +823,5 @@ def _generate_authority(domain):
     md5 = ":".join([md5[i:i+2].upper() for i in range(0, len(md5), 2)])
     ca.sha1 = sha1
     ca.md5 = md5
-    storage.certs.add("authorities", ca)
+    storage.certificate_authorities[ca.id] = ca
     return ca

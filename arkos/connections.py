@@ -12,40 +12,44 @@ import xmlrpc.client
 
 from .utilities.errors import ConnectionServiceError
 from .utilities.errors import InvalidConfigError
-from dbus import SystemBus, Interface
+from pydbus import SystemBus
 
 
 class ConnectionsManager:
     """Manages arkOS connections to system-level processes via their APIs."""
 
-    def connect(self, config, secrets):
-        """
-        Initialize the connections.
-
-        :param Config config: arkOS config
-        :param Config secrets: arkOS secrets
-        """
+    def __init__(self, config, secrets):
         self.config = config
         self.secrets = secrets
+
+    def connect(self):
+        """Initialize the connections."""
+        self.connect_services()
+        self.connect_ldap()
+
+    def connect_services(self):
         self.DBus = SystemBus()
-        self.SystemD = self.SystemDConnect("/org/freedesktop/systemd1",
-                                           "org.freedesktop.systemd1.Manager")
-        self.LDAP = ldap_connect(config=config, passwd=secrets.get("ldap"))
+        self.SystemD = self.DBus.get('org.freedesktop.systemd1')
         self.Supervisor = supervisor_connect()
 
-    def SystemDConnect(self, path, interface):
+    def connect_ldap(self):
+        self.LDAP = ldap_connect(
+            config=self.config, passwd=self.secrets.get("ldap")
+        )
+
+    def SystemDGet(self, path, interface):
         """
         Initialize a DBus interface to a systemd resource.
 
         :param str path: Path to systemd object
         :param str interface: Name of resource
-        :returns: DBus ``Interface``
+        :returns: DBus handler
         """
         try:
-            systemd = self.DBus.get_object("org.freedesktop.systemd1", path)
+            item = self.DBus.get(path, interface)
+            return item
         except Exception as e:
             raise ConnectionServiceError("SystemD") from e
-        return Interface(systemd, dbus_interface=interface)
 
 
 def ldap_connect(

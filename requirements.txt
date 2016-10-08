@@ -14,3 +14,4 @@ psutil==4.1.0
 miniupnpc==1.9
 semantic_version>=2.6.0
 gnupg==2.0.2
+pydbus

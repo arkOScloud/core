@@ -91,7 +91,7 @@ class BackupController:
             self.version = self.site.app.version
         signals.emit("backups", "pre_backup", self)
 
-        msg = "Running pre-restore for {0}...".format(self.id)
+        msg = "Running pre-backup for {0}...".format(self.id)
         nthread.update(Notification("info", "Backup", msg))
         # Trigger the pre-backup hook for the app/site
         if self.ctype == "site":
@@ -199,8 +199,9 @@ class BackupController:
                 os.unlink(sql_path)
                 if dbmgr.meta.database_multiuser:
                     dbpasswd = random_string(16)
-                    if databases.get_user(sitename):
-                        databases.get_user(sitename).remove()
+                    dbuser = databases.get_users(sitename)
+                    if dbuser:
+                        dbuser.remove()
                     db_user = dbmgr.add_user(sitename, dbpasswd)
                     db_user.chperm("grant", db)
 

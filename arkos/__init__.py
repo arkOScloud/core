@@ -23,6 +23,20 @@ storage = StorageControl()
 conns = ConnectionsManager()
 logger = LoggingControl()
 
+class StorageControl:
+    """The primary controller for all Storage classes."""
+    TYPES = [
+        "applications", "websites", "certificates", "certificate_authorities",
+        "databases", "database_users", "database_engines", "updates",
+        "policies", "shared_files", "shares", "mounts", "share_engines",
+        "signals"
+    ]
+
+    def __init__(self):
+        """Initialize arkOS storage."""
+        for x in self.TYPES:
+            setattr(self, x, {})
+
 
 def init(config_path="/etc/arkos/settings.json",
          secrets_path="/etc/arkos/secrets.json",
@@ -32,7 +46,7 @@ def init(config_path="/etc/arkos/settings.json",
     config.load(config_path)
     secrets.load(secrets_path)
     policies.load(policies_path)
-    conns.connect(config, secrets)
+    conns.connect()
     arch = detect_architecture()
     config.set("enviro", "version", version)
     config.set("enviro", "arch", arch[0])
@@ -57,3 +71,11 @@ def initial_scans():
     tracked_services.initialize()
     if config.get("general", "enable_upnp", True):
         tracked_services.initialize_upnp(tracked_services.get())
+
+
+config = Config("settings.json")
+secrets = Config("secrets.json")
+policies = Config("policies.json")
+storage = StorageControl()
+conns = ConnectionsManager(config, secrets)
+logger = LoggingControl()

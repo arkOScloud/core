@@ -1,4 +1,3 @@
 recursive-include arkos * *.*
 recursive-exclude arkos *~ *.pyc
 recursive-exclude defaults * *.*
-include defaults/*.json

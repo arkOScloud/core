@@ -61,8 +61,7 @@ def add(by, id, sig, func):
     :param str sig: signal ID to listen for
     :param func func: hook function to execute
     """
-    l = Listener(by, id, sig, func)
-    storage.signals.add("listeners", l)
+    storage.signals[id] = Listener(by, id, sig, func)
 
 
 def emit(id, sig, data=None, crit=True):
@@ -74,10 +73,11 @@ def emit(id, sig, data=None, crit=True):
     :param data: parameter to pass to hook function (if necessary)
     :param bool crit: Raise hook function exceptions?
     """
-    s = storage.signals.get("listeners")
-    for x in s:
-        if x.id == id and x.sig == sig:
-            x.trigger(data, crit)
+    sigs = filter(
+        lambda x: x.id == id and x.sig == sig, storage.signals.values()
+    )
+    for x in sigs:
+        x.trigger(data, crit)
 
 
 def remove(by):
@@ -86,7 +86,5 @@ def remove(by):
 
     :param str by: name of the module to dereigster listeners for
     """
-    sigs = storage.signals.get("listeners")
-    for x in sigs:
-        if x.by == by:
-            storage.signals.remove("listeners", by)
+    for x in filter(lambda x: x.by == by, list(storage.signals.values())):
+        del storage.signals[x.id]

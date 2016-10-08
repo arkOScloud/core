@@ -10,7 +10,7 @@ Licensed under GPLv3, see LICENSE.md
 import configparser
 import os
 
-from arkos import storage, signals
+from arkos import applications, signals
 from arkos.system import network
 from arkos.utilities import errors, shell, cidr_to_netmask
 
@@ -257,7 +257,7 @@ def get_defense_rules():
     remove = []
     cfg = get_jail_config(jailconf)
     fcfg = configparser.SafeConfigParser()
-    for c in storage.apps.get("applications"):
+    for c in applications.get():
         if hasattr(c, "f2b") and hasattr(c, "f2b_name"):
             lst.append({"id": c.f2b_name, "icon": c.f2b_icon, "f2b": c.f2b})
         elif hasattr(c, "f2b"):

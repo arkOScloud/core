@@ -298,7 +298,7 @@ class Site:
         msg = "Finishing..."
         nthread.update(Notification("info", "Websites", msg))
         self.installed = True
-        storage.sites.add("sites", self)
+        storage.websites[self.id] = self
         if self.port == 80:
             cleanup_acme_dummy(self.domain)
         signals.emit("websites", "site_installed", self)
@@ -324,7 +324,7 @@ class Site:
                 self.db.remove()
             except:
                 pass
-            db_user = databases.get_user(self.id)
+            db_user = databases.get_users(self.id)
             if db_user:
                 try:
                     db_user.remove()
@@ -679,7 +679,7 @@ class Site:
             msg = "Removing database..."
             nthread.update(Notification("info", "Websites", msg))
             if self.db.manager.meta.database_multiuser:
-                db_user = databases.get_user(self.db.id)
+                db_user = databases.get_users(self.db.id)
                 if db_user:
                     db_user.remove()
             self.db.remove()
@@ -695,7 +695,8 @@ class Site:
         nthread.update(Notification("info", "Websites", msg))
         self.post_remove()
         create_acme_dummy(self.domain)
-        storage.sites.remove("sites", self)
+        if self.id in storage.websites:
+            del storage.websites[self.id]
         signals.emit("websites", "site_removed", self)
         msg = "{0} site removed successfully".format(self.app.name)
         nthread.complete(Notification("success", "Websites", msg))
@@ -845,7 +846,7 @@ class ReverseProxy(Site):
 
         # Track port and reload daemon
         self.installed = True
-        storage.sites.add("sites", self)
+        storage.websites[self.id] = self
         signals.emit("websites", "site_installed", self)
         self.nginx_enable()
 
@@ -861,7 +862,8 @@ class ReverseProxy(Site):
             os.unlink(os.path.join("/etc/nginx/sites-available", self.id))
         except:
             pass
-        storage.sites.remove("sites", self)
+        if self.id in storage.websites:
+            del storage.websites[self.id]
         signals.emit("websites", "site_removed", self)
 
     @property
@@ -903,27 +905,24 @@ def get(id=None, type=None, force=False):
     :return: Website(s)
     :rtype: Website or list thereof
     """
-    sites = storage.sites.get("sites")
-    if not sites or force:
-        sites = scan()
-    if id or type:
+    data = storage.websites
+    if not data or force:
+        data = scan()
+    if id:
+        return data.get(id)
+    if type:
         type_list = []
-        for site in sites:
+        for site in data.values():
             isRP = (type == "ReverseProxy" and isinstance(site, ReverseProxy))
-            if site.id == id:
-                return site
-            elif (type and isRP) or (type and site.app.id == type):
+            if (type and isRP) or (type and site.app.id == type):
                 type_list.append(site)
-        if type_list:
-            return type_list
-        return None
-    return sites
+        return type_list
+    return data.values()
 
 
 def scan():
     """Search website directories for sites, load them and store metadata."""
     from arkos import certificates
-    sites = []
 
     for x in os.listdir("/etc/nginx/sites-available"):
         path = os.path.join("/srv/http/webapps", x)
@@ -991,11 +990,10 @@ def scan():
             site.php = "php" in server.filter("Key", "index")[0].value
         except IndexError:
             pass
-        sites.append(site)
+        storage.websites[site.id] = site
         signals.emit("websites", "site_loaded", site)
 
-    storage.sites.set("sites", sites)
-    return sites
+    return storage.websites
 
 
 def nginx_reload():
