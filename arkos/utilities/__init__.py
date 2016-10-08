@@ -15,6 +15,7 @@ __all__ = [
     "path_to_b64",
     "b64_to_path",
     "extract",
+    "genAPIKey",
     "compare_versions",
     "compress",
     "cidr_to_netmask",

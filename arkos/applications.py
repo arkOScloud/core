@@ -173,7 +173,8 @@ class App:
                     try:
                         python.install(
                             dep["package"],
-                            version=dep.get("version")
+                            version=dep.get("version"),
+                            py2=True if dep.get("py2") else False
                         )
                     except:
                         error = "Couldn't install {0}".format(dep["package"])

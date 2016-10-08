@@ -48,6 +48,7 @@ class DiskPartition:
         self.enabled = enabled
         self.crypt = crypt
 
+    @property
     def is_mounted(self):
         """Return True if partition is mounted."""
         return self.mountpoint and os.path.ismount(self.mountpoint)
@@ -117,7 +118,9 @@ class DiskPartition:
     def enable(self):
         """Enable mounting of this partition on boot."""
         if self.crypt:
-            raise errors.InvalidConfigError("Cannot enable encrypted virutal disks")
+            raise errors.InvalidConfigError(
+                "Cannot enable encrypted virutal disks"
+            )
         f = FstabEntry()
         f.src = self.path
         f.dst = os.path.join("/media", self.id)

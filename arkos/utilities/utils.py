@@ -24,6 +24,9 @@ import tempfile
 import time
 import zipfile
 
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
+
 from . import errors
 
 
@@ -47,6 +50,15 @@ def is_binary(chunk):
         (ratio1 > 0.3 and ratio2 < 0.05) or
         (ratio1 > 0.8 and ratio2 > 0.8)
     )
+
+
+def genAPIKey():
+    """Generate an API key."""
+    rep = random.choice(['rA', 'aZ', 'gQ', 'hH', 'hG', 'aR', 'DD']).encode()
+    digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
+    digest.update(str(random.getrandbits(256)).encode())
+    final = digest.finalize()
+    return base64.b64encode(final, rep).decode('utf-8').rstrip('==')
 
 
 def compare_versions(v1, op, v2):

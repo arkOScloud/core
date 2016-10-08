@@ -91,7 +91,7 @@ class BackupController:
             self.version = self.site.app.version
         signals.emit("backups", "pre_backup", self)
 
-        msg = "Running pre-restore for {0}...".format(self.id)
+        msg = "Running pre-backup for {0}...".format(self.id)
         nthread.update(Notification("info", "Backup", msg))
         # Trigger the pre-backup hook for the app/site
         if self.ctype == "site":

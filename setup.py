@@ -11,6 +11,7 @@ Licensed under GPLv3, see LICENSE.md
 from setuptools import setup, find_packages
 
 install_requires = [
+    'click',
     'cryptography',
     'free_tls_certificates',
     'GitPython',
@@ -47,8 +48,7 @@ setup(
     url='http://arkos.io/',
     packages=find_packages(),
     test_suite='tests',
-    data_files=[
-        ('/etc/arkos', ['defaults/settings.json']),
-        ('/etc/arkos', ['defaults/policies.json']),
-    ]
+    entry_points={
+        'console_scripts': ['arkosctl = arkos.ctl:cli'],
+    }
 )

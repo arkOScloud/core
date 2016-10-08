@@ -19,19 +19,24 @@ from pydbus import SystemBus
 class ConnectionsManager:
     """Manages arkOS connections to system-level processes via their APIs."""
 
-    def connect(self, config, secrets):
-        """
-        Initialize the connections.
-
-        :param Config config: arkOS config
-        :param Config secrets: arkOS secrets
-        """
+    def __init__(self, config, secrets):
         self.config = config
         self.secrets = secrets
+
+    def connect(self):
+        """Initialize the connections."""
+        self.connect_services()
+        self.connect_ldap()
+
+    def connect_services(self):
         self.DBus = SystemBus()
         self.SystemD = self.DBus.get('org.freedesktop.systemd1')
-        self.LDAP = ldap_connect(config=config, passwd=secrets.get("ldap"))
         self.Supervisor = supervisor_connect()
+
+    def connect_ldap(self):
+        self.LDAP = ldap_connect(
+            config=self.config, passwd=self.secrets.get("ldap")
+        )
 
     def SystemDGet(self, path, interface):
         """

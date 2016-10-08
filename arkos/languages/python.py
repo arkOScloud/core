@@ -11,16 +11,17 @@ from arkos import logger
 from arkos.utilities import errors, shell
 
 
-def install(pkg, version=None):
+def install(pkg, version=None, py2=False):
     """
     Install a set of Python packages from PyPI.
 
     :param str pkg: package to install
     :param str version: If present, install this specific version
+    :param bool py2: If True, install for Python 2.x instead
     """
     if version:
         pkg = pkg + "==" + version
-    s = shell("pip install {0}".format(pkg))
+    s = shell("pip{0} install {1}".format("2" if py2 else "", pkg))
     if s["code"] != 0:
         errmsg = "PyPI install of {0} failed.".format(pkg)
         logmsg = "PyPI install failure details:\n{0}"
@@ -64,5 +65,5 @@ def get_installed():
     s = shell("pip freeze")
     return [
         {"id": x.split(b"==")[0], "version": x.split(b"==")[1]}
-        for x in s["stdout"].split(b"\n") if x.split()
+        for x in s["stdout"].split(b"\n") if x.split() and b"==" in x
     ]
