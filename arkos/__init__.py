@@ -16,12 +16,6 @@ from arkos.utilities import detect_architecture
 
 version = "0.8.0"
 
-config = Config("settings.json")
-secrets = Config("secrets.json")
-policies = Config("policies.json")
-storage = StorageControl()
-conns = ConnectionsManager()
-logger = LoggingControl()
 
 class StorageControl:
     """The primary controller for all Storage classes."""
