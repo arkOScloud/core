@@ -109,7 +109,6 @@ class Mount:
     def __init__(self, path="", network_path="", readonly=False,
                  username="", password="", is_mounted=False, manager=None):
         """Initialize."""
-        self.id = id
         self.path = path
         self.network_path = network_path
         self.readonly = readonly

@@ -72,7 +72,6 @@ class Service:
 
     def start(self):
         """Start service."""
-
         signals.emit("services", "pre_start", self)
         if self.stype == "supervisor":
             supervisor_ping()

@@ -200,7 +200,6 @@ def get_connections(id=None, iface=None):
     Get list of network connections.
 
     :param str id: Filter by network connection name
-
     :param str iface: Filter by network interface name
     :returns: Connection(s)
     :rtype: Connection or list thereof
