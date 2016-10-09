@@ -293,7 +293,7 @@ def get(uid=None, name=None):
     :rtype: User or list thereof
     """
     r = []
-    rootdn = config.get("general", "ldap_rootdn", "dc=arkos-servers,dc=org")
+    rootdn = config.get("general", "ldap_rootdn")
     ldap_users = conns.LDAP.search_s("ou=users," + rootdn, ldap.SCOPE_SUBTREE,
                                      "(objectClass=inetOrgPerson)", None)
     for x in ldap_users:

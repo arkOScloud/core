@@ -17,21 +17,22 @@ install_requires = [
     'GitPython',
     'gnupg',
     'miniupnpc',
+    'mockldap==0.3.0',
     'netifaces',
     'ntplib',
+    'psutil',
     'pydbus',
     'pyldap',
     'pyparted==3.10.7',
     'pycryptsetup==1.7.2',
-    'python-gnupg',
     'python-pacman',
     'python-nginx',
-    'psutil',
     'requests',
     'semantic_version'
 ]
 
 dependency_links = [
+    'https://git.coderouge.co/arkOS/mockldap/repository/archive.tar.gz?ref=0.3.0#egg=mockldap-0.3.0',
     'https://git.coderouge.co/arkOS/python-cryptsetup/repository/archive.tar.gz?ref=1.7.2#egg=pycryptsetup-1.7.2',
     'https://github.com/rhinstaller/pyparted/archive/v3.10.7.tar.gz#egg=pyparted-3.10.7'
 ]

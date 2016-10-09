@@ -20,7 +20,7 @@ def check_updates():
     updates = []
     gpg = gnupg.GPG()
     server = config.get("general", "repo_server")
-    current = config.get("updates", "current_update", 0)
+    current = config.get("updates", "current_update")
     # Fetch updates from registry server
     api_url = "https://{0}/api/v1/updates/{1}"
     data = api(api_url.format(server, str(current)), crit=True)

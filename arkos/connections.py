@@ -68,10 +68,9 @@ def ldap_connect(
     """
     if not all([uri, rootdn, dn]) and not config:
         raise errors.InvalidConfigError("No LDAP values passed")
-    uri = uri or config.get("general", "ldap_uri", "ldap://localhost")
-    rootdn = rootdn or config.get("general", "ldap_rootdn",
-                                  "dc=arkos-servers,dc=org")
-    conn_type = conn_type or config.get("general", "ldap_conntype", "dynamic")
+    uri = uri or config.get("general", "ldap_uri")
+    rootdn = rootdn or config.get("general", "ldap_rootdn")
+    conn_type = conn_type or config.get("general", "ldap_conntype")
 
     if conn_type == "dynamic":
         c = ldap.ldapobject.ReconnectLDAPObject(

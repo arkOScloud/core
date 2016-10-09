@@ -72,7 +72,7 @@ class SecurityPolicy:
             policies.set(self.type, self.id, self.policy)
         policies.save()
         storage.policies[self.id] = self
-        if config.get("general", "firewall", True) and fw:
+        if config.get("general", "firewall") and fw:
             security.regenerate_firewall(get())
 
     def remove(self, fw=True):
@@ -93,7 +93,7 @@ class SecurityPolicy:
         policies.save()
         if self.id in storage.policies:
             del storage.policies[self.id]
-        if config.get("general", "firewall", True) and fw:
+        if config.get("general", "firewall") and fw:
             security.regenerate_firewall(get())
 
     @property
@@ -190,7 +190,7 @@ def deregister(type, id="", fw=True):
         elif x.id == id:
             x.remove(fw=False)
             break
-    if config.get("general", "firewall", True) and fw:
+    if config.get("general", "firewall") and fw:
         security.regenerate_firewall(get())
 
 
@@ -393,7 +393,7 @@ def initialize():
     policy = policies.get("arkos", "upnp", 1)
     pol = SecurityPolicy("arkos", "upnp", "uPnP Firewall Comms",
                          "server", [("udp", 1900)], policy)
-    if config.get("general", "enable_upnp", True):
+    if config.get("general", "enable_upnp"):
         storage.policies[pol.id] = pol
 
     # ACME dummies
@@ -425,7 +425,7 @@ def deregister_website(site):
 
 def open_upnp_site(site):
     """Convenience function to register a website with uPnP."""
-    if config.get("general", "enable_upnp", True):
+    if config.get("general", "enable_upnp"):
         open_upnp(("tcp", site.port))
     domain = site.domain
     if domain == "localhost" or domain.endswith(".local"):
@@ -442,7 +442,7 @@ def open_upnp_site(site):
 
 def close_upnp_site(site):
     """Convenience function to deregister a website with uPnP."""
-    if config.get("general", "enable_upnp", True):
+    if config.get("general", "enable_upnp"):
         close_upnp(("tcp", site.port))
 
 

@@ -10,8 +10,70 @@ Licensed under GPLv3, see LICENSE.md
 import json
 import os
 
-import arkos
 from arkos.utilities.errors import ConfigurationError
+
+DEFAULT_CONFIG = {
+    "general": {
+        "repo_server": "grm.arkos.io",
+        "policy_path": "/etc/arkos/policies.json",
+        "firewall": True,
+        "enable_upnp": True,
+        "ntp_server": "ntp.arkos.io",
+        "date_format": "DD MMM YYYY",
+        "time_format": "HH:mm:ss",
+        "ldap_uri": "ldap://localhost",
+        "ldap_rootdn": "dc=arkos-servers,dc=org",
+        "ldap_conntype": "dynamic"
+    },
+    "apps": {
+        "app_dir": "/var/lib/arkos/applications",
+        "purge": True
+    },
+    "certificates": {
+        "cert_dir": "/etc/arkos/ssl/certs",
+        "key_dir": "/etc/arkos/ssl/keys",
+        "ca_cert_dir": "/etc/arkos/ssl/ca_certs",
+        "ca_key_dir": "/etc/arkos/ssl/ca_keys",
+        "acme_dir": "/etc/arkos/ssl/acme/certs",
+        "acme_server": "https://acme-v01.api.letsencrypt.org/directory",
+        "ciphers": "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:kEDH+AESGCM:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:ECDHE-RSA-DES-CBC3-SHA:ECDHE-ECDSA-DES-CBC3-SHA:EDH-RSA-DES-CBC3-SHA:EDH-DSS-DES-CBC3-SHA:DES-CBC3-SHA:HIGH:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK"
+    },
+    "websites": {
+        "site_dir": "/srv/http/webapps"
+    },
+    "filesystems": {
+        "vdisk_dir": "/vdisk",
+        "cipher": "aes-xts-plain64",
+        "keysize": 256
+    },
+    "updates": {
+        "check_updates": True,
+        "current_update": 0
+    },
+    "backups": {
+        "driver": "filesystem",
+        "location": "/var/lib/arkos/backups"
+    },
+    "genesis": {
+        "anonymous": True,
+        "host": "0.0.0.0",
+        "port": 8000,
+        "ssl": False,
+        "cert_file": "",
+        "key_file": "",
+        "firstrun": False
+    }
+}
+
+TEST_CONFIG = DEFAULT_CONFIG.copy()
+TEST_CONFIG["general"].update({
+    "repo_server": "grm-test.arkos.io",
+    "enable_upnp": False
+})
+TEST_CONFIG["certificates"].update({
+    "acme_server": "https://acme-staging.api.letsencrypt.org/directory"
+})
+TEST_CONFIG["genesis"].update({"firstrun": True})
 
 
 class Config:
@@ -29,24 +91,31 @@ class Config:
         :param str filename: name of file under base config directory
         """
         self.config = {}
+        self.default = {}
         self.filename = filename
 
-    def load(self, path):
+    def load(self, path, default={}):
         """
         Load the config from file.
 
+        If ``default`` is specified, that object will be used as a config
+        if the ``path`` does not exist. If it is not specified, an Exception
+        will be thrown in this circumstance.
+
         :param str path: Path to config file on disk.
+        :param dict default: Default configuration to use
         """
-        if not os.path.exists(path):
-            dir = os.path.dirname(os.path.abspath(
-                os.path.dirname(arkos.__file__)))
-            if os.path.exists(os.path.join(dir, self.filename)):
-                path = os.path.join(dir, self.filename)
-            else:
+        self.default = default
+        if os.path.exists(path):
+            with open(path) as f:
+                self.config = json.loads(f.read())
+            self.path = path
+        else:
+            if not default:
                 raise ConfigurationError("{0} not found".format(self.filename))
-        self.path = path
-        with open(path) as f:
-            self.config = json.loads(f.read())
+            else:
+                self.load_object(self.default, path)
+                self.path = path
 
     def load_object(self, obj, path=""):
         """
@@ -67,6 +136,8 @@ class Config:
         config = self.config.copy()
         if "enviro" in config:
             del config["enviro"]
+        if not os.path.exists(os.path.dirname(self.path)):
+            os.makedirs(os.path.dirname(self.path))
         with open(self.path, 'w') as f:
             f.write(json.dumps(self.config, sort_keys=True,
                     indent=4, separators=(',', ': ')))
@@ -82,12 +153,14 @@ class Config:
         """
         if section in self.config \
                 and type(self.config.get(section)) not in [dict, list]:
-            return self.config.get(section)
+            value = self.config.get(section, default)
         elif section in self.config:
-            value = self.config.get(section).get(key)
+            value = self.config.get(section).get(key, default)
+            if value is None and section in self.default:
+                value = self.default.get(section).get(key, default)
         else:
             value = None or default
-        return default if value in [None, [], {}] else value
+        return value
 
     def get_all(self, section=None):
         """

@@ -1,12 +1,10 @@
 import click
 import os
-import sys
 
-from arkos import config, secrets, policies, logger, version
+from arkos import config, configs, secrets, policies, logger
 from arkos.ctl import apikeys, applications, backups, certificates, databases
 from arkos.ctl import files, filesystems, initialize, networks, packages
 from arkos.ctl import roles, security, services, system, websites
-from arkos.utilities import detect_architecture
 from arkos.ctl.utilities import CLIException
 
 
@@ -35,12 +33,12 @@ modgroups = [
 
 @click.group()
 @click.option(
-    "--configfile", envvar="ARKOSCTL_CONFIG", default="/etc/arkos/settings.json",
-    help="Path to arkOS settings.json file"
+    "--configfile", envvar="ARKOSCTL_CONFIG",
+    default="/etc/arkos/settings.json", help="Path to arkOS settings.json file"
 )
 @click.option(
-    "--secretsfile", envvar="ARKOSCTL_SECRETS", default="/etc/arkos/secrets.json",
-    help="Path to arkOS secrets.json file"
+    "--secretsfile", envvar="ARKOSCTL_SECRETS",
+    default="/etc/arkos/secrets.json", help="Path to arkOS secrets.json file"
 )
 @click.option(
     "--policiesfile", envvar="ARKOSCTL_POLICIES",
@@ -54,14 +52,9 @@ def cli(configfile, secretsfile, policiesfile, v):
         raise CLIException(
             "You must run this script as root, or prefixed with `sudo`."
         )
-    if len(sys.argv) > 1 and sys.argv[1] != "init":
-        config.load(configfile)
-        secrets.load(secretsfile)
-        policies.load(policiesfile)
-    arch = detect_architecture()
-    config.set("enviro", "version", version)
-    config.set("enviro", "arch", arch[0])
-    config.set("enviro", "board", arch[1])
+    config.load(configfile, default=configs.DEFAULT_CONFIG)
+    secrets.load(secretsfile, default={})
+    policies.load(policiesfile, default={})
     logger.add_stream_logger(st="[{levelname}] {comp}: {message}", debug=v)
 
 for x in modgroups:

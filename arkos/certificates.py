@@ -29,9 +29,6 @@ if not groups.get_system("ssl-cert"):
     groups.SystemGroup("ssl-cert").add()
 gid = groups.get_system("ssl-cert").gid
 
-LETSENCRYPT_LIVE = "https://acme-v01.api.letsencrypt.org/directory"
-LETSENCRYPT_STAGING = "https://acme-staging.api.letsencrypt.org/directory"
-
 
 class Certificate:
     """
@@ -276,7 +273,7 @@ def scan():
     """
     assigns = {}
     if config.get("genesis", "ssl"):
-        gen_cert = config.get("genesis", "cert_file", "")
+        gen_cert = config.get("genesis", "cert_file")
         ssl = os.path.splitext(os.path.basename(gen_cert))[0]
         if ssl and ssl in assigns:
             assigns[ssl].append({"type": "genesis", "id": "genesis",
@@ -307,8 +304,7 @@ def scan():
         storage.certificates[id] = \
             _scan_a_cert(id, cert_path, key_path, assigns)
 
-    acmedir = config.get(
-        "certificates", "acme_dir", "/etc/arkos/ssl/acme/certs")
+    acmedir = config.get("certificates", "acme_dir")
     if not os.path.exists(acmedir):
         os.makedirs(acmedir)
 
@@ -504,7 +500,7 @@ def _request_acme_certificate(domain, webroot, nthread):
     signals.emit("certificates", "pre_add", id)
     domains = [domain]
 
-    acme_dir = config.get("certificates", "acme_dir", "/etc/arkos/ssl/acme")
+    acme_dir = config.get("certificates", "acme_dir")
     cert_dir = os.path.join(acme_dir, "certs", domain)
     cert_path = os.path.join(cert_dir, "cert.pem")
     key_path = os.path.join(cert_dir, "privkey.pem")
@@ -530,7 +526,7 @@ def _request_acme_certificate(domain, webroot, nthread):
             leclient.issue_certificate(
                 domains,
                 acme_dir,
-                acme_server=LETSENCRYPT_LIVE,
+                acme_server=config.get("certificates", "acme_server"),
                 certificate_file=cert_path,
                 private_key_file=key_path,
                 agree_to_tos_url=agree_to_tos)

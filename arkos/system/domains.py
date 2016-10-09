@@ -82,8 +82,8 @@ def get(id=None):
     :rtype: Domain or list thereof
     """
     results = []
-    qset = conns.LDAP.search_s("ou=domains,{0}".format(
-        config.get("general", "ldap_rootdn", "dc=arkos-servers,dc=org")),
+    qset = conns.LDAP.search_s(
+        "ou=domains,{0}".format(config.get("general", "ldap_rootdn")),
         ldap.SCOPE_SUBTREE, "(virtualdomain=*)", ["virtualdomain"])
     for x in qset:
         d = Domain(x[1]["virtualdomain"][0].decode(),

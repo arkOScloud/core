@@ -253,7 +253,7 @@ class App:
         for s in self.services:
             if s.get("default_policy", 0) and s["ports"]:
                 ports.append(s["ports"])
-        if ports and config.get("general", "enable_upnp", True):
+        if ports and config.get("general", "enable_upnp"):
             tracked_services.open_all_upnp(ports)
         verify_app_dependencies()
         smsg = "{0} installed successfully.".format(self.name)
@@ -291,7 +291,7 @@ class App:
                     services.stop(item["daemon"])
                     services.disable(item["daemon"])
                 pacman.remove([item["package"]],
-                              purge=config.get("apps", "purge", False))
+                              purge=config.get("apps", "purge"))
 
         # Remove the app's directory and cleanup the app object
         shutil.rmtree(os.path.join(config.get("apps", "app_dir"), self.id))
@@ -309,7 +309,7 @@ class App:
         for s in self.services:
             if s.get("default_policy", 0) and s["ports"]:
                 ports.append(s["ports"])
-        if ports and config.get("general", "enable_upnp", True):
+        if ports and config.get("general", "enable_upnp"):
             tracked_services.close_all_upnp(ports)
         smsg = "{0} uninstalled successfully".format(self.name)
         nthread.complete(Notification("success", "Apps", smsg))
