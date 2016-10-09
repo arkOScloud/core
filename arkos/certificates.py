@@ -719,7 +719,7 @@ def _generate_certificate(
     cert = cert.issuer_name(ca_cert.issuer)
     cert = cert.serial_number(int.from_bytes(os.urandom(20), "big") >> 1)
     cert = cert.public_key(key.public_key())
-    cert = cert.not_validbefore(datetime.datetime.utcnow())
+    cert = cert.not_valid_before(datetime.datetime.utcnow())
     cert = cert.not_valid_after(
         datetime.datetime.utcnow() + datetime.timedelta(days=730)
     )
@@ -790,7 +790,7 @@ def _generate_authority(domain):
     cert = cert.issuer_name(issuer)
     cert = cert.serial_number(int.from_bytes(os.urandom(20), "big") >> 1)
     cert = cert.public_key(key.public_key())
-    cert = cert.not_validbefore(datetime.datetime.utcnow())
+    cert = cert.not_valid_before(datetime.datetime.utcnow())
     cert = cert.not_valid_after(
         datetime.datetime.utcnow() + datetime.timedelta(days=1825)
     )
