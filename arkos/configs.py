@@ -108,7 +108,7 @@ class Config:
         """
         self.default = default
         if os.path.exists(path):
-            with open(path) as f:
+            with open(path, "r") as f:
                 self.config = json.loads(f.read())
             self.path = path
         else:
