@@ -183,7 +183,7 @@ def random_string(length=40):
     return ''.join(random.choice(chars) for _ in range(length))
 
 
-def api(url, post=None, method="get", returns="json", headers=[], crit=False):
+def api(url, post=None, method="get", returns="json", headers=[], crit=True):
     """
     Multipurpose function to send/receive data from an Internet address.
 
@@ -206,18 +206,18 @@ def api(url, post=None, method="get", returns="json", headers=[], crit=False):
             req = action(url, headers=headers, json=post)
         else:
             req = action(url, headers=headers, json=post)
+        req.raise_for_status()
         if returns == "json":
             return req.json()
         elif returns == "str":
             return req.text
         else:
             return req.content
-        req.raise_for_status()
     except requests.exceptions.HTTPError as e:
         if crit:
             raise errors.OperationFailedError(
                 (err_str + "HTTP Error {2}").format(
-                    method.upper(), url, req.code))
+                    method.upper(), url, req.status_code))
     except requests.exceptions.RequestException as e:
         if crit:
             raise errors.OperationFailedError(

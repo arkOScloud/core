@@ -271,6 +271,7 @@ def scan():
     :return: list of Certificate objects
     :rtype: list
     """
+    logger.debug("Crts", "Scanning for certificates")
     assigns = {}
     if config.get("genesis", "ssl"):
         gen_cert = config.get("genesis", "cert_file")
@@ -369,6 +370,7 @@ def scan_authorities():
     :return: list of CertificateAuthority objects
     :rtype: list
     """
+    logger.debug("Crts", "Scanning for certificate authorities")
     storage.certificate_authorities.clear()
     ca_cert_dir = config.get("certificates", "ca_cert_dir")
     ca_key_dir = config.get("certificates", "ca_key_dir")

@@ -148,6 +148,9 @@ class App:
                         pack["version"], "lt", dep["version"]
                     )
                 if not pack or invalid_ver:
+                    logger.debug(
+                        "Apps", "{0} not found. Attempting install..."
+                        .format(dep["package"]))
                     try:
                         pacman.install(dep["package"])
                     except:
@@ -160,7 +163,7 @@ class App:
                         verify = False
             if dep["type"] == "python":
                 pack = next(
-                    filter(lambda x: x["id"] == dep["package"],
+                    filter(lambda x: x["id"].lower() == dep["package"].lower(),
                            installed["py"]),
                     None
                 )
@@ -170,6 +173,9 @@ class App:
                         pack["version"], "lt", dep["version"]
                     )
                 if not pack or invalid_ver:
+                    logger.debug(
+                        "Apps", "{0} not found. Attempting install..."
+                        .format(dep["package"]))
                     try:
                         python.install(
                             dep["package"],
@@ -181,10 +187,9 @@ class App:
                         verify = False
                         if cry:
                             raise AppDependencyError(dep["package"], "python")
-                    finally:
-                        if dep.get("internal"):
-                            error = "Reload required"
-                            verify = False
+                    if dep.get("internal"):
+                        error = "Reload required"
+                        verify = False
             if dep["type"] == "ruby":
                 pack = next(
                     filter(lambda x: x["id"] == dep["package"],
@@ -197,6 +202,9 @@ class App:
                         pack["version"], "lt", dep["version"]
                     )
                 if not pack or invalid_ver:
+                    logger.debug(
+                        "Apps", "{0} not found. Attempting install..."
+                        .format(dep["package"]))
                     try:
                         ruby.install(
                             dep["package"],
@@ -207,10 +215,9 @@ class App:
                         verify = False
                         if cry:
                             raise AppDependencyError(dep["package"], "ruby")
-                    finally:
-                        if dep.get("internal"):
-                            error = "Reload required"
-                            verify = False
+                    if dep.get("internal"):
+                        error = "Reload required"
+                        verify = False
         self.loadable = verify
         self.error = error
         return verify
@@ -434,11 +441,13 @@ def scan(verify=True, cry=True):
     :rtype: list
     """
     signals.emit("apps", "pre_scan")
+    logger.debug("Apps", "Scanning for applications")
     app_dir = config.get("apps", "app_dir")
     if not os.path.exists(app_dir):
         os.makedirs(app_dir)
 
     pacman.refresh()
+    logger.debug("Apps", "Getting system/python/ruby installed list")
     inst_list = {
         "sys": pacman.get_installed(),
         "py": python.get_installed(),
@@ -447,9 +456,15 @@ def scan(verify=True, cry=True):
 
     # Get paths for installed apps, metadata for available ones
     installed_apps = [x for x in os.listdir(app_dir) if not x.startswith(".")]
-    api_url = "https://{0}/api/v1/apps"
-    available_apps = api(api_url.format(config.get("general", "repo_server")),
-                         crit=False)
+    api_url = ("https://{0}/api/v1/apps"
+               .format(config.get("general", "repo_server")))
+    logger.debug("Apps", "Fetching available apps: {0}".format(api_url))
+    try:
+        available_apps = api(api_url)
+    except Exception as e:
+        available_apps = []
+        logger.error("Apps", "Could not get available apps from GRM.")
+        logger.error("Apps", str(e))
     if available_apps:
         available_apps = available_apps["applications"]
     else:
