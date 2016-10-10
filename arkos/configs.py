@@ -68,7 +68,8 @@ DEFAULT_CONFIG = {
 TEST_CONFIG = DEFAULT_CONFIG.copy()
 TEST_CONFIG["general"].update({
     "repo_server": "grm-test.arkos.io",
-    "enable_upnp": False
+    "enable_upnp": False,
+    "ldap_conntype": "simple"
 })
 TEST_CONFIG["certificates"].update({
     "acme_server": "https://acme-staging.api.letsencrypt.org/directory"
@@ -94,7 +95,7 @@ class Config:
         self.default = {}
         self.filename = filename
 
-    def load(self, path, default={}):
+    def load(self, path, default=None):
         """
         Load the config from file.
 
@@ -111,7 +112,7 @@ class Config:
                 self.config = json.loads(f.read())
             self.path = path
         else:
-            if not default:
+            if default is None:
                 raise ConfigurationError("{0} not found".format(self.filename))
             else:
                 self.load_object(self.default, path)
@@ -156,7 +157,7 @@ class Config:
             value = self.config.get(section, default)
         elif section in self.config:
             value = self.config.get(section).get(key, default)
-            if value is None and section in self.default:
+            if value is None and self.default and section in self.default:
                 value = self.default.get(section).get(key, default)
         else:
             value = None or default
