@@ -2,8 +2,13 @@ image: python:3.4
 
 before_script:
   - apt-get update -qy
-  - apt-get install -y libcryptsetup-dev python3-gi libsasl2-dev libldap2-dev libssl-dev libdbus-1-dev libdbus-glib-1-dev libparted-dev
-  - ln -s /usr/lib/python3/dist-packages/gi /usr/local/lib/python3.4/site-packages/
+  - apt-get install -y libcryptsetup-dev python3-gi libsasl2-dev libldap2-dev libssl-dev libdbus-1-dev libdbus-glib-1-dev libparted-dev libglib2.0-dev libffi-dev libgirepository1.0-dev libcairo2 libcairo-gobject2 python3-cairo-dev
+  - wget http://ftp.gnome.org/pub/GNOME/sources/pygobject/3.20/pygobject-3.20.1.tar.xz
+  - tar xf pygobject-3.20.1.tar.xz
+  - cd pygobject-3.20.1
+  - ./configure --prefix=/usr/local
+  - make
+  - make install
 
 test:
   script:
