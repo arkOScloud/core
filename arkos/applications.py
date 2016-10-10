@@ -156,7 +156,7 @@ class App:
                         if cry:
                             raise AppDependencyError(dep["package"], "system")
                     if dep.get("internal"):
-                        error = "Restart required"
+                        error = "Reload required"
                         verify = False
             if dep["type"] == "python":
                 pack = next(
@@ -183,7 +183,7 @@ class App:
                             raise AppDependencyError(dep["package"], "python")
                     finally:
                         if dep.get("internal"):
-                            error = "Restart required"
+                            error = "Reload required"
                             verify = False
             if dep["type"] == "ruby":
                 pack = next(
@@ -209,7 +209,7 @@ class App:
                             raise AppDependencyError(dep["package"], "ruby")
                     finally:
                         if dep.get("internal"):
-                            error = "Restart required"
+                            error = "Reload required"
                             verify = False
         self.loadable = verify
         self.error = error
