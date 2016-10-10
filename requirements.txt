@@ -7,11 +7,11 @@ gnupg
 miniupnpc
 netifaces
 ntplib
--e git+https://git.coderouge.co/arkOS/mockldap@0.3.0#egg=mockldap-0.3.0
+https://git.coderouge.co/arkOS/mockldap/repository/archive.tar.gz?ref=0.3.0#egg=mockldap-0.3.0
 psutil
--e git+https://git.coderouge.co/arkOS/python-cryptsetup@1.7.2#egg=pycryptsetup-1.7.2
+https://git.coderouge.co/arkOS/python-cryptsetup/repository/archive.tar.gz?ref=1.7.2#egg=pycryptsetup-1.7.2
 pyldap
--e git+https://github.com/rhinstaller/pyparted@v3.10.7#egg=parted-3.10.7
+https://github.com/rhinstaller/pyparted/archive/v3.10.7.tar.gz#egg=pyparted-3.10.7
 python-pacman
 python-nginx
 requests
