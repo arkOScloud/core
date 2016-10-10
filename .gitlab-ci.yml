@@ -2,10 +2,11 @@ image: python:3.5
 
 before_script:
   - apt-get update -qy
-  - apt-get install -y libcryptsetup-dev python3-gi python3-virtualenv libsasl2-dev libldap2-dev libssl-dev libdbus-1-dev libdbus-glib-1-dev libparted-dev
+  - apt-get install -y libcryptsetup-dev python3-gi libsasl2-dev libldap2-dev libssl-dev libdbus-1-dev libdbus-glib-1-dev libparted-dev
 
 test:
   script:
+    - pip install virtualenv
     - virtualenv venv
     - source venv/bin/activate
     - pip install -r requirements.txt
