@@ -3,6 +3,7 @@ image: python:3.4
 before_script:
   - apt-get update -qy
   - apt-get install -y libcryptsetup-dev python3-gi libsasl2-dev libldap2-dev libssl-dev libdbus-1-dev libdbus-glib-1-dev libparted-dev
+  - ln -s /usr/lib/python3/dist-packages/gi /usr/local/lib/python3.4/site-packages/
 
 test:
   script:
