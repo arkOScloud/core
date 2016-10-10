@@ -11,7 +11,7 @@ ntplib
 psutil
 -e git+https://git.coderouge.co/arkOS/python-cryptsetup@1.7.2#egg=pycryptsetup-1.7.2
 pyldap
--e git+https://github.com/rhinstaller/pyparted@v3.10.7#egg=pyparted-3.10.7
+-e git+https://github.com/rhinstaller/pyparted@v3.10.7#egg=parted-3.10.7
 python-pacman
 python-nginx
 requests
