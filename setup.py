@@ -13,6 +13,7 @@ from setuptools import setup, find_packages
 install_requires = [
     'click',
     'cryptography',
+    'dbus-python',
     'free_tls_certificates',
     'GitPython',
     'gnupg',
@@ -21,7 +22,6 @@ install_requires = [
     'netifaces',
     'ntplib',
     'psutil',
-    'pydbus',
     'pyldap',
     'pyparted==3.10.7',
     'pycryptsetup==1.7.2',
