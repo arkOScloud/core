@@ -6,10 +6,6 @@ before_script:
 
 test:
   script:
-    - pip install virtualenv
-    - virtualenv venv
-    - source venv/bin/activate
     - pip install -r requirements.txt
-    - ln -s /usr/lib/python3/dist-packages/gi venv/lib/python3.4/site-packages/
     - python setup.py test
   when: on_success
