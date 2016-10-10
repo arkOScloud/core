@@ -8,11 +8,12 @@ Licensed under GPLv3, see LICENSE.md
 """
 
 import ldap
+import ldap.modlist
 import xmlrpc.client
 
-from .utilities.errors import ConnectionServiceError
-from .utilities.errors import InvalidConfigError
-from pydbus import SystemBus
+
+from .utilities import errors
+from dbus import SystemBus, Interface
 
 
 class ConnectionsManager:
@@ -29,7 +30,8 @@ class ConnectionsManager:
 
     def connect_services(self):
         self.DBus = SystemBus()
-        self.SystemD = self.DBus.get('org.freedesktop.systemd1')
+        self.SystemD = self.SystemDConnect(
+            "/org/freedesktop/systemd1", "org.freedesktop.systemd1.Manager")
         self.Supervisor = supervisor_connect()
 
     def connect_ldap(self):
@@ -50,6 +52,9 @@ class ConnectionsManager:
             return item
         except Exception as e:
             raise ConnectionServiceError("SystemD") from e
+    def SystemDConnect(self, path, interface):
+        systemd = self.DBus.get_object("org.freedesktop.systemd1", path)
+        return Interface(systemd, dbus_interface=interface)
 
 
 def ldap_connect(
@@ -66,11 +71,10 @@ def ldap_connect(
     :returns: LDAP connection object
     """
     if not all([uri, rootdn, dn]) and not config:
-        raise InvalidConfigError("No LDAP values passed")
-    uri = uri or config.get("general", "ldap_uri", "ldap://localhost")
-    rootdn = rootdn or config.get("general", "ldap_rootdn",
-                                  "dc=arkos-servers,dc=org")
-    conn_type = conn_type or config.get("general", "ldap_conntype", "dynamic")
+        raise errors.InvalidConfigError("No LDAP values passed")
+    uri = uri or config.get("general", "ldap_uri")
+    rootdn = rootdn or config.get("general", "ldap_rootdn")
+    conn_type = conn_type or config.get("general", "ldap_conntype")
 
     if conn_type == "dynamic":
         c = ldap.ldapobject.ReconnectLDAPObject(
@@ -81,15 +85,15 @@ def ldap_connect(
     try:
         c.simple_bind_s("{0},{1}".format(dn, rootdn), passwd)
     except ldap.INVALID_CREDENTIALS:
-        raise ConnectionServiceError("LDAP", "Invalid username/password")
+        raise errors.ConnectionError("LDAP", "Invalid username/password")
     except Exception as e:
-        raise ConnectionServiceError("LDAP") from e
+        raise errors.ConnectionError("LDAP") from e
     if dn != "cn=admin":
         data = c.search_s("cn=admins,ou=groups,{0}".format(rootdn),
                           ldap.SCOPE_SUBTREE, "(objectClass=*)",
                           ["member"])[0][1]["member"]
         if "{0},{1}".format(dn, rootdn) not in data:
-            raise ConnectionServiceError("LDAP", "Not an administrator")
+            raise errors.ConnectionError("LDAP", "Not an administrator")
     return c
 
 
@@ -103,4 +107,4 @@ def supervisor_connect():
         s = xmlrpc.client.Server("http://localhost:9001/RPC2")
         return s.supervisor
     except Exception as e:
-        raise ConnectionServiceError("Supervisor") from e
+        raise errors.ConnectionError("Supervisor") from e

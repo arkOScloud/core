@@ -85,8 +85,7 @@ class BackupController:
         nthread.title = "Creating a backup"
 
         if not backup_location:
-            backup_location = config.get("backups", "location",
-                                         "/var/lib/arkos/backups")
+            backup_location = config.get("backups", "location")
         if self.ctype == "site":
             self.version = self.site.app.version
         signals.emit("backups", "pre_backup", self)
@@ -331,8 +330,7 @@ def get(backup_location=""):
     """
     backups = []
     if not backup_location:
-        backup_location = config.get("backups", "location",
-                                     "/var/lib/arkos/backups")
+        backup_location = config.get("backups", "location")
     if not os.path.exists(backup_location):
         os.makedirs(backup_location)
     for x in glob.glob(os.path.join(backup_location, "*/*.tar.gz")):
@@ -448,8 +446,7 @@ def remove(id, time, backup_location=""):
     :param str backup_location: Location (instead of arkOS default)
     """
     if not backup_location:
-        backup_location = config.get("backups", "location",
-                                     "/var/lib/arkos/backups")
+        backup_location = config.get("backups", "location")
     backups = get()
     for x in backups:
         if x["id"] == id+"/"+time:

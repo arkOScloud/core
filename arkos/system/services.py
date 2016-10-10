@@ -11,6 +11,8 @@ import configparser
 import os
 import time
 
+from dbus.exceptions import DBusException
+
 from arkos import conns, signals
 from arkos.utilities import shell
 
@@ -83,22 +85,22 @@ class Service:
         else:
             # Send the start command to systemd
             try:
-                svc = conns.SystemDGet(
-                    ".systemd1", conns.SystemD.LoadUnit(self.sfname)
-                )
-                conns.SystemD.StartUnit(self.sfname, "replace")
-            except Exception as e:
+                path = conns.SystemD.LoadUnit(self.name + ".service")
+                conns.SystemD.StartUnit(self.name + ".service", "replace")
+            except DBusException as e:
                 raise ActionError("dbus", str(e))
             timeout = 0
             time.sleep(1)
             # Wait for the service to start, raise exception if it fails
             while timeout < 10:
-                data = svc.Get('org.freedesktop.systemd1.Unit', 'ActiveState')
-                if str(data) == "failed":
-                    raise ActionError("svc", "The service failed to start. "
-                                      "Please check `sudo systemctl -l status "
-                                      "{0}".format(self.sfname))
-                elif str(data) == "active":
+                data = conns.SystemDConnect(
+                    path, "org.freedesktop.DBus.Properties")
+                data = data.GetAll("org.freedesktop.systemd1.Unit")
+                if str(data["ActiveState"]) == "failed":
+                    raise ActionError(
+                        "svc", "The service failed to start. Please check "
+                        "`sudo arkosctl svc status {0}`".format(self.name))
+                elif str(data["ActiveState"]) == "active":
                     self.state = "running"
                     signals.emit("services", "post_start", self)
                     break
@@ -106,8 +108,8 @@ class Service:
                 time.sleep(1)
             else:
                 raise ActionError("svc", "The service start timed out. "
-                                  "Please check `sudo systemctl -l status "
-                                  "{0}".format(self.sfname))
+                                  "Please check `sudo arkosctl svc status {0}`"
+                                  .format(self.sfname))
 
     def stop(self):
         """Stop service."""
@@ -120,18 +122,18 @@ class Service:
         else:
             # Send the stop command to systemd
             try:
-                svc = conns.SystemDGet(
-                    ".systemd1", conns.SystemD.LoadUnit(self.sfname)
-                )
-                conns.SystemD.StopUnit(self.sfname, "replace")
-            except Exception as e:
+                path = conns.SystemD.LoadUnit(self.name + ".service")
+                conns.SystemD.StopUnit(self.name + ".service", "replace")
+            except DBusException as e:
                 raise ActionError("dbus", str(e))
             timeout = 0
             time.sleep(1)
             # Wait for the service to stop, raise exception if it fails
             while timeout < 10:
-                data = svc.Get('org.freedesktop.systemd1.Unit', 'ActiveState')
-                if str(data) in ["inactive", "failed"]:
+                data = conns.SystemDConnect(
+                    path, "org.freedesktop.DBus.Properties")
+                data = data.GetAll("org.freedesktop.systemd1.Unit")
+                if str(data["ActiveState"]) in ["inactive", "failed"]:
                     self.state = "stopped"
                     signals.emit("services", "post_stop", self)
                     break
@@ -139,8 +141,8 @@ class Service:
                 time.sleep(1)
             else:
                 raise ActionError("svc", "The service stop timed out. "
-                                  "Please check `sudo systemctl -l status "
-                                  "{0}".format(self.sfname))
+                                  "Please check `sudo arkosctl svc status {0}`"
+                                  .format(self.sfname))
 
     def restart(self, real=False):
         """Restart service."""
@@ -153,25 +155,27 @@ class Service:
         else:
             # Send the restart command to systemd
             try:
-                svc = conns.SystemDGet(
-                    ".systemd1", conns.SystemD.LoadUnit(self.sfname)
-                )
+                path = conns.SystemD.LoadUnit(self.name + ".service")
                 if real:
-                    conns.SystemD.RestartUnit(self.sfname, "replace")
+                    conns.SystemD.RestartUnit(
+                        self.name + ".service", "replace")
                 else:
-                    conns.SystemD.ReloadOrRestartUnit(self.sfname, "replace")
-            except Exception as e:
+                    conns.SystemD.ReloadOrRestartUnit(
+                        self.name + ".service", "replace")
+            except DBusException as e:
                 raise ActionError("dbus", str(e))
             timeout = 0
             time.sleep(1)
             # Wait for the service to restart, raise exception if it fails
             while timeout < 10:
-                data = svc.Get('org.freedesktop.systemd1.Unit', 'ActiveState')
-                if str(data) == "failed":
-                    raise ActionError("svc", "The service failed to restart. "
-                                      "Please check `sudo systemctl -l status "
-                                      "{0}".format(self.sfname))
-                elif str(data) == "active":
+                data = conns.SystemDConnect(
+                    path, "org.freedesktop.DBus.Properties")
+                data = data.GetAll("org.freedesktop.systemd1.Unit")
+                if str(data["ActiveState"]) == "failed":
+                    raise ActionError(
+                        "svc", "The service failed to restart. Please check "
+                        "`sudo arkosctl svc status {0}`".format(self.name))
+                elif str(data["ActiveState"]) == "active":
                     self.state = "running"
                     signals.emit("services", "post_restart", self)
                     break
@@ -179,8 +183,8 @@ class Service:
                 time.sleep(1)
             else:
                 raise ActionError("svc", "The service restart timed out. "
-                                  "Please check `sudo systemctl -l status "
-                                  "{0}".format(self.sfname))
+                                  "Please check `sudo arkosctl svc status {0}`"
+                                  .format(self.sfname))
 
     def get_log(self):
         """Get supervisor service logs."""
@@ -203,8 +207,9 @@ class Service:
             conns.Supervisor.restart()
         else:
             try:
-                conns.SystemD.EnableUnitFiles([self.sfname], False, True)
-            except Exception as e:
+                conns.SystemD.EnableUnitFiles(
+                    [self.name + ".service"], False, True)
+            except DBusException as e:
                 raise ActionError("dbus", str(e))
         self.enabled = True
 
@@ -219,8 +224,8 @@ class Service:
             self.state = "stopped"
         else:
             try:
-                conns.SystemD.DisableUnitFiles([self.sfname], False)
-            except Exception as e:
+                conns.SystemD.DisableUnitFiles([self.name + ".service"], False)
+            except DBusException as e:
                 raise ActionError("dbus", str(e))
         self.enabled = False
 
@@ -274,7 +279,7 @@ def get(id=None):
     # Get all unit files, loaded or not
     try:
         units = conns.SystemD.ListUnitFiles()
-    except Exception as e:
+    except DBusException as e:
         raise ActionError("dbus", str(e))
 
     for unit in units:
@@ -287,7 +292,7 @@ def get(id=None):
     # Get all loaded services
     try:
         units = conns.SystemD.ListUnits()
-    except Exception as e:
+    except DBusException as e:
         raise ActionError("dbus", str(e))
 
     for unit in units:

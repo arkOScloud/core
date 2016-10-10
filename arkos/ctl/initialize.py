@@ -25,33 +25,6 @@ def init():
 @init.command()
 @click.option(
     "--yes", is_flag=True, callback=abort_if_false, expose_value=False,
-    prompt='Are you sure you want to initialize configs? Any existing data '
-    'will be overwritten.'
-)
-def configs():
-    """Initialize arkOS internal configuration files."""
-    if not os.path.exists("/usr/share/arkos/arkos-core/settings.json"):
-        raise CLIException(
-            "Template files could not be found. Your installation may "
-            "be corrupted. Please reinstall the `arkos-core` package."
-        )
-
-    logger.info('ctl:init:configs', 'Initializing configuration files')
-    if not os.path.exists("/etc/arkos"):
-        os.makedirs("/etc/arkos")
-    shutil.copy(
-        "/usr/share/arkos/arkos-core/settings.json", "/etc/arkos/settings.json"
-    )
-    with open("/etc/arkos/secrets.json", "w") as f:
-        f.write("{}\n")
-    with open("/etc/arkos/policies.json", "w") as f:
-        f.write("{}\n")
-    logger.success('ctl:init:configs', 'Completed')
-
-
-@init.command()
-@click.option(
-    "--yes", is_flag=True, callback=abort_if_false, expose_value=False,
     prompt='Are you sure you want to initialize LDAP? Any existing data '
     'will be overwritten.'
 )
@@ -111,7 +84,6 @@ def ldap():
     data = data.replace("%ROOTPW%", ldap_pwhash)
     with open("/etc/openldap/slapd.conf", "w") as f:
         f.write(data)
-    secrets.load("/etc/arkos/secrets.json")
     secrets.set("ldap", ldap_passwd)
     secrets.save()
 
@@ -220,7 +192,6 @@ def redis():
     data = data.replace("%REDISPASS%", redis_passwd)
     with open("/etc/arkos-redis.conf", "w") as f:
         f.write(data)
-    secrets.load("/etc/arkos/secrets.json")
     secrets.set("redis", redis_passwd)
     secrets.save()
 

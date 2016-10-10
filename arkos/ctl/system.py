@@ -1,16 +1,19 @@
 # -*- coding: utf-8 -*-
 import click
 
-from arkos import config, logger
+from arkos import config, logger, version
 from arkos.system import stats as statistics, sysconfig
-from arkos.utilities import shell
+from arkos.utilities import shell, detect_architecture
 from arkos.ctl.utilities import CLIException
 
 
 @click.group(name='sys')
 def system():
     """System commands"""
-    pass
+    arch = detect_architecture()
+    config.set("enviro", "version", version)
+    config.set("enviro", "arch", arch[0])
+    config.set("enviro", "board", arch[1])
 
 
 @system.command()
@@ -38,8 +41,8 @@ def stats():
         raise CLIException(str(e))
 
 
-@system.command()
-def version():
+@system.command(name='version')
+def show_version():
     """Show version and diagnostic details"""
     click.echo(shell("uname -a")["stdout"].decode().rstrip("\n"))
     click.echo(

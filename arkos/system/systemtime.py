@@ -63,7 +63,7 @@ def get_date():
     :returns: Date in config's ``date_format``
     :rtype: str
     """
-    return time.strftime(config.get("general", "date_format", "%d %b %Y"))
+    return time.strftime(config.get("general", "date_format"))
 
 
 def get_time():
@@ -73,7 +73,7 @@ def get_time():
     :returns: Time in config's ``time_format``
     :rtype: str
     """
-    return time.strftime(config.get("general", "time_format", "%H:%M"))
+    return time.strftime(config.get("general", "time_format"))
 
 
 def get_unix_time(ts=None, fmt="%Y-%m-%dT%H:%M:%S"):

@@ -138,8 +138,7 @@ def get(gid=None, name=None):
     :rtype: Group or list thereof
     """
     r = []
-    qry = "ou=groups,{0}".format(config.get("general", "ldap_rootdn",
-                                            "dc=arkos-servers,dc=org"))
+    qry = "ou=groups,{0}".format(config.get("general", "ldap_rootdn"))
     search = conns.LDAP.search_s(qry, ldap.SCOPE_SUBTREE,
                                  "(objectClass=posixGroup)", None)
     for x in search:
