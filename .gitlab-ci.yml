@@ -1,0 +1,11 @@
+image: python:3.5
+
+before_script:
+  - apt-get update -qy
+  - apt-get install -y libcryptsetup-dev libsasl2-dev libldap2-dev libssl-dev libdbus-1-dev libdbus-glib-1-dev libparted-dev
+
+test:
+  script:
+    - pip install -r requirements.txt
+    - python setup.py test
+  when: on_success

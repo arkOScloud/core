@@ -1,91 +1,124 @@
+"""
+Classes for management of arkOS process logging.
+
+arkOS Core
+(c) 2016 CitizenWeb
+Written by Jacob Cook
+Licensed under GPLv3, see LICENSE.md
+"""
+
 import datetime
 import logging
-import sys
 
-from errors import DefaultException
+from .utils import random_string
 
 
-class DefaultMessage:
-    PRINT = False
+class StreamFormatter(logging.Formatter):
+    def format(self, record):
+        if type(record.msg) in [str, bytes]:
+            id = random_string(16)
+            data = {"id": id, "message_id": id, "title": None,
+                    "message": record.msg, "comp": "Unknown", "cls": "runtime",
+                    "complete": True}
+        else:
+            data = record.msg.copy()
+        levelname = "CRITICAL"
+        logtime = datetime.datetime.fromtimestamp(record.created)
+        logtime = logtime.strftime("%Y-%m-%d %H:%M:%S")
+        logtime = "%s,%03d" % (logtime, record.msecs)
+        if record.levelname == "DEBUG":
+            levelname = "\033[37mDEBUG\033[0m  "
+        if record.levelname == "INFO":
+            levelname = "\033[36mINFO\033[0m   "
+        if record.levelname == "SUCCESS":
+            levelname = "\033[32mSUCCESS\033[0m"
+        if record.levelname == "WARNING":
+            levelname = "\033[33mWARN\033[0m   "
+        if record.levelname == "ERROR":
+            levelname = "\033[31mERROR\033[0m  "
+        data.update({"cls": data["cls"].upper()[0], "levelname": levelname,
+                     "asctime": logtime})
+        result = self._fmt.format(**data)
+        return result
 
-    def __init__(self, cls="", msg="", head=""):
-        if cls == "error" and msg:
-            raise DefaultException(str(msg))
-        elif self.PRINT and cls == "warning" and msg:
-            print "\033[33m%s\033[0m" % msg
-        elif self.PRINT and msg:
-            print "\033[32m%s\033[0m" % msg
 
-    def update(self, cls, msg, head=""):
-        if cls == "error":
-            raise DefaultException(str(msg))
-        elif self.PRINT and cls == "warning":
-            print "\033[33m%s\033[0m" % msg
-        elif self.PRINT:
-            print "\033[32m%s\033[0m" % msg
+class RuntimeFilter(logging.Filter):
+    def filter(self, record):
+        return 1 if record.msg["cls"].startswith("r") else 0
 
-    def complete(self, cls, msg, head=""):
-        if cls == "error":
-            raise DefaultException(str(msg))
-        elif self.PRINT and cls == "warning":
-            print "\033[33m%s\033[0m" % msg
-        elif self.PRINT:
-            print "\033[32m%s\033[0m" % msg
+
+class NotificationFilter(logging.Filter):
+    def filter(self, record):
+        cls = "r" if type(record.msg) != dict else record.msg["cls"][0]
+        return 1 if cls == "n" else 0
 
 
 class LoggingControl:
+    """Control logging for runtime events, using `logging` module API."""
+
     def __init__(self, logger=None):
-        self.logger = logger
+        self.logger = logger or logging.getLogger("arkos")
+        logging.addLevelName(25, "SUCCESS")
 
-    def info(self, msg):
-        self.logger.info(msg)
+    def add_stream_logger(
+            self, st="{asctime} [{cls}] [{levelname}] {comp}: {message}",
+            debug=False):
+        """Create a new stream logger."""
+        self.logger.handlers = []
+        stdout = logging.StreamHandler()
+        self.logger.setLevel(logging.DEBUG)
+        stdout.setLevel(logging.DEBUG if debug else logging.INFO)
+        dformatter = StreamFormatter(st)
+        stdout.setFormatter(dformatter)
+        self.logger.addHandler(stdout)
 
-    def warn(self, msg):
-        self.logger.warn(msg)
+    def _log(self, level, mobj, exc_info=False):
+        self.logger.log(level, mobj, exc_info=exc_info)
 
-    def error(self, msg):
-        self.logger.error(msg)
+    def debug(self, comp, message, id=None):
+        """Send a message with log level DEBUG."""
+        id = id or random_string(16)
+        self._log(10, {
+            "id": id, "message_id": id, "cls": "runtime",
+            "comp": comp, "title": None, "message": message
+        })
 
-    def debug(self, msg):
-        self.logger.debug(msg)
+    def info(self, comp, message, id=None):
+        """Send a message with log level INFO."""
+        id = id or random_string(16)
+        self._log(20, {
+            "id": id, "message_id": id, "cls": "runtime",
+            "comp": comp, "title": None, "message": message
+        })
 
+    def success(self, comp, message, id=None):
+        """Send a message with log level SUCCESS."""
+        id = id or random_string(16)
+        self._log(25, {
+            "id": id, "message_id": id, "cls": "runtime",
+            "comp": comp, "title": None, "message": message
+        })
 
-class ConsoleHandler(logging.StreamHandler):
-    def __init__(self, stream, debug, tstamp=True):
-        self.tstamp = tstamp
-        self.debug = debug
-        logging.StreamHandler.__init__(self, stream)
+    def warning(self, comp, message, id=None):
+        """Send a message with log level WARNING."""
+        id = id or random_string(16)
+        self._log(30, {
+            "id": id, "message_id": id, "cls": "runtime",
+            "comp": comp, "title": None, "message": message
+        })
 
-    def handle(self, record):
-        if not self.stream.isatty():
-            return logging.StreamHandler.handle(self, record)
+    def error(self, comp, message, id=None):
+        """Send a message with log level ERROR."""
+        id = id or random_string(16)
+        self._log(40, {
+            "id": id, "message_id": id, "cls": "runtime",
+            "comp": comp, "title": None, "message": message
+        }, exc_info=True)
 
-        s = ""
-        if self.tstamp:
-            d = datetime.datetime.fromtimestamp(record.created)
-            s += d.strftime("\033[37m%d.%m.%Y %H:%M \033[0m")
-        if self.debug:
-            s += ("%s:%s"%(record.filename,record.lineno)).ljust(30)
-        l = ""
-        if record.levelname == "DEBUG":
-            l = "\033[37mDEBUG\033[0m "
-        if record.levelname == "INFO":
-            l = "\033[32mINFO\033[0m  "
-        if record.levelname == "WARNING":
-            l = "\033[33mWARN\033[0m  "
-        if record.levelname == "ERROR":
-            l = "\033[31mERROR\033[0m "
-        s += l.ljust(9)
-        s += record.msg
-        s += "\n"
-        self.stream.write(s)
-
-
-def new_logger(log_level=logging.INFO, debug=False):
-    logger = logging.getLogger("arkos")
-    stdout = ConsoleHandler(sys.stdout, debug, False)
-    stdout.setLevel(logging.DEBUG if debug else log_level)
-    dformatter = logging.Formatter("%(asctime)s [%(levelname)s] %(module)s: %(message)s")
-    stdout.setFormatter(dformatter)
-    logger.addHandler(stdout)
-    return logger
+    def critical(self, comp, message, id=None):
+        """Send a message with log level CRITICAL."""
+        id = id or random_string(16)
+        self._log(50, {
+            "id": id, "message_id": id, "cls": "runtime",
+            "comp": comp, "title": None, "message": message
+        })

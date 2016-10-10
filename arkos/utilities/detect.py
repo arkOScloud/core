@@ -1,7 +1,17 @@
+"""
+Helper functions to detect system architecture and platform.
+
+arkOS Core
+(c) 2016 CitizenWeb
+Written by Jacob Cook
+Licensed under GPLv3, see LICENSE.md
+"""
+
 import platform
 
 
 def detect_architecture():
+    """Detect system architecture and board type."""
     arch, btype = "Unknown", "Unknown"
     cpuinfo = {}
     # Get architecture
@@ -13,21 +23,28 @@ def detect_architecture():
         with open("/proc/cpuinfo", "r") as f:
             d = f.read().split("\n")
         for x in d:
-            # Parse output of function function c_show in linux/arch/arm/kernel/setup.c
+            # Parse output of function c_show in linux/arch/arm/kernel/setup.c
             k, _, v = x.partition(":")
             cpuinfo[k.strip()] = v.strip()
         # Is this a... Raspberry Pi?
-        if cpuinfo.has_key("Hardware") and cpuinfo["Hardware"] in ("BCM2708", "BCM2835"):
+        if cpuinfo.get("Hardware", "") in ("BCM2708", "BCM2835"):
             btype = "Raspberry Pi"
-        elif cpuinfo.has_key("Hardware") and cpuinfo["Hardware"] == "BCM2709":
+        elif cpuinfo.get("Hardware", "") in ("BCM2709", "BCM2836")\
+                and "crc32" not in cpuinfo["Features"]:
             btype = "Raspberry Pi 2"
+        elif cpuinfo.get("Hardware", "") in ("BCM2709", "BCM2710", "BCM2837")\
+                and "crc32" in cpuinfo["Features"]:
+            arch = "aarch64"
+            btype = "Raspberry Pi 3"
         # Is this a... BeagleBone Black?
-        elif cpuinfo.has_key("Hardware") and "Generic AM33XX" in cpuinfo["Hardware"] and cpuinfo["CPU part"] == "0xc08":
+        elif "Hardware" in cpuinfo and "Generic AM33XX" in cpuinfo["Hardware"]\
+                and cpuinfo["CPU part"] == "0xc08":
             btype = "BeagleBone Black"
         # Is this a Cubieboard (series)?
-        elif cpuinfo.has_key("Hardware") and cpuinfo["Hardware"] == "sun7i" and cpuinfo["CPU part"] == "0xc07":
+        elif cpuinfo.get("Hardware", "") == "sun7i"\
+                and cpuinfo["CPU part"] == "0xc07":
             meminfo = {}
-            # Since both the Cubieboard2 and Cubietruck have the same processor,
+            # Since both the Cubieboard2 and Cubietruck have the same processor
             # we need to check memory size to make a good guess.
             with open("/proc/meminfo", "r") as f:
                 d = f.read().split("\n")
@@ -42,7 +59,9 @@ def detect_architecture():
                 btype = "Cubietruck"
     return (arch, btype)
 
+
 def detect_platform(mapping=True):
+    """Detect distro platform."""
     base_mapping = {
         "gentoo base system": "gentoo",
         "centos linux": "centos",
@@ -63,7 +82,7 @@ def detect_platform(mapping=True):
 
     dist = ""
     (maj, min, patch) = platform.python_version_tuple()
-    if (maj * 10 + min) >= 26:
+    if (int(maj) * 10 + int(min)) >= 26:
         dist = platform.linux_distribution()[0]
     else:
         dist = platform.dist()[0]

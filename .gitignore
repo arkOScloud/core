@@ -1,2 +1,5 @@
 dist
 arkos_core.egg-info
+*.pyc
+venv
+doc/_build
