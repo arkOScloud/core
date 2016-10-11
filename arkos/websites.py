@@ -96,13 +96,13 @@ class Site:
             self._install(extra_vars, enable, nthread)
         except Exception as e:
             self.clean_up()
-            nthread.complete(Notification("error", "Websites", str(e)))
+            nthread.complete(Notification("error", "Webs", str(e)))
             raise
 
     def _install(self, extra_vars, enable, nthread):
         nthread.title = "Installing website"
 
-        msg = Notification("info", "Websites", "Preparing to install...")
+        msg = Notification("info", "Webs", "Preparing to install...")
         nthread.update(msg)
 
         # Make sure the chosen port is indeed open
@@ -140,7 +140,7 @@ class Site:
 
         msg = "Running pre-installation..."
         uid, gid = users.get_system("http").uid, groups.get_system("http").gid
-        nthread.update(Notification("info", "Websites", msg))
+        nthread.update(Notification("info", "Webs", msg))
 
         # Call website type's pre-install hook
         self.pre_install(extra_vars)
@@ -156,7 +156,7 @@ class Site:
         # Create DB and/or DB user as necessary
         if getattr(self.app, "selected_dbengine", None):
             msg = "Creating database..."
-            nthread.update(Notification("info", "Websites", msg))
+            nthread.update(Notification("info", "Webs", msg))
             mgr = databases.get_managers(self.app.selected_dbengine)
             if not mgr:
                 estr = "No manager found for {0}"
@@ -184,7 +184,7 @@ class Site:
 
         # Download and extract the source repo / package
         msg = "Downloading website source..."
-        nthread.update(Notification("info", "Websites", msg))
+        nthread.update(Notification("info", "Webs", msg))
         if self.app.download_url and ending == ".git":
             g = git.Repo.clone_from(self.app.download_url, self.path)
             if hasattr(self.app, "download_at_tag"):
@@ -194,7 +194,7 @@ class Site:
 
             # Format extraction command according to type
             msg = "Extracting source..."
-            nthread.update(Notification("info", "Websites", msg))
+            nthread.update(Notification("info", "Webs", msg))
             if ending in [".tar.gz", ".tgz", ".tar.bz2"]:
                 arch = tarfile.open(pkg_path, "r:gz")
                 r = (x for x in arch.getnames() if re.match("^[^/]*$", x))
@@ -291,12 +291,12 @@ class Site:
 
         # Call site type's post-installation hook
         msg = "Running post-installation. This may take a few minutes..."
-        nthread.update(Notification("info", "Websites", msg))
+        nthread.update(Notification("info", "Webs", msg))
         specialmsg = self.post_install(extra_vars, dbpasswd)
 
         # Cleanup and reload daemons
         msg = "Finishing..."
-        nthread.update(Notification("info", "Websites", msg))
+        nthread.update(Notification("info", "Webs", msg))
         self.installed = True
         storage.websites[self.id] = self
         if self.port == 80:
@@ -309,7 +309,7 @@ class Site:
             php_reload()
 
         msg = "{0} site installed successfully".format(self.app.name)
-        nthread.complete(Notification("success", "Websites", msg))
+        nthread.complete(Notification("success", "Webs", msg))
         if specialmsg:
             return specialmsg
 
@@ -596,7 +596,7 @@ class Site:
         try:
             self._update(nthread)
         except Exception as e:
-            nthread.complete(Notification("error", "Websites", str(e)))
+            nthread.complete(Notification("error", "Webs", str(e)))
             raise
 
     def _update(self, nthread):
@@ -627,7 +627,7 @@ class Site:
 
         # Download and extract the source package
         msg = "Downloading website source..."
-        nthread.update(Notification("info", "Websites", msg))
+        nthread.update(Notification("info", "Webs", msg))
         if self.download_url and ending == ".git":
             pkg_path = self.download_url
         elif self.download_url:
@@ -636,12 +636,12 @@ class Site:
 
         # Call the site type's update hook
         msg = "Updating website..."
-        nthread.update(Notification("info", "Websites", msg))
+        nthread.update(Notification("info", "Webs", msg))
         self.update_site(self.path, pkg_path, self.version)
 
         # Update stored version and remove temp source archive
         msg = "{0} updated successfully".format(self.id)
-        nthread.complete(Notification("success", "Websites", msg))
+        nthread.complete(Notification("success", "Webs", msg))
         self.version = self.app.version.rsplit("-", 1)[0]
         if pkg_path:
             os.unlink(pkg_path)
@@ -655,7 +655,7 @@ class Site:
         try:
             self._remove(nthread)
         except Exception as e:
-            nthread.complete(Notification("error", "Websites", str(e)))
+            nthread.complete(Notification("error", "Webs", str(e)))
             raise
 
     def _remove(self, nthread):
@@ -663,12 +663,12 @@ class Site:
 
         # Call site type's pre-removal hook
         msg = "Running pre-removal. This may take a few minutes..."
-        nthread.update(Notification("info", "Websites", msg))
+        nthread.update(Notification("info", "Webs", msg))
         self.pre_remove()
 
         # Remove source directories
         msg = "Cleaning directories..."
-        nthread.update(Notification("info", "Websites", msg))
+        nthread.update(Notification("info", "Webs", msg))
         if os.path.islink(self.path):
             os.unlink(self.path)
         else:
@@ -677,7 +677,7 @@ class Site:
         # If there's a database, get rid of that too
         if self.db:
             msg = "Removing database..."
-            nthread.update(Notification("info", "Websites", msg))
+            nthread.update(Notification("info", "Webs", msg))
             if self.db.manager.meta.database_multiuser:
                 db_user = databases.get_users(self.db.id)
                 if db_user:
@@ -692,14 +692,14 @@ class Site:
 
         # Call site type's post-removal hook
         msg = "Running post-removal..."
-        nthread.update(Notification("info", "Websites", msg))
+        nthread.update(Notification("info", "Webs", msg))
         self.post_remove()
         create_acme_dummy(self.domain)
         if self.id in storage.websites:
             del storage.websites[self.id]
         signals.emit("websites", "site_removed", self)
         msg = "{0} site removed successfully".format(self.app.name)
-        nthread.complete(Notification("success", "Websites", msg))
+        nthread.complete(Notification("success", "Webs", msg))
 
     @property
     def as_dict(self):
@@ -777,7 +777,7 @@ class ReverseProxy(Site):
         try:
             self._install(extra_vars, enable, nthread)
         except Exception as e:
-            nthread.complete(Notification("error", "Websites", str(e)))
+            nthread.complete(Notification("error", "Webs", str(e)))
             raise
 
     def _install(self, extra_vars, enable, nthread):
@@ -924,6 +924,7 @@ def scan():
     """Search website directories for sites, load them and store metadata."""
     from arkos import certificates
 
+    logger.debug("Webs", "Scanning for websites")
     for x in os.listdir("/etc/nginx/sites-available"):
         path = os.path.join("/srv/http/webapps", x)
         if not os.path.exists(path):
@@ -941,6 +942,9 @@ def scan():
         if app and app.type == "website":
             # If it's a regular website, initialize its class, metadata, etc
             if not app or not app.loadable or not app.installed:
+                logger.debug(
+                    "Webs", "Website found but could not be loaded: {0}"
+                    .format(meta.get("id")))
                 continue
             site = app._website(id=meta.get("website", "id"))
             site.app = app
@@ -955,7 +959,7 @@ def scan():
         else:
             # Unknown website type.
             logger.debug(
-                "Websites", "Unknown website found and ignoring, id {0}"
+                "Webs", "Unknown website found and ignoring, id {0}"
                 .format(meta.get("website", "id"))
             )
             continue

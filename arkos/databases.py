@@ -7,7 +7,7 @@ Written by Jacob Cook
 Licensed under GPLv3, see LICENSE.md
 """
 
-from arkos import storage, signals, applications
+from arkos import logger, storage, signals, applications
 
 
 class Database:
@@ -253,6 +253,7 @@ def scan():
     :return: Database(s)
     :rtype: Database or list thereof
     """
+    logger.debug("DBas", "Scanning for databases")
     storage.databases.clear()
     for x in get_managers():
         try:

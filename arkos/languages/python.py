@@ -64,6 +64,9 @@ def get_installed():
     """
     s = shell("pip freeze")
     return [
-        {"id": x.split(b"==")[0], "version": x.split(b"==")[1]}
+        {
+            "id": x.split(b"==")[0].decode(),
+            "version": x.split(b"==")[1].decode()
+        }
         for x in s["stdout"].split(b"\n") if x.split() and b"==" in x
     ]

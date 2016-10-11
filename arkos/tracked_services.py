@@ -238,18 +238,19 @@ def is_open_port(port, domain=None, ignore_common=False):
 
 
 def _upnp_igd_connect():
+    logger.debug("TrSv", "Attempting to connect to uPnP IGD")
     upnpc = miniupnpc.UPnP()
     upnpc.discoverdelay = 3000
     devs = upnpc.discover()
     if devs == 0:
         msg = "Failed to connect to uPnP IGD: no devices found"
-        logger.warning("TrackedSvcs", msg)
+        logger.warning("TrSv", msg)
         return
     try:
         upnpc.selectigd()
     except Exception as e:
         msg = "Failed to connect to uPnP IGD: {0}"
-        logger.warning("TrackedSvcs", msg.format(str(e)))
+        logger.warning("TrSv", msg.format(str(e)))
     return upnpc
 
 
@@ -273,7 +274,7 @@ def open_upnp(port):
                              pf.format(port[1]), '')
     except Exception as e:
         msg = "Failed to register {0} with uPnP IGD: {1}"
-        logger.error("TrackedSvcs", msg.format(port, str(e)))
+        logger.error("TrSv", msg.format(port, str(e)))
 
 
 def close_upnp(port):
@@ -316,8 +317,8 @@ def initialize_upnp(svcs):
                                      port, pf.format(port), '')
             except Exception as e:
                 msg = "Failed to register {0} with uPnP IGD: {1}"\
-                      .format(port, str(e))
-                logger.warning("TrackedSvcs", msg)
+                    .format(port, str(e))
+                logger.warning("TrSv", msg)
 
 
 def open_all_upnp(ports):
@@ -341,7 +342,7 @@ def open_all_upnp(ports):
                                  port[1], pf.format(port[1]), '')
         except Exception as e:
             msg = "Failed to register {0} with uPnP IGD: {1}"
-            logger.error("TrackedSvcs", msg.format(port, str(e)))
+            logger.error("TrSv", msg.format(port, str(e)))
 
 
 def close_all_upnp(ports):
@@ -382,6 +383,7 @@ def get_open_port(ignore_common=False):
 
 def initialize():
     """Initialize security policy tracking."""
+    logger.debug("TrSv", "Initializing security policy tracking")
     # arkOS
     policy = policies.get("arkos", "arkos", 2)
     port = [("tcp", int(config.get("genesis", "port")))]
@@ -437,7 +439,7 @@ def open_upnp_site(site):
                " Make sure your ports are properly forwarded and"
                " that your domain is properly set up.")\
                .format(site.port, site.domain)
-        Notification("error", "TrackedSvcs", msg).send()
+        Notification("error", "TrSv", msg).send()
 
 
 def close_upnp_site(site):
