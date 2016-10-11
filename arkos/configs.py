@@ -7,6 +7,7 @@ Written by Jacob Cook
 Licensed under GPLv3, see LICENSE.md
 """
 
+import copy
 import json
 import os
 
@@ -65,7 +66,7 @@ DEFAULT_CONFIG = {
     }
 }
 
-TEST_CONFIG = DEFAULT_CONFIG.copy()
+TEST_CONFIG = copy.deepcopy(DEFAULT_CONFIG)
 TEST_CONFIG["general"].update({
     "repo_server": "grm-test.arkos.io",
     "enable_upnp": False,
