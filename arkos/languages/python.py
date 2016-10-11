@@ -56,13 +56,15 @@ def is_installed(name):
     return False
 
 
-def get_installed():
+def get_installed(py2=False):
     """
     Get all installed Python packages.
 
     Returns in format `{"id": "package_name", "version": "1.0.0"}`.
+
+    :param bool py2: Check Python 2.x packages instead of 3.x
     """
-    s = shell("pip freeze")
+    s = shell("pip{0} freeze".format("2" if py2 else ""))
     return [
         {
             "id": x.split(b"==")[0].decode(),
