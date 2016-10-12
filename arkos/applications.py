@@ -472,6 +472,8 @@ def scan(verify=True, cry=True):
     else:
         available_apps = []
 
+    # installed_apps.remove('syncthing')
+
     # Create objects for installed apps with appropriate metadata
     for x in installed_apps:
         try:
