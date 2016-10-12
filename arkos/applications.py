@@ -134,6 +134,7 @@ class App:
             pacman.refresh()
             installed["sys"] = pacman.get_installed()
             installed["py"] = python.get_installed()
+            installed["py2"] = python.get_installed(py2=True)
             installed["rb"] = ruby.get_installed()
         for dep in self.dependencies:
             if dep["type"] == "system":
@@ -451,6 +452,7 @@ def scan(verify=True, cry=True):
     inst_list = {
         "sys": pacman.get_installed(),
         "py": python.get_installed(),
+        "py2": python.get_installed(py2=True),
         "rb": ruby.get_installed()
     }
 

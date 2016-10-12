@@ -43,7 +43,7 @@ def install(gem, version=None, update=False):
     verify_path()
     if version:
         gem = gem + ":" + version
-    s = shell("gem {0} -N --no-user-install {0}".format(
+    s = shell("gem {0} -N --no-user-install {1}".format(
         "update" if update else "install", gem
     ))
     if s["code"] != 0:
