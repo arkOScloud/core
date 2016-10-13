@@ -286,7 +286,7 @@ def get(uid=None, name=None):
     """
     Get all LDAP users.
 
-    :param str id: ID of single user to fetch
+    :param str uid: ID of single user to fetch
     :param str name: username of single user to fetch
     :returns: User(s)
     :rtype: User or list thereof

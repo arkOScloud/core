@@ -1,5 +1,3 @@
-
-
 """
 Classes and functions for management of TLS certificates in arkOS.
 

@@ -39,19 +39,6 @@ class ConnectionsManager:
             config=self.config, passwd=self.secrets.get("ldap")
         )
 
-    def SystemDGet(self, path, interface):
-        """
-        Initialize a DBus interface to a systemd resource.
-
-        :param str path: Path to systemd object
-        :param str interface: Name of resource
-        :returns: DBus handler
-        """
-        try:
-            item = self.DBus.get(path, interface)
-            return item
-        except Exception as e:
-            raise ConnectionServiceError("SystemD") from e
     def SystemDConnect(self, path, interface):
         systemd = self.DBus.get_object("org.freedesktop.systemd1", path)
         return Interface(systemd, dbus_interface=interface)
