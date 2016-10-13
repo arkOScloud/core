@@ -179,7 +179,7 @@ class Service:
                     self.state = "running"
                     signals.emit("services", "post_restart", self)
                     break
-                timeout + 1
+                timeout += 1
                 time.sleep(1)
             else:
                 raise ActionError("svc", "The service restart timed out. "
