@@ -342,6 +342,7 @@ class Site:
     def add_acme_challenge(self):
         challenge_path = os.path.join(self.path, ".well-known/acme-challenge/")
         confpath = os.path.join("/etc/nginx/sites-available/", self.id)
+        uid = users.get_system("http").uid
         block = nginx.loadf(confpath)
         server = block.server
         locations = server.filter("Location", "/.well-known/acme-challenge/")
@@ -356,6 +357,9 @@ class Site:
         nginx.dumpf(block, confpath)
         if not os.path.exists(challenge_path):
             os.makedirs(challenge_path)
+        os.chown(self.path, uid)
+        os.chown(os.path.join(self.path, ".well_known"), uid)
+        os.chown(challenge_path, uid)
         nginx_reload()
         return challenge_path
 
@@ -1048,11 +1052,15 @@ def create_acme_dummy(domain):
     )
     origin = os.path.join("/etc/nginx/sites-available", "acme-"+domain)
     target = os.path.join("/etc/nginx/sites-enabled", "acme-"+domain)
+    uid = users.get_system("http").uid
     nginx.dumpf(conf, origin)
     if not os.path.exists(target):
         os.symlink(origin, target)
     if not os.path.exists(challenge_dir):
         os.makedirs(challenge_dir)
+    os.chown(site_dir, uid)
+    os.chown(os.path.join(site_dir, ".well_known"), uid)
+    os.chown(challenge_dir, uid)
     tracked_services.register(
         "acme", domain, domain + "(ACME Validation)", "globe", [('tcp', 80)],
         2

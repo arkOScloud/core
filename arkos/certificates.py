@@ -21,7 +21,7 @@ import time
 
 from arkos import config, signals, storage, websites, applications, logger
 from arkos.messages import Notification, NotificationThread
-from arkos.system import groups
+from arkos.system import users, groups
 from arkos.utilities import errors, shell
 
 
@@ -538,12 +538,15 @@ def _request_acme_certificate(domain, webroot, nthread):
             continue
         except leclient.NeedToTakeAction as e:
             if not has_written_files:
+                uid = users.get_system("http").uid
                 if not os.path.exists(webroot):
                     os.makedirs(webroot)
+                os.chown(webroot, uid)
                 for x in e.actions:
                     fn = os.path.join(webroot, x.file_name)
                     with open(fn, 'w') as f:
                         f.write(x.contents)
+                    os.chown(fn, uid)
                 has_written_files = True
                 continue
             else:
@@ -555,7 +558,7 @@ def _request_acme_certificate(domain, webroot, nthread):
         except leclient.WaitABit as e:
             while e.until_when > datetime.datetime.now():
                 until = e.until_when - datetime.datetime.now()
-                until_secs = int(round(until.total_seconds()))
+                until_secs = int(round(until.total_seconds())) + 1
                 if until_secs > 300:
                     raise errors.InvalidConfigError(
                         "Requesting a certificate failed - LE rate limiting "
