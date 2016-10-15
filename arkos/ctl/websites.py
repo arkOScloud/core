@@ -68,7 +68,10 @@ def create(id, site_type, address, port, extra_data):
         sapp = applications.get(site_type.lower())
         if hasattr(sapp, "website_options") and not extra_data:
             for x in sapp.website_options:
-                edata[x["id"]] = click.prompt(x["name"])
+                if x == "messages":
+                    continue
+                for y in sapp.website_options[x]:
+                    edata[y["id"]] = click.prompt(y["label"])
         site = sapp._website
         site = site(sapp, id, address, port)
         site.install(edata, True)

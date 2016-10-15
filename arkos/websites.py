@@ -357,9 +357,9 @@ class Site:
         nginx.dumpf(block, confpath)
         if not os.path.exists(challenge_path):
             os.makedirs(challenge_path)
-        os.chown(self.path, uid)
-        os.chown(os.path.join(self.path, ".well_known"), uid)
-        os.chown(challenge_path, uid)
+        os.chown(self.path, uid, -1)
+        os.chown(os.path.join(self.path, ".well_known"), uid, -1)
+        os.chown(challenge_path, uid, -1)
         nginx_reload()
         return challenge_path
 
@@ -1058,9 +1058,9 @@ def create_acme_dummy(domain):
         os.symlink(origin, target)
     if not os.path.exists(challenge_dir):
         os.makedirs(challenge_dir)
-    os.chown(site_dir, uid)
-    os.chown(os.path.join(site_dir, ".well_known"), uid)
-    os.chown(challenge_dir, uid)
+    os.chown(site_dir, uid, -1)
+    os.chown(os.path.join(site_dir, ".well_known"), uid, -1)
+    os.chown(challenge_dir, uid, -1)
     tracked_services.register(
         "acme", domain, domain + "(ACME Validation)", "globe", [('tcp', 80)],
         2

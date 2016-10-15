@@ -84,8 +84,8 @@ class Service:
         else:
             # Send the start command to systemd
             try:
-                path = conns.SystemD.LoadUnit(self.name + ".service")
-                conns.SystemD.StartUnit(self.name + ".service", "replace")
+                path = conns.SystemD.LoadUnit(self.sfname)
+                conns.SystemD.StartUnit(self.sfname, "replace")
             except DBusException as e:
                 raise ActionError("dbus", str(e))
             timeout = 0
@@ -121,8 +121,8 @@ class Service:
         else:
             # Send the stop command to systemd
             try:
-                path = conns.SystemD.LoadUnit(self.name + ".service")
-                conns.SystemD.StopUnit(self.name + ".service", "replace")
+                path = conns.SystemD.LoadUnit(self.sfname)
+                conns.SystemD.StopUnit(self.sfname, "replace")
             except DBusException as e:
                 raise ActionError("dbus", str(e))
             timeout = 0
@@ -154,13 +154,11 @@ class Service:
         else:
             # Send the restart command to systemd
             try:
-                path = conns.SystemD.LoadUnit(self.name + ".service")
+                path = conns.SystemD.LoadUnit(self.sfname)
                 if real:
-                    conns.SystemD.RestartUnit(
-                        self.name + ".service", "replace")
+                    conns.SystemD.RestartUnit(self.sfname, "replace")
                 else:
-                    conns.SystemD.ReloadOrRestartUnit(
-                        self.name + ".service", "replace")
+                    conns.SystemD.ReloadOrRestartUnit(self.sfname, "replace")
             except DBusException as e:
                 raise ActionError("dbus", str(e))
             timeout = 0
@@ -206,8 +204,7 @@ class Service:
             conns.Supervisor.restart()
         else:
             try:
-                conns.SystemD.EnableUnitFiles(
-                    [self.name + ".service"], False, True)
+                conns.SystemD.EnableUnitFiles([self.sfname], False, True)
             except DBusException as e:
                 raise ActionError("dbus", str(e))
         self.enabled = True
@@ -223,7 +220,7 @@ class Service:
             self.state = "stopped"
         else:
             try:
-                conns.SystemD.DisableUnitFiles([self.name + ".service"], False)
+                conns.SystemD.DisableUnitFiles([self.sfname], False)
             except DBusException as e:
                 raise ActionError("dbus", str(e))
         self.enabled = False

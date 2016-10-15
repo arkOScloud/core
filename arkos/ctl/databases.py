@@ -154,7 +154,7 @@ def drop(name):
         raise CLIException(str(e))
 
 
-@db_users.command()
+@db_users.command(name='drop')
 @click.argument("name")
 def drop_user(name):
     """Delete a database user."""
