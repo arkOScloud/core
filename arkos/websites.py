@@ -632,16 +632,16 @@ class Site:
         # Download and extract the source package
         msg = "Downloading website source..."
         nthread.update(Notification("info", "Webs", msg))
-        if self.download_url and ending == ".git":
+        if self.app.download_url and ending == ".git":
             pkg_path = self.download_url
-        elif self.download_url:
+        elif self.app.download_url:
             pkg_path = os.path.join("/tmp", self.id + ending)
             download(self.app.download_url, file=pkg_path, crit=True)
 
         # Call the site type's update hook
         msg = "Updating website..."
         nthread.update(Notification("info", "Webs", msg))
-        self.update_site(self.path, pkg_path, self.version)
+        self.update_site(pkg_path, self.app.version)
 
         # Update stored version and remove temp source archive
         msg = "{0} updated successfully".format(self.id)
@@ -1059,7 +1059,7 @@ def create_acme_dummy(domain):
     if not os.path.exists(challenge_dir):
         os.makedirs(challenge_dir)
     os.chown(site_dir, uid, -1)
-    os.chown(os.path.join(site_dir, ".well_known"), uid, -1)
+    os.chown(os.path.join(site_dir, ".well-known"), uid, -1)
     os.chown(challenge_dir, uid, -1)
     tracked_services.register(
         "acme", domain, domain + "(ACME Validation)", "globe", [('tcp', 80)],
