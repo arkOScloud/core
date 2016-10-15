@@ -398,6 +398,11 @@ def initialize():
     if config.get("general", "enable_upnp"):
         storage.policies[pol.id] = pol
 
+    # SSHd
+    policy = policies.get("arkos", "sshd", 1)
+    pol = SecurityPolicy(
+        "arkos", "sshd", "SSH", "server", [("tcp", 22)], policy)
+
     # ACME dummies
     for x in glob.glob("/etc/nginx/sites-enabled/acme-*"):
         acme_name = x.split("/etc/nginx/sites-enabled/acme-")[1]

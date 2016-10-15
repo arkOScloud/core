@@ -31,7 +31,8 @@ def initialize_firewall():
     shell("iptables -A INPUT -j arkos-apps")
 
     # Allow ICMP (ping)
-    shell("iptables -A INPUT -p icmp -m icmp --icmp-type echo-request -j ACCEPT")
+    shell(
+        "iptables -A INPUT -p icmp -m icmp --icmp-type echo-request -j ACCEPT")
 
     # Accept established/related connections
     shell("iptables -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT")

@@ -4,7 +4,7 @@ import os
 import pwd
 import shutil
 
-from arkos import logger, secrets
+from arkos import logger, secrets, security
 from arkos.utilities import shell, random_string, hashpw
 from arkos.ctl.utilities import abort_if_false, CLIException
 
@@ -227,3 +227,11 @@ def nginx():
     shell("systemctl enable nginx")
     shell("systemctl restart nginx")
     logger.success('ctl:init:nginx', 'Completed')
+
+
+@init.command()
+def firewall():
+    """Initialize default firewall rules."""
+    logger.info('ctl:init:firewall', 'Initializing firewall')
+    security.initialize_firewall()
+    logger.success('ctl:init:firewall', 'Completed')
