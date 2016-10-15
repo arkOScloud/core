@@ -7,7 +7,7 @@ Written by Jacob Cook
 Licensed under GPLv3, see LICENSE.md
 """
 
-from arkos import storage
+from arkos import storage, logger
 
 
 class Listener:
@@ -61,7 +61,12 @@ def add(by, id, sig, func):
     :param str sig: signal ID to listen for
     :param func func: hook function to execute
     """
-    storage.signals[id] = Listener(by, id, sig, func)
+    if not storage.signals.get(id):
+        storage.signals[id] = []
+    storage.signals[id].append(Listener(by, id, sig, func))
+    logger.debug("Sign", "Registered {0} to {1} for {2}".format(
+        sig, id, by
+    ))
 
 
 def emit(id, sig, data=None, crit=True):
@@ -73,8 +78,10 @@ def emit(id, sig, data=None, crit=True):
     :param data: parameter to pass to hook function (if necessary)
     :param bool crit: Raise hook function exceptions?
     """
+    if not storage.signals.get(id):
+        return
     sigs = filter(
-        lambda x: x.id == id and x.sig == sig, storage.signals.values()
+        lambda x: x.sig == sig, storage.signals.get(id)
     )
     for x in sigs:
         x.trigger(data, crit)
@@ -86,5 +93,6 @@ def remove(by):
 
     :param str by: name of the module to dereigster listeners for
     """
-    for x in filter(lambda x: x.by == by, list(storage.signals.values())):
-        del storage.signals[x.id]
+    for x in storage.signals:
+        for y in filter(lambda z: z.by == by, storage.signals[x]):
+            storage.signals.remove(y)

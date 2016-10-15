@@ -149,11 +149,12 @@ class BackupController:
                 "size": os.path.getsize(path), "is_ready": True,
                 "site_type": self.site.app.id if self.site else None}
 
-    def restore(self, data, nthread=NotificationThread()):
+    def restore(self, backup, data=True, nthread=NotificationThread()):
         """
         Restore an associated arkOS app backup.
 
-        :param Backup data: backup to restore
+        :param Backup backup: backup to restore
+        :param bool data: Restore backed up data files too?
         :param NotificationThread nthread: notification thread to use
         :returns: ``Backup``
         :rtype: dict
@@ -162,14 +163,14 @@ class BackupController:
 
         # Trigger pre-restore hook for the app/site
         signals.emit("backups", "pre_restore", self)
-        msg = "Running pre-restore for {0}...".format(data["pid"])
+        msg = "Running pre-restore for {0}...".format(backup["pid"])
         nthread.update(Notification("info", "Backup", msg))
         self.pre_restore()
 
         # Extract all files in archive
         sitename = ""
         nthread.update(Notification("info", "Backup", "Extracting files..."))
-        with tarfile.open(data["path"], "r:gz") as t:
+        with tarfile.open(backup["path"], "r:gz") as t:
             for x in t.getnames():
                 if x.startswith("etc/nginx/sites-available"):
                     sitename = os.path.basename(x)
@@ -185,7 +186,7 @@ class BackupController:
             meta = configparser.SafeConfigParser()
             meta.read(os.path.join(self.site.path, ".arkos"))
             sql_path = "/{0}.sql".format(sitename)
-            if meta.get("website", "dbengine", None) \
+            if meta.get("website", "dbengine", fallback=None) \
                     and os.path.exists(sql_path):
                 nthread.update(
                     Notification("info", "Backup", "Restoring database..."))
@@ -205,7 +206,7 @@ class BackupController:
                     db_user.chperm("grant", db)
 
         # Trigger post-restore hook for the app/site
-        msg = "Running post-restore for {0}...".format(data["pid"])
+        msg = "Running post-restore for {0}...".format(backup["pid"])
         nthread.update(Notification("info", "Backup", msg))
         if self.ctype == "site":
             self.post_restore(self.site, dbpasswd)
@@ -213,12 +214,12 @@ class BackupController:
         else:
             self.post_restore()
         signals.emit("backups", "post_restore", self)
-        data["is_ready"] = True
-        msg = "{0} restored successfully.".format(data["pid"])
+        backup["is_ready"] = True
+        msg = "{0} restored successfully.".format(backup["pid"])
         nthread.complete(Notification("info", "Backup", msg))
-        return data
+        return backup
 
-    def get_config(self):
+    def get_config(self, site):
         """
         Return configuration file paths to include in backups.
 
@@ -229,7 +230,7 @@ class BackupController:
         """
         return []
 
-    def get_data(self):
+    def get_data(self, site):
         """
         Return data file paths to include in backups.
 
@@ -240,11 +241,11 @@ class BackupController:
         """
         return []
 
-    def pre_backup(self):
+    def pre_backup(self, site):
         """Hook executed before backup. Override in backup module code."""
         pass
 
-    def post_backup(self):
+    def post_backup(self, site):
         """Hook executed after backup. Override in backup module code."""
         pass
 
@@ -252,7 +253,7 @@ class BackupController:
         """Hook executed before restore. Override in backup module code."""
         pass
 
-    def post_restore(self):
+    def post_restore(self, site, dbpasswd):
         """Hook executed after restore. Override in backup module code."""
         pass
 
@@ -464,11 +465,14 @@ def site_load(site):
     :param Website site: Site to create controller for
     """
     if site.__class__.__name__ != "ReverseProxy":
+        logger.debug(
+            "Back", "Registering backupcontroller for {0}".format(site.id))
         controller = site.app.get_module("backup") or BackupController
         site.backup = controller(site.id, site.app.icon, site,
                                  site.app.version)
     else:
         site.backup = None
+
 
 signals.add("backup", "websites", "site_loaded", site_load)
 signals.add("backup", "websites", "site_installed", site_load)
