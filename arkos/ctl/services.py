@@ -138,7 +138,7 @@ def log(name):
         if not service:
             raise CLIException("No service found")
         if service.stype == "system":
-            data = shell("journalctl -x -b 0 -u {0}".format(service.name))
+            data = shell("journalctl -x -b 0 -u {0}".format(service.sfname))
             click.echo_via_pager(
                 data["stdout"].decode()
             )

@@ -275,6 +275,9 @@ def get(id=None):
     """
     svcs, files = [], {}
 
+    if id and id.endswith(".service"):
+        id = id.split(".service")[0]
+
     # Get all unit files, loaded or not
     try:
         units = conns.SystemD.ListUnitFiles()
