@@ -296,8 +296,11 @@ class App:
         for item in self.dependencies:
             if item["type"] == "system" and not item["package"] in exclude:
                 if item.get("daemon"):
-                    services.stop(item["daemon"])
-                    services.disable(item["daemon"])
+                    try:
+                        services.get(item["daemon"]).stop()
+                        services.get(item["daemon"]).disable()
+                    except:
+                        pass
                 pacman.remove([item["package"]],
                               purge=config.get("apps", "purge"))
 
@@ -615,5 +618,18 @@ def _install(id, load=True, cry=True):
         setattr(app, x, data[x])
     app.upgradable = ""
     app.installed = True
+    for x in app.services:
+        if x["type"] == "system" and x.get("binary") \
+                and not x.get("ignore_on_install"):
+            s = services.get(x["binary"])
+            if s:
+                s.enable()
+                if s.state != "running":
+                    try:
+                        s.start()
+                    except services.ActionError as e:
+                        logger.warning(
+                            "Apps", "{0} could not be automatically started."
+                            .format(s.name))
     if load:
         app.load(cry=cry)

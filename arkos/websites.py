@@ -948,7 +948,7 @@ def scan():
             if not app or not app.loadable or not app.installed:
                 logger.debug(
                     "Webs", "Website found but could not be loaded: {0}"
-                    .format(meta.get("id")))
+                    .format(meta.get("website", "id")))
                 continue
             site = app._website(id=meta.get("website", "id"))
             site.app = app

@@ -33,13 +33,13 @@ class Service:
     Services can be of type ``systemd`` or ``supervisor``.
     """
 
-    def __init__(self, name="", stype="", state=False, enabled=False, cfg={}):
+    def __init__(self, name="", stype="", state="", enabled=False, cfg={}):
         """
         Initialize the service.
 
         :param str name: Service name
         :param str stype: either ``systemd`` or ``supervisor``
-        :param bool state: Running state of the service
+        :param str state: Running state of the service
         :param bool enabled: Service starts on boot?
         :param dict cfg: Config (for supervisor services)
         """

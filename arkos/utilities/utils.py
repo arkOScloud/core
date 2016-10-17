@@ -299,7 +299,7 @@ def str_fperms(mode):
 
 def path_to_b64(path):
     """Convert a filesystem path to a safe base64-encoded string."""
-    if type(path) == str:
+    if isinstance(path, str):
         path = bytes(path, 'utf-8')
     path = path.replace(b"//", b"/")
     return base64.b64encode(path, altchars=b"+-").replace(b"=", b"*").decode()
