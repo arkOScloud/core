@@ -57,6 +57,13 @@ class User:
         qry = "uid={0},ou=users,{1}"
         return qry.format(self.name, self.rootdn)
 
+    @property
+    def full_name(self):
+        """Return the user's full name."""
+        return self.first_name + (
+            (" " + self.last_name) if self.last_name else ""
+        )
+
     def add(self, passwd):
         """
         Add the user to LDAP.
@@ -76,8 +83,8 @@ class User:
             "objectClass": [b"mailAccount", b"inetOrgPerson", b"posixAccount"],
             "givenName": [b(self.first_name)],
             "sn": [b(self.last_name)] if self.last_name else [b"NONE"],
-            "displayName": [b(self.first_name + " " + self.last_name)],
-            "cn": [b(self.first_name + (" " + self.last_name or ""))],
+            "displayName": [b(self.full_name)],
+            "cn": [b(self.full_name)],
             "uid": [b(self.name)],
             "mail": [b(self.name + "@" + self.domain)],
             "maildrop": [b(self.name)],
@@ -122,9 +129,9 @@ class User:
         ldif = ldif[0][1]
         attrs = {
             "givenName": [b(self.first_name)],
-            "sn": [b(self.last_name or "")],
-            "displayName": [b(self.first_name + " " + self.last_name)],
-            "cn": [b(self.first_name + (" " + self.last_name or ""))],
+            "sn": [b(self.last_name)] if self.last_name else [b"NONE"],
+            "displayName": [b(self.full_name)],
+            "cn": [b(self.full_name)],
             "mail": [b(x) for x in self.mail]
         }
         if newpasswd:
@@ -264,7 +271,7 @@ class User:
         :param bool delete_home: Delete the user's home directory too?
         """
         signals.emit("users", "pre_remove", self)
-        self.admin, self.sudo = False, False
+        self.admin = self.sudo = False
         self.update_adminsudo()
         if delete_home:
             hdir = conns.LDAP.search_s(self.ldap_id, ldap.SCOPE_SUBTREE,
@@ -283,6 +290,7 @@ class User:
             "name": self.name,
             "first_name": self.first_name,
             "last_name": self.last_name,
+            "full_name": self.full_name,
             "domain": self.domain,
             "admin": self.admin,
             "sudo": self.sudo,
