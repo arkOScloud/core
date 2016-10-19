@@ -13,10 +13,12 @@ import os
 import pwd
 import shutil
 
-from . import groups
+from passlib.hash import nthash, ldap_sha512_crypt
+
+from . import groups, sysconfig
 
 from arkos import conns, config, logger, signals
-from arkos.utilities import b, errors, hashpw, shell
+from arkos.utilities import b, errors, shell
 
 
 class User:
@@ -79,7 +81,7 @@ class User:
             "uid": [b(self.name)],
             "mail": [b(self.name + "@" + self.domain)],
             "maildrop": [b(self.name)],
-            "userPassword": [b(hashpw(passwd))],
+            "userPassword": [b(ldap_sha512_crypt.encrypt(passwd))],
             "gidNumber": [b"100"],
             "uidNumber": [b(str(self.uid))],
             "homeDirectory": [b("/home/" + self.name)],
@@ -92,7 +94,10 @@ class User:
         modes = ["admin" if self.admin else "", "sudo" if self.sudo else ""]
         msg = "Setting user modes: {0}".format(", ".join(modes))
         logger.debug("Roles", msg)
+
         self.update_adminsudo()
+        self.update_samba(passwd)
+
         signals.emit("users", "post_add", {"user": self, "passwd": passwd})
 
     def update(self, newpasswd=""):
@@ -123,11 +128,14 @@ class User:
             "mail": [b(x) for x in self.mail]
         }
         if newpasswd:
-            attrs["userPassword"] = [b(hashpw(newpasswd))]
+            attrs["userPassword"] = [b(ldap_sha512_crypt.encrypt(newpasswd))]
         signals.emit("users", "pre_update", self)
         nldif = ldap.modlist.modifyModlist(ldif, attrs, ignore_oldexistent=1)
         conns.LDAP.modify_s(self.ldap_id, nldif)
+
         self.update_adminsudo()
+        self.update_samba(newpasswd)
+
         signals.emit(
             "users", "post_update", {"user": self, "passwd": newpasswd}
         )
@@ -173,6 +181,63 @@ class User:
         elif not self.sudo and is_sudo:
             conns.LDAP.delete_s(
                 "cn=" + self.name + ",ou=sudo," + self.rootdn)
+
+    def update_samba(self, passwd=""):
+        """Update Samba values in LDAP."""
+        domain = conns.LDAP.search_s(
+            self.rootdn, ldap.SCOPE_SUBTREE, "objectClass=sambaDomain", None)
+        if not domain:
+            hostname = sysconfig.get_hostname().upper()
+            sambaSID = "S-1-5-21-0-0-0"
+            dldif = {
+                "objectClass": [b"sambaDomain"],
+                "sambaDomainName": [b(hostname)],
+                "sambaSID": [b(sambaSID)],
+                "sambaAlgorithmicRidBase": [b"1000"],
+                "sambaNextUserRid": [b"1000"],
+                "sambaMinPwdLength": [b"5"],
+                "sambaPwdHistoryLength": [b"0"],
+                "sambaLogonToChgPwd": [b"0"],
+                "sambaMaxPwdAge": [b"-1"],
+                "sambaMinPwdAge": [b"0"],
+                "sambaLockoutDuration": [b"30"],
+                "sambaLockoutObservationWindow": [b"30"],
+                "sambaLockoutThreshold": [b"0"],
+                "sambaForceLogoff": [b"-1"],
+                "sambaRefuseMachinePwdChange": [b"0"],
+                "sambaNextRid": [b(str(get_next_uid()))]
+            }
+            dldif = ldap.modlist.addModlist(dldif)
+            conns.LDAP.add_s(
+                "sambaDomainName={0},{1}".format(hostname, self.rootdn), dldif)
+        else:
+            sambaSID = domain[0][1]["sambaSID"][0].decode()
+            attrs = {
+                "sambaNextRid": [b(str(get_next_uid()))]
+            }
+            dldif = ldap.modlist.modifyModlist(
+                domain[0][1], attrs, ignore_oldexistent=1)
+            conns.LDAP.modify_s(domain[0][0], dldif)
+        if passwd:
+            try:
+                uldif = conns.LDAP.search_s(
+                    self.ldap_id, ldap.SCOPE_SUBTREE, "(objectClass=*)", None)
+            except ldap.NO_SUCH_OBJECT:
+                raise errors.InvalidConfigError(
+                    "Users", "This user does not exist")
+            uldif = uldif[0][1]
+            attrs = {
+                "objectClass": [
+                    b"mailAccount", b"inetOrgPerson", b"posixAccount",
+                    b"sambaSamAccount"
+                ],
+                "sambaSID": [b("{0}-{1}".format(sambaSID, self.uid))],
+                "sambaAcctFlags": [b"[U          ]"],
+                "sambaNTPassword": [b(nthash.encrypt(passwd).upper())]
+            }
+            nldif = ldap.modlist.modifyModlist(
+                uldif, attrs, ignore_oldexistent=1)
+            conns.LDAP.modify_s(self.ldap_id, nldif)
 
     def verify_passwd(self, passwd):
         """

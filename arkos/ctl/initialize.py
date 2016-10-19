@@ -4,8 +4,10 @@ import os
 import pwd
 import shutil
 
+from passlib.hash import ldap_sha512_crypt
+
 from arkos import logger, secrets, security
-from arkos.utilities import shell, random_string, hashpw
+from arkos.utilities import shell, random_string
 from arkos.ctl.utilities import abort_if_false, CLIException
 
 
@@ -78,7 +80,7 @@ def ldap():
 
     logger.info('ctl:init:ldap', 'Setting admin password')
     ldap_passwd = random_string(16)
-    ldap_pwhash = hashpw(ldap_passwd)
+    ldap_pwhash = ldap_sha512_crypt.encrypt(ldap_passwd)
     with open("/etc/openldap/slapd.conf", "r") as f:
         data = f.read()
     data = data.replace("%ROOTPW%", ldap_pwhash)

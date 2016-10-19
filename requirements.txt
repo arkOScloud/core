@@ -8,6 +8,7 @@ miniupnpc
 netifaces
 ntplib
 https://git.coderouge.co/arkOS/mockldap/repository/archive.tar.gz?ref=0.3.0#egg=mockldap-0.3.0
+passlib
 psutil
 https://git.coderouge.co/arkOS/python-cryptsetup/repository/archive.tar.gz?ref=1.7.2#egg=pycryptsetup-1.7.2
 pyldap

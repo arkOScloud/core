@@ -9,7 +9,6 @@ Licensed under GPLv3, see LICENSE.md
 
 import bz2
 import base64
-import crypt
 import gzip
 import os
 import random
@@ -252,13 +251,6 @@ def shell(c, stdin=None, env={}):
     data = p.communicate(b(stdin) if stdin else None)
     return {"code": p.returncode, "stdout": data[0],
             "stderr": data[1]}
-
-
-def hashpw(passw):
-    """Create a password hash."""
-    rnd = "".join(random.sample(string.ascii_uppercase + string.digits, 16))
-    salt = "$6$" + rnd + "$"
-    return "{CRYPT}" + crypt.crypt(passw, salt)
 
 
 def can_be_int(data):
