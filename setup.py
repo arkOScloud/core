@@ -38,7 +38,7 @@ dependency_links = [
 
 setup(
     name='arkos-core',
-    version='0.8.0',
+    version='0.8.1',
     install_requires=install_requires,
     dependency_links=dependency_links,
     description='arkOS core system management libraries',
