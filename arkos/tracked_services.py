@@ -263,15 +263,17 @@ def open_upnp(port):
     upnpc = _upnp_igd_connect()
     if not upnpc:
         return
-    if upnpc.getspecificportmapping(port[1], port[0].upper()):
+    if upnpc.getspecificportmapping(int(port[1]), port[0].upper()):
         try:
-            upnpc.deleteportmapping(port[1], port[0].upper())
+            upnpc.deleteportmapping(int(port[1]), port[0].upper())
         except:
             pass
     try:
         pf = 'arkOS Port Forwarding: {0}'
-        upnpc.addportmapping(port[1], port[0].upper(), upnpc.lanaddr, port[1],
-                             pf.format(port[1]), '')
+        upnpc.addportmapping(
+            int(port[1]), port[0].upper(), upnpc.lanaddr, int(port[1]),
+            pf.format(port[1]), ''
+        )
     except Exception as e:
         msg = "Failed to register {0} with uPnP IGD: {1}"
         logger.error("TrSv", msg.format(port, str(e)))

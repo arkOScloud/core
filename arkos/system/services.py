@@ -80,7 +80,9 @@ class Service:
                 conns.Supervisor.startProcess(self.name)
                 signals.emit("services", "post_start", self)
             except:
-                raise ActionError()
+                raise ActionError(
+                    "svc", "The service failed to start. Please check "
+                    "`sudo arkosctl svc status {0}`".format(self.name))
         else:
             # Send the start command to systemd
             try:

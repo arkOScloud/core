@@ -572,7 +572,7 @@ class Site:
                 listen.value = "[::]:" + str(port)
             else:
                 listen.value = str(port)
-        if self.app.website_root:
+        if hasattr(self.app, "website_root") and self.app.website_root:
             webroot = os.path.join(self.path, self.app.website_root)
         else:
             webroot = self.path
