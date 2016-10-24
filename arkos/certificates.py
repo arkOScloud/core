@@ -539,14 +539,15 @@ def _request_acme_certificate(domain, webroot, nthread):
         except leclient.NeedToTakeAction as e:
             if not has_written_files:
                 uid = users.get_system("http").uid
+                gid = groups.get_system("ssl-cert").gid
                 if not os.path.exists(webroot):
                     os.makedirs(webroot)
-                os.chown(webroot, uid)
+                os.chown(webroot, uid, gid)
                 for x in e.actions:
                     fn = os.path.join(webroot, x.file_name)
                     with open(fn, 'w') as f:
                         f.write(x.contents)
-                    os.chown(fn, uid)
+                    os.chown(fn, uid, gid)
                 has_written_files = True
                 continue
             else:

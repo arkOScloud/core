@@ -358,7 +358,7 @@ class Site:
         if not os.path.exists(challenge_path):
             os.makedirs(challenge_path)
         os.chown(self.path, uid, -1)
-        os.chown(os.path.join(self.path, ".well_known"), uid, -1)
+        os.chown(os.path.join(self.path, ".well-known"), uid, -1)
         os.chown(challenge_path, uid, -1)
         nginx_reload()
         return challenge_path

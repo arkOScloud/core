@@ -32,9 +32,8 @@ def detect_architecture():
         elif cpuinfo.get("Hardware", "") in ("BCM2709", "BCM2836")\
                 and "crc32" not in cpuinfo["Features"]:
             btype = "Raspberry Pi 2"
-        elif cpuinfo.get("Hardware", "") in ("BCM2709", "BCM2710", "BCM2837")\
+        elif cpuinfo.get("Hardware", "") in ("BCM2710", "BCM2837")\
                 and "crc32" in cpuinfo["Features"]:
-            arch = "aarch64"
             btype = "Raspberry Pi 3"
         # Is this a... BeagleBone Black?
         elif "Hardware" in cpuinfo and "Generic AM33XX" in cpuinfo["Hardware"]\
