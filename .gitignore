@@ -1,5 +1,14 @@
-dist
-arkos_core.egg-info
+# Compiled output
 *.pyc
-venv
+dist
 doc/_build
+arkos_core.egg-info
+
+# Eclipse project files 
+/.settings
+.project
+.pydevproject
+
+# Misc
+venv
+/env
