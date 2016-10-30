@@ -24,7 +24,7 @@ class ConfigurationError(Error):
     """Raised when a value cannot be found in an arkOS configuration file."""
 
 
-class ConnectionError(Error):
+class ConnectionServiceError(Error):
     """Raised in chain when a system API connection fails."""
 
     def __init__(self, service, info=""):
