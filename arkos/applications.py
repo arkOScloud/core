@@ -482,12 +482,12 @@ def scan(verify=True, cry=True):
                 data = json.loads(f.read())
         except ValueError:
             warn_str = "Failed to load {0} due to a JSON parsing error"
-            logger.warn("Apps", warn_str.format(x))
+            logger.warning("Apps", warn_str.format(x))
             continue
         except IOError:
             warn_str = "Failed to load {0}: manifest file inaccessible "\
                        "or not present"
-            logger.warn("Apps", warn_str.format(x))
+            logger.warning("Apps", warn_str.format(x))
             continue
         logger.debug("Apps", " *** Loading {0}".format(data["id"]))
         app = App(**data)
