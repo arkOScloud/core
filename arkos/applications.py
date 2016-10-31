@@ -619,7 +619,7 @@ def _install(id, load=True, cry=True):
     app.upgradable = ""
     app.installed = True
     for x in app.services:
-        if x["type"] == "system" and x.get("binary") \
+        if x.get("type") == "system" and x.get("binary") \
                 and not x.get("ignore_on_install"):
             s = services.get(x["binary"])
             if s:
