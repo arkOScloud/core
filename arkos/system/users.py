@@ -193,8 +193,12 @@ class User:
 
     def update_samba(self, passwd=""):
         """Update Samba values in LDAP."""
-        domain = conns.LDAP.search_s(
-            self.rootdn, ldap.SCOPE_SUBTREE, "objectClass=sambaDomain", None)
+        try:
+            domain = conns.LDAP.search_s(
+                self.rootdn, ldap.SCOPE_SUBTREE,
+                "objectClass=sambaDomain", None)
+        except ldap.NO_SUCH_OBJECT:
+            domain = None
         if not domain:
             hostname = sysconfig.get_hostname().upper()
             sambaSID = "S-1-5-21-0-0-0"
@@ -217,8 +221,12 @@ class User:
                 "sambaNextRid": [b(str(get_next_uid()))]
             }
             dldif = ldap.modlist.addModlist(dldif)
-            conns.LDAP.add_s(
-                "sambaDomainName={0},{1}".format(hostname, self.rootdn), dldif)
+            try:
+                conns.LDAP.add_s(
+                    "sambaDomainName={0},{1}".format(hostname, self.rootdn),
+                    dldif)
+            except ldap.ALREADY_EXISTS:
+                pass
         else:
             sambaSID = domain[0][1]["sambaSID"][0].decode()
             attrs = {

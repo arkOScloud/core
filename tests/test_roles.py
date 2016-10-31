@@ -87,7 +87,7 @@ class RolesTestCase(unittest.TestCase):
         u.update(newpasswd="mypass")
         u = users.get(name="testuser")
         self.assertEqual(u.first_name, "Notatest")
-        self.assertEqual(u.last_name, "")
+        self.assertIn(u.last_name, ["", None])
         self.assertTrue(u.verify_passwd("mypass"))
 
     def test_del_user(self):
