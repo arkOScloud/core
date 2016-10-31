@@ -188,6 +188,7 @@ class Site:
         if self.app.download_url and ending == ".git":
             g = git.Repo.clone_from(self.app.download_url, self.path)
             if hasattr(self.app, "download_at_tag"):
+                g = git.Git(self.path)
                 g.checkout(self.app.download_git_tag)
         elif self.app.download_url:
             download(self.app.download_url, file=pkg_path, crit=True)
