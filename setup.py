@@ -27,7 +27,8 @@ install_requires = [
     'python-pacman',
     'python-nginx',
     'requests',
-    'semantic_version'
+    'semantic_version',
+    'wheel'
 ]
 
 dependency_links = [
@@ -38,7 +39,7 @@ dependency_links = [
 
 setup(
     name='arkos-core',
-    version='0.8.1',
+    version='0.8.2',
     install_requires=install_requires,
     dependency_links=dependency_links,
     description='arkOS core system management libraries',

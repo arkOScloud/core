@@ -15,7 +15,7 @@ from arkos.utilities.logs import LoggingControl
 from arkos.connections import ConnectionsManager
 from arkos.utilities import detect_architecture
 
-version = "0.8.1"
+version = "0.8.2"
 
 
 class StorageControl:

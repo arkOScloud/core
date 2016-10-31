@@ -17,3 +17,4 @@ python-pacman
 python-nginx
 requests
 semantic_version
+wheel
