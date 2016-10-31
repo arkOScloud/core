@@ -122,6 +122,8 @@ class User:
             raise errors.InvalidConfigError(
                 "Users", "This user does not exist")
 
+        self.mail = list(set(self.mail))
+
         for i, x in enumerate(self.mail):
             if not x.endswith(self.domain):
                 self.mail[i] = x.split("@")[0] + "@" + self.domain
