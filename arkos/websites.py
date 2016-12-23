@@ -871,6 +871,12 @@ class ReverseProxy(Site):
             del storage.websites[self.id]
         signals.emit("websites", "site_removed", self)
 
+    def enable_ssl(self, cert_path, key_path):
+        pass
+
+    def disable_ssl(self):
+        pass
+
     @property
     def as_dict(self):
         """Return reverse proxy metadata as dict."""
