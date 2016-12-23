@@ -49,8 +49,7 @@ def get_temp():
 def get_ram():
     """Get free and total RAM stats."""
     s = psutil.virtual_memory()
-    a = int(s.used) - (int(s.cached) + int(s.buffers))
-    return (a, int(s.total), int(s.percent))
+    return (int(s.available), int(s.total), int(s.percent))
 
 
 def get_cpu():

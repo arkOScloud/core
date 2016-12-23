@@ -597,7 +597,7 @@ def get_fstab():
 def save_fstab_entry(e, remove=False):
     """Format and save fstab entry."""
     lines = []
-    uuid = "UUID={0}".format(e.uuid) if e.uuid else ""
+    uuid = "UUID={0}".format(e.uuid.decode()) if e.uuid else ""
     with open("/etc/fstab", "r") as f:
         for x in f.readlines():
             if x.startswith(e.src) or (uuid and x.startswith(uuid)):

@@ -163,9 +163,10 @@ class App:
                         error = "Reload required"
                         verify = False
             if dep["type"] == "python":
+                ilist = installed["py2"] if dep.get("py2") else installed["py"]
                 pack = next(
                     filter(lambda x: x["id"].lower() == dep["package"].lower(),
-                           installed["py"]),
+                           ilist),
                     None
                 )
                 invalid_ver = False

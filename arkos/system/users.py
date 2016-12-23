@@ -249,7 +249,7 @@ class User:
                     b"sambaSamAccount"
                 ],
                 "sambaSID": [b("{0}-{1}".format(sambaSID, self.uid))],
-                "sambaAcctFlags": [b"[U          ]"],
+                "sambaAcctFlags": [b"[UX         ]"],
                 "sambaNTPassword": [b(nthash.encrypt(passwd).upper())]
             }
             nldif = ldap.modlist.modifyModlist(
