@@ -425,6 +425,8 @@ class Site:
                                         self.id))
 
         # Set the certificate name in the metadata file
+        if not os.path.exists(os.path.join(self.path, ".arkos")):
+            raise errors.InvalidConfigError("Could not find metadata file")
         meta = configparser.SafeConfigParser()
         meta.read(os.path.join(self.path, ".arkos"))
         meta.set("website", "ssl", self.cert.id)
@@ -1090,7 +1092,7 @@ def cleanup_acme_dummy(domain):
         shutil.rmtree(site_dir)
     if os.path.exists(origin):
         os.unlink(origin)
-    if os.path.exists(target):
+    if os.path.islink(target):
         os.unlink(target)
         found = True
     tracked_services.deregister("acme", domain)

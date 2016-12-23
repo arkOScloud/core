@@ -82,4 +82,4 @@ def get_uptime():
     h, m = divmod(m, 60)
     d, h = divmod(h, 24)
 
-    return [s, m, h, d]
+    return [s, m, h, n.days]

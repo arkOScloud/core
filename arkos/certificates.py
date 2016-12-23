@@ -502,6 +502,12 @@ def _request_acme_certificate(domain, webroot, nthread):
     signals.emit("certificates", "pre_add", id)
     domains = [domain]
 
+    uid = users.get_system("http").uid
+    gid = groups.get_system("ssl-cert").gid
+
+    if webroot:
+        webroot = os.path.join(webroot, ".well-known", "acme-challenge")
+
     acme_dir = config.get("certificates", "acme_dir")
     cert_dir = os.path.join(acme_dir, "certs", domain)
     cert_path = os.path.join(cert_dir, "cert.pem")
@@ -538,8 +544,6 @@ def _request_acme_certificate(domain, webroot, nthread):
             continue
         except leclient.NeedToTakeAction as e:
             if not has_written_files:
-                uid = users.get_system("http").uid
-                gid = groups.get_system("ssl-cert").gid
                 if not os.path.exists(webroot):
                     os.makedirs(webroot)
                 os.chown(webroot, uid, gid)
@@ -613,10 +617,12 @@ def _request_acme_certificate(domain, webroot, nthread):
     storage.certificates[c.id] = c
 
     with open("/etc/cron.d/arkos-acme-renew", "a") as f:
+        f.write("0 4 * * * systemctl reload nginx\n")
         fln = ("30 3 * * * free_tls_certificate {0} {1} {2} {3} {4} "
                ">> /var/log/acme-renew.log\n")
         f.write(fln.format(
-            " ".join(domains), key_path, cert_path, webroot, acme_dir
+            " ".join(domains), key_path, cert_path,
+            webroot.split("/.well-known/acme-challenge")[0], acme_dir
         ))
 
     signals.emit("certificates", "post_add", c)
