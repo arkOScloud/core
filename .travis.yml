@@ -1,10 +1,13 @@
 language: python
 dist: trusty
-sudo: true
+sudo: required
 python:
-  - "3.4"  # Debian 8 (Jessie)
-  - "3.5"
-  - "3.6"
+  - "3.4"  # Debian 8 (Jessie) and Ubuntu 14.04 (Trusty)
+  - "3.5"  # Debian 9 (Sid) and Ubuntu 16.04 (Xenial)
+  - "3.6"  # Arch Linux
+matrix:
+  allow_failures:
+  - python: "3.6"
 before_install:
 - sudo apt-get update -qq
 - sudo apt-get install -qq libcryptsetup-dev libsasl2-dev libldap2-dev libssl-dev libdbus-1-dev libdbus-glib-1-dev libparted-dev
