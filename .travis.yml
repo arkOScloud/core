@@ -1,6 +1,6 @@
 language: python
 dist: trusty
-sudo: false
+sudo: true
 python:
   - "3.4"  # Debian 8 (Jessie)
   - "3.5"
