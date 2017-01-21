@@ -1,6 +1,8 @@
 language: python
+dist: trusty
+sudo: false
 python:
-  - "3.4"
+  - "3.4"  # Debian 8 (Jessie)
   - "3.5"
   - "3.6"
 before_install:
