@@ -32,7 +32,7 @@ install_requires = [
 ]
 
 dependency_links = [
-    'https://git.coderouge.co/arkOS/python-cryptsetup/repository/archive.tar.gz?ref=1.7.2#egg=pycryptsetup-1.7.2',
+    'https://github.com/arkOScloud/python-cryptsetup/archive/1.7.2.tar.gz#egg=pycryptsetup-1.7.2',
     'https://github.com/rhinstaller/pyparted/archive/v3.10.7.tar.gz#egg=pyparted-3.10.7'
 ]
 
