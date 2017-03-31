@@ -502,7 +502,7 @@ def _request_acme_certificate(domain, webroot, nthread):
     signals.emit("certificates", "pre_add", id)
     domains = [domain]
 
-    uid = users.get_system("http").uid
+    uid = users.get_system(config.get("websites", "user", "www-data")).uid
     gid = groups.get_system("ssl-cert").gid
 
     if webroot:

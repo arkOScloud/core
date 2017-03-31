@@ -42,6 +42,8 @@ ciphers = ":".join([
     "!RC4", "!MD5", "!PSK"
     ])
 
+http_user = config.get("websites", "user", "www-data")
+
 
 class Site:
     """Class representing a Website object."""
@@ -139,7 +141,8 @@ class Site:
                 "Invalid source archive format in {0}".format(self.app.id))
 
         msg = "Running pre-installation..."
-        uid, gid = users.get_system("http").uid, groups.get_system("http").gid
+        uid = users.get_system(http_user).uid,
+        gid = groups.get_system(http_user).gid
         nthread.update(Notification("info", "Webs", msg))
 
         # Call website type's pre-install hook
@@ -343,7 +346,7 @@ class Site:
     def add_acme_challenge(self):
         challenge_path = os.path.join(self.path, ".well-known/acme-challenge/")
         confpath = os.path.join("/etc/nginx/sites-available/", self.id)
-        uid = users.get_system("http").uid
+        uid = users.get_system(http_user).uid
         block = nginx.loadf(confpath)
         server = block.server
         locations = server.filter("Location", "/.well-known/acme-challenge/")
@@ -1061,7 +1064,7 @@ def create_acme_dummy(domain):
     )
     origin = os.path.join("/etc/nginx/sites-available", "acme-"+domain)
     target = os.path.join("/etc/nginx/sites-enabled", "acme-"+domain)
-    uid = users.get_system("http").uid
+    uid = users.get_system(http_user).uid
     nginx.dumpf(conf, origin)
     if not os.path.exists(target):
         os.symlink(origin, target)
