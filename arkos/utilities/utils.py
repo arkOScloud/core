@@ -346,10 +346,48 @@ def extract(pin, pout, delete=False):
     name = os.path.basename(pin)
     if name.endswith((".tar.gz", ".tgz")):
         with tarfile.open(pin, "r:gz") as t:
-            t.extractall(pout)
+            def is_within_directory(directory, target):
+                
+                abs_directory = os.path.abspath(directory)
+                abs_target = os.path.abspath(target)
+            
+                prefix = os.path.commonprefix([abs_directory, abs_target])
+                
+                return prefix == abs_directory
+            
+            def safe_extract(tar, path=".", members=None, *, numeric_owner=False):
+            
+                for member in tar.getmembers():
+                    member_path = os.path.join(path, member.name)
+                    if not is_within_directory(path, member_path):
+                        raise Exception("Attempted Path Traversal in Tar File")
+            
+                tar.extractall(path, members, numeric_owner=numeric_owner) 
+                
+            
+            safe_extract(t, pout)
     elif name.endswith(".tar"):
         with tarfile.open(pin, "r") as t:
-            t.extractall(pout)
+            def is_within_directory(directory, target):
+                
+                abs_directory = os.path.abspath(directory)
+                abs_target = os.path.abspath(target)
+            
+                prefix = os.path.commonprefix([abs_directory, abs_target])
+                
+                return prefix == abs_directory
+            
+            def safe_extract(tar, path=".", members=None, *, numeric_owner=False):
+            
+                for member in tar.getmembers():
+                    member_path = os.path.join(path, member.name)
+                    if not is_within_directory(path, member_path):
+                        raise Exception("Attempted Path Traversal in Tar File")
+            
+                tar.extractall(path, members, numeric_owner=numeric_owner) 
+                
+            
+            safe_extract(t, pout)
     elif name.endswith(".gz"):
         f = gzip.open(pin, "rb")
         i = f.read()
@@ -358,7 +396,26 @@ def extract(pin, pout, delete=False):
             f.write(i)
     elif name.endswith((".tar.bz2", ".tbz2")):
         with tarfile.open(pin, "r:bz2") as t:
-            t.extractall(f[0])
+            def is_within_directory(directory, target):
+                
+                abs_directory = os.path.abspath(directory)
+                abs_target = os.path.abspath(target)
+            
+                prefix = os.path.commonprefix([abs_directory, abs_target])
+                
+                return prefix == abs_directory
+            
+            def safe_extract(tar, path=".", members=None, *, numeric_owner=False):
+            
+                for member in tar.getmembers():
+                    member_path = os.path.join(path, member.name)
+                    if not is_within_directory(path, member_path):
+                        raise Exception("Attempted Path Traversal in Tar File")
+            
+                tar.extractall(path, members, numeric_owner=numeric_owner) 
+                
+            
+            safe_extract(t, f["0"])
     elif name.endswith(".bz2"):
         f = bz2.BZ2File(pin, "r")
         i = f.read()
